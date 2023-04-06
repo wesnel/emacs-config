@@ -26,17 +26,12 @@
 
         overlays = [
           (import emacs-overlay)
-
-          (final: prev: {
-            emacsGit-nox = prev.emacsGit-nox.overrideAttrs (old: {
-              buildInputs = old.buildInputs ++ [
-                # provide dictionaries for flyspell
-                (final.aspellWithDicts (d: with d; [ en en-computers en-science ]))
-              ];
-            });
-          })
         ];
       };
+
+      aspell = let
+        pkg = pkgs.aspellWithDicts (d: with d; [ en en-computers en-science ]);
+      in "${pkg}/bin/aspell";
     in {
       packages = rec {
         default = emacs-config;
@@ -50,6 +45,7 @@
             src = ./default.el;
 
             inherit (pkgs) pass;
+            inherit aspell;
           };
 
           override = epkgs: epkgs // {
