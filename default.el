@@ -1,11 +1,20 @@
-;;; init.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
+;;; default.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2023 Wesley Nelson
 
 ;; Author: Wesley Nelson <wgn@wesnel.dev>
 ;; Maintainer: Wesley Nelson <wgn@wesnel.dev>
+;; URL: https://git.sr.ht/~wgn/emacs-config
+
+;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
+
+;; This is an Emacs configuration which is intended to be used in
+;; conjunction with Nix. It contains template variables such as
+;; @aspell@ which need to be substituted with real values using
+;; something similar to the substituteAll function provided by
+;; nixpkgs.
 
 ;;; License:
 
