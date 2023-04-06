@@ -500,7 +500,12 @@
 
   (use-package nix-mode
     :ensure t
-    :mode "\\.nix\\'"))
+    :mode "\\.nix\\'")
+
+  (use-package yaml-mode
+    :ensure t
+    :mode (("\\.yaml\\'" . yaml-mode)
+           ("\\.yml\\'" . yaml-mode))))
 
 (provide 'init)
 ;;; init.el ends here
