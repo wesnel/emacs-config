@@ -32,6 +32,10 @@
       aspell = let
         pkg = pkgs.aspellWithDicts (d: with d; [ en en-computers en-science ]);
       in "${pkg}/bin/aspell";
+
+      goimports = let
+        pkg = pkgs.gotools;
+      in "${pkg}/bin/goimports";
     in {
       packages = rec {
         default = emacs-config;
@@ -44,8 +48,11 @@
             name = "default.el";
             src = ./default.el;
 
-            inherit (pkgs) pass;
-            inherit aspell;
+            inherit (pkgs)
+              pass;
+            inherit
+              aspell
+              goimports;
           };
 
           override = epkgs: epkgs // {

@@ -484,10 +484,8 @@
     (add-hook 'go-ts-mode-hook #'go-ts-mode-before-save-hook-setup)
 
     :config
-    ;; Prefer goimports to gofmt if installed.
-    (let ((goimports (executable-find "goimports")))
-      (when goimports
-        (setq gofmt-command goimports)))
+    ;; Prefer goimports to gofmt.
+    (setq gofmt-command "@goimports@")
 
     ;; CamelCase aware editing operations.
     (subword-mode +1)
