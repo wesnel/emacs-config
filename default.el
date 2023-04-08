@@ -399,7 +399,8 @@
   ;;
 
   (use-package eglot
-    :hook ((go-ts-mode) . eglot-ensure)
+    :commands (eglot
+               eglot-ensure)
 
     :bind
     (:map eglot-mode-map
@@ -479,9 +480,12 @@
     (add-hook 'go-ts-mode-hook #'go-ts-mode-highlighting-setup)
 
     ;; Set up eglot for go-ts-mode.
-    (defun go-ts-mode-before-save-hook-setup ()
-      (add-hook 'before-save-hook #'eglot-format-buffer t t))
-    (add-hook 'go-ts-mode-hook #'go-ts-mode-before-save-hook-setup)
+    (defun go-ts-mode-eglot-setup ()
+      (with-eval-after-load 'eglot
+        (add-to-list 'eglot-server-programs
+                     '((go-mode go-dot-mod-mode go-dot-work-mode go-ts-mode go-mod-ts-mode) . ("@gopls@")))
+        (add-hook 'before-save-hook #'eglot-format-buffer t t)))
+    (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
 
     :config
     ;; Prefer goimports to gofmt.

@@ -20,48 +20,16 @@
     { self
     , emacs-overlay
     , flake-utils
-    , nixpkgs }: flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {
-        inherit system;
+    , nixpkgs }:
+      flake-utils.lib.simpleFlake {
+        inherit self nixpkgs;
 
-        overlays = [
+        preOverlays = [
           (import emacs-overlay)
         ];
+
+        name = "emacs-config";
+        overlay = ./overlay.nix;
+        systems = flake-utils.lib.defaultSystems;
       };
-
-      aspell = let
-        pkg = pkgs.aspellWithDicts (d: with d; [ en en-computers en-science ]);
-      in "${pkg}/bin/aspell";
-
-      goimports = let
-        pkg = pkgs.gotools;
-      in "${pkg}/bin/goimports";
-    in {
-      packages = rec {
-        default = emacs-config;
-
-        emacs-config = pkgs.emacsWithPackagesFromUsePackage {
-          package = pkgs.emacsGit-nox;
-          config = ./default.el;
-
-          defaultInitFile = pkgs.substituteAll {
-            name = "default.el";
-            src = ./default.el;
-
-            inherit (pkgs)
-              pass;
-            inherit
-              aspell
-              goimports;
-          };
-
-          override = epkgs: epkgs // {
-            chatgpt-shell = pkgs.callPackage ./overrides/chatgpt-shell {
-              inherit (pkgs) fetchFromGitHub;
-              inherit (epkgs) trivialBuild markdown-mode;
-            };
-          };
-        };
-      };
-    });
 }
