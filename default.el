@@ -488,7 +488,8 @@
       (with-eval-after-load 'eglot
         (add-to-list 'eglot-server-programs
                      '((go-mode go-dot-mod-mode go-dot-work-mode go-ts-mode go-mod-ts-mode) . ("@gopls@")))
-        (add-hook 'before-save-hook #'eglot-format-buffer t t)))
+        (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (eglot-ensure))
     (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
 
     :config
