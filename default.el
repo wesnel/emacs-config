@@ -89,10 +89,14 @@
     (add-hook 'prog-mode-hook 'enable-whitespace))
 
   ;; Color scheme.
-  (load-theme 'modus-vivendi t)
+  (use-package modus-themes
+    :config
+    (modus-themes-select 'modus-vivendi-tinted))
 
   ;; Syntax highlighting.
-  (setq treesit-font-lock-level 4)
+  (use-package treesit
+    :config
+    (setq treesit-font-lock-level 4))
 
   ;; Highlight TODO comments.
   (use-package hl-todo
