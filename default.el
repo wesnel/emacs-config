@@ -89,9 +89,8 @@
     (add-hook 'prog-mode-hook 'enable-whitespace))
 
   ;; Color scheme.
-  (use-package modus-themes
-    :config
-    (modus-themes-select 'modus-vivendi-tinted))
+  (require-theme 'modus-themes)
+  (modus-themes-load-theme 'modus-vivendi-tinted)
 
   ;; Syntax highlighting.
   (use-package treesit
