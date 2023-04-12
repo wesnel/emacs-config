@@ -108,13 +108,6 @@
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)
 
-  ;; Displays available keybindings in a pop-up.
-  (use-package which-key
-    :ensure t
-
-    :config
-    (which-key-mode +1))
-
   (use-package vertico
     :ensure t
 
@@ -146,13 +139,6 @@
     :config
     (setq completion-styles '(orderless basic)
           completion-category-overrides '((file (styles partial-completion)))))
-
-  ;; Enable rich annotations using the Marginalia package.
-  (use-package marginalia
-    :ensure t
-
-    :config
-    (marginalia-mode +1))
 
   ;; Provides search and navigation based on completing-read.
   (use-package consult
@@ -383,8 +369,9 @@
   ;;
 
   (use-package eglot
-    :commands (eglot
-               eglot-ensure)
+    :commands
+    (eglot
+     eglot-ensure)
 
     :bind
     (:map eglot-mode-map
@@ -433,6 +420,24 @@
     :config
     (setq chatgpt-shell-openai-key (lambda ()
                                      (nth 0 (process-lines "@pass@" "show" "openai-key")))))
+
+  ;;
+  ;; Emacs Assistance
+  ;;
+
+  ;; Displays available keybindings in a pop-up.
+  (use-package which-key
+    :ensure t
+
+    :config
+    (which-key-mode +1))
+
+  ;; Enable rich annotations using the Marginalia package.
+  (use-package marginalia
+    :ensure t
+
+    :config
+    (marginalia-mode +1))
 
   (use-package helpful
     :ensure t
@@ -493,8 +498,10 @@
 
   (use-package yaml-mode
     :ensure t
-    :mode (("\\.yaml\\'" . yaml-mode)
-           ("\\.yml\\'" . yaml-mode))))
+
+    :mode
+    (("\\.yaml\\'" . yaml-mode)
+     ("\\.yml\\'" . yaml-mode))))
 
 (provide 'init)
 ;;; init.el ends here
