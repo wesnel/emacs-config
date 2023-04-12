@@ -40,11 +40,8 @@
   (eval-when-compile
     (require 'use-package))
 
-  ;; Store all backup and autosave files in the tmp dir.
-  (setq backup-directory-alist
-        `((".*" . ,temporary-file-directory)))
-  (setq auto-save-file-name-transforms
-        `((".*" ,temporary-file-directory t)))
+  (use-package no-littering
+    :ensure t)
 
   ;; Revert buffers automatically when underlying files are changed externally.
   (global-auto-revert-mode t)
@@ -260,36 +257,24 @@
   ;; History
   ;;
 
-  (defvar savefile-dir (expand-file-name "savefile" user-emacs-directory)
-    "This folder stores all the automatically generated save/history-files.")
-  (unless (file-exists-p savefile-dir)
-    (make-directory savefile-dir))
-
   ;; Persist history over Emacs restarts. Vertico sorts by history position.
   (use-package savehist
     :config
-    (setq savehist-additional-variables
-          ;; Search entries.
-          '(search-ring regexp-search-ring)
+    (setq savehist-additional-variables '(search-ring regexp-search-ring)
           ;; Save every minute.
-          savehist-autosave-interval 60
-          ;; Keep the home clean.
-          savehist-file (expand-file-name "savehist" savefile-dir))
+          savehist-autosave-interval 60)
 
     (savehist-mode +1))
 
   ;; Remember your location in a file when saving files.
   (use-package saveplace
     :config
-    (setq save-place-file (expand-file-name "saveplace" savefile-dir))
-
     (save-place-mode +1))
 
   ;; Save recent files.
   (use-package recentf
     :config
-    (setq recentf-save-file (expand-file-name "recentf" savefile-dir)
-          recentf-max-saved-items 500
+    (setq recentf-max-saved-items 500
           recentf-max-menu-items 15
           ;; Disable recentf-cleanup on Emacs start, because it can cause
           ;; problems with remote files.
@@ -303,8 +288,7 @@
 
     :config
     ;; Autosave the undo-tree history.
-    (setq undo-tree-history-directory-alist `((".*" . ,temporary-file-directory))
-          undo-tree-auto-save-history t)
+    (setq undo-tree-auto-save-history t)
 
     (global-undo-tree-mode +1))
 
@@ -392,10 +376,7 @@
   (use-package eshell
     :bind
     (("C-x m" . eshell)
-     ("C-x M" . (lambda () (interactive) (eshell t))))
-
-    :config
-    (setq eshell-directory-name (expand-file-name "eshell" savefile-dir)))
+     ("C-x M" . (lambda () (interactive) (eshell t)))))
 
   ;;
   ;; Coding Assistance
