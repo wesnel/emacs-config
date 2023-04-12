@@ -225,19 +225,31 @@
     (([remap other-window] . ace-window)
      ("s-w" . ace-window)))
 
-  ;; Convenient jumping to text.
-  (use-package avy
+  (use-package eyebrowse
+    :ensure t
+
+    :config
+    (eyebrowse-mode +1))
+
+  ;;
+  ;; Killing and Deletion
+  ;;
+
+  ;; More intuitive deletion
+  (delete-selection-mode +1)
+
+  (use-package easy-kill
     :ensure t
 
     :bind
-    (("C-:" . avy-goto-char)
-     ("s-," . avy-goto-char)
-     ("C-'" . avy-goto-char-2)
-     ("M-g f" . avy-goto-line)
-     ("M-g w" . avy-goto-word-1)
-     ("M-g e" . avy-goto-word-0)
-     ("s-." . avy-goto-word-or-subword-1)
-     ("C-c v" . avy-goto-word-or-subword-1)))
+    (([remap kill-ring-save] . easy-kill)
+     ([remap mark-sexp] . easy-mark)))
+
+  (use-package browse-kill-ring
+    :ensure t
+
+    :bind
+    (("M-y" . browse-kill-ring)))
 
   ;;
   ;; History
@@ -322,6 +334,32 @@
           ispell-extra-args '("--sug-mode=ultra")))
 
   ;;
+  ;; Text Movement
+  ;;
+
+  ;; More logical movement behavior
+  (use-package mwim
+    :ensure t
+
+    :bind
+    (("C-a" . mwim-beginning)
+     ("C-e" . mwim-end)))
+
+  ;; Convenient jumping to text.
+  (use-package avy
+    :ensure t
+
+    :bind
+    (("C-:" . avy-goto-char)
+     ("s-," . avy-goto-char)
+     ("C-'" . avy-goto-char-2)
+     ("M-g f" . avy-goto-line)
+     ("M-g w" . avy-goto-word-1)
+     ("M-g e" . avy-goto-word-0)
+     ("s-." . avy-goto-word-or-subword-1)
+     ("C-c v" . avy-goto-word-or-subword-1)))
+
+  ;;
   ;; Text Expansion
   ;;
 
@@ -354,6 +392,12 @@
     :bind
     (:map selected-keymap
           ("C-x c" . mc/edit-lines)))
+
+  (use-package visual-regexp
+    :ensure t
+
+    :bind
+    (("M-%" . vr/query-replace)))
 
   ;;
   ;; Shells
@@ -448,6 +492,13 @@
      ("C-h k" . helpful-key)
      ("C-h x" . helpful-command)
      ("C-c C-d" . helpful-at-point)))
+
+  (use-package discover-my-major
+    :ensure t
+
+    :bind
+    (("C-h M-m" . discover-my-major)
+     ("C-h M-S-M" . discover-my-mode)))
 
   ;;
   ;; Coding Language Support
