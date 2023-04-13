@@ -397,7 +397,7 @@
     :ensure t
 
     :bind
-    (("M-%" . vr/query-replace)))
+    (("C-M-%" . vr/query-replace)))
 
   ;;
   ;; Shells
