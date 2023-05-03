@@ -503,6 +503,14 @@
     :ensure t
     :mode "\\.http\\'")
 
+  ;; Interact with Elastic from emacs.
+  (use-package es-mode
+    :ensure t
+    :mode "\\.es\\'"
+
+    :commands
+    (es-command-center))
+
   ;; Golang support.
   (use-package go-mode
     :ensure t
