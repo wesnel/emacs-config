@@ -11,10 +11,9 @@
 ;;; Commentary:
 
 ;; This is an Emacs configuration which is intended to be used in
-;; conjunction with Nix. It contains template variables such as
-;; @aspell@ which need to be substituted with real values using
-;; something similar to the substituteAll function provided by
-;; nixpkgs.
+;; conjunction with Nix. It contains template variables wrapped with @
+;; which need to be substituted with real values using something
+;; similar to the substituteAll function provided by nixpkgs.
 
 ;;; License:
 
@@ -231,6 +230,11 @@
     :config
     (eyebrowse-mode +1))
 
+  (use-package dired
+    :config
+    (setq ls-lisp-use-insert-directory-program nil)
+    (require 'ls-lisp))
+
   ;;
   ;; Killing and Deletion
   ;;
@@ -311,18 +315,8 @@
   (setq require-final-newline t)
 
   ;; Maintain balanced parens.
-  (use-package smartparens
-    :ensure t
-    :hook prog-mode
-
-    :config
-    (require 'smartparens-config)
-
-    (setq sp-base-key-bindings 'paredit
-          sp-autoskip-closing-pair 'always
-          sp-hybrid-kill-entire-symbol nil)
-
-    (sp-use-paredit-bindings))
+  (use-package elec-pair
+    :hook (prog-mode . electric-pair-local-mode))
 
   (use-package flyspell
     :hook
@@ -504,6 +498,11 @@
   ;; Coding Language Support
   ;;
 
+  ;; Send HTTP requests from emacs.
+  (use-package restclient
+    :ensure t
+    :mode "\\.http\\'")
+
   (use-package go-mode
     :ensure t
     :mode "\\.go\\'"
@@ -552,7 +551,20 @@
 
     :mode
     (("\\.yaml\\'" . yaml-mode)
-     ("\\.yml\\'" . yaml-mode))))
+     ("\\.yml\\'" . yaml-mode)))
+
+  ;;
+  ;; Org
+  ;;
+
+  ;; Send HTTP requests from org-mode.
+  (use-package ob-restclient
+    :ensure t
+
+    :config
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((restclient . t)))))
 
 (provide 'init)
 ;;; init.el ends here
