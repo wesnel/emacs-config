@@ -503,6 +503,7 @@
     :ensure t
     :mode "\\.http\\'")
 
+  ;; Golang support.
   (use-package go-mode
     :ensure t
     :mode "\\.go\\'"
@@ -542,10 +543,33 @@
           ("C-c b" . go-run)
           ("C-h f" . godoc-at-point)))
 
+  ;; Python support.
+  (use-package python
+    :init
+    ;; Open python files with tree-sitter support.
+    (add-to-list 'major-mode-remap-alist
+                 '(python-mode . python-ts-mode))
+
+    ;; Set up syntax highlighting for python-ts-mode.
+    (defun python-ts-mode-highlighting-setup ()
+      (treesit-font-lock-recompute-features))
+    (add-hook 'python-ts-mode-hook #'python-ts-mode-highlighting-setup)
+
+    ;; Set up eglot for python-ts-mode.
+    (defun python-ts-mode-eglot-setup ()
+      (with-eval-after-load 'eglot
+        (add-to-list 'eglot-server-programs
+                     '((python-mode python-ts-mode) . ("@pylsp@")))
+        (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (eglot-ensure))
+    (add-hook 'python-ts-mode-hook #'python-ts-mode-eglot-setup))
+
+  ;; Nix support.
   (use-package nix-mode
     :ensure t
     :mode "\\.nix\\'")
 
+  ;; YAML support.
   (use-package yaml-mode
     :ensure t
 

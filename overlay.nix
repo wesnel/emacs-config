@@ -13,6 +13,10 @@ let
     pkg = final.gopls;
   in "${pkg}/bin/gopls";
 
+  pylsp = let
+    pkg = final.python311Packages.python-lsp-server;
+  in "${pkg}/bin/pylsp";
+
   emacs-config = final.emacsWithPackagesFromUsePackage {
     package = final.emacsGit-nox;
     config = ./default.el;
@@ -26,7 +30,8 @@ let
       inherit
         aspell
         goimports
-        gopls;
+        gopls
+        pylsp;
     };
 
     override = epkgs: epkgs // {
