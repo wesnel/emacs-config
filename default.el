@@ -509,7 +509,12 @@
     :mode "\\.es\\'"
 
     :commands
-    (es-command-center))
+    (es-command-center)
+
+    :config
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((elasticsearch . t))))
 
   ;; Golang support.
   (use-package go-mode
