@@ -29,7 +29,7 @@
         ];
 
         name = "emacs-config";
-        overlay = ./overlay.nix;
+        overlay = ./overlays;
         systems = flake-utils.lib.defaultSystems;
       };
 }
