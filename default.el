@@ -232,6 +232,11 @@
      ("s-w" . ace-window)))
 
   (use-package perspective
+    :ensure t
+
+    :commands
+    (persp-mode)
+
     :bind
     ("C-x C-b" . persp-list-buffers)
 
