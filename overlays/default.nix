@@ -46,6 +46,7 @@ final: prev:
       override = epkgs: epkgs // {
         chatgpt-shell = let
           rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
+          sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
 
           propagatedUserEnvPkgs = with epkgs; [
             markdown-mode
@@ -57,12 +58,31 @@ final: prev:
           src = final.fetchFromGitHub {
             owner = "xenodium";
             repo = "chatgpt-shell";
-            sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
-            inherit rev;
+
+            inherit
+              rev
+              sha256;
           };
 
           inherit propagatedUserEnvPkgs;
           buildInputs = propagatedUserEnvPkgs;
+        };
+
+        devil = let
+          rev = "98064ffed40a86def0049d87d8412a5049d14c31";
+          sha256 = "sha256-yZPtYt/9QvAtMn/3lYpmctb+hB5WmyeTovjTqVU/nhQ=";
+        in epkgs.trivialBuild {
+          pname = "devil";
+          version = rev;
+
+          src = final.fetchFromGitHub {
+            owner = "susam";
+            repo = "devil";
+
+            inherit
+              rev
+              sha256;
+          };
         };
       };
     };

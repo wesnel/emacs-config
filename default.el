@@ -107,6 +107,13 @@
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)
 
+  ;; Make a deal with the devil to avoid emacs pinky.
+  (use-package devil
+    :ensure t
+
+    :config
+    (global-devil-mode))
+
   (use-package vertico
     :ensure t
 
@@ -224,11 +231,15 @@
     (([remap other-window] . ace-window)
      ("s-w" . ace-window)))
 
-  (use-package eyebrowse
-    :ensure t
+  (use-package perspective
+    :bind
+    ("C-x C-b" . persp-list-buffers)
 
-    :config
-    (eyebrowse-mode +1))
+    :custom
+    (persp-mode-prefix-key (kbd "C-c M-p"))
+
+    :init
+    (persp-mode))
 
   (use-package dired
     :config
@@ -357,11 +368,87 @@
   ;; Text Expansion
   ;;
 
-  (use-package company
+  (use-package corfu
     :ensure t
 
+    :init
+    (setq read-extended-command-predicate
+          #'command-completion-default-include-p)
+    (setq tab-always-indent 'complete)
+
     :config
-    (global-company-mode +1))
+    (defun orderless-fast-dispatch (word index total)
+      (and (= index 0) (= total 1) (length< word 4)
+           `(orderless-regexp . ,(concat "^" (regexp-quote word)))))
+
+    (orderless-define-completion-style orderless-fast
+      (orderless-style-dispatchers '(orderless-fast-dispatch))
+      (orderless-matching-styles '(orderless-literal orderless-regexp)))
+
+    (setq corfu-auto t
+          corfu-auto-delay 0
+          corfu-auto-prefix 0
+          completion-styles '(orderless-fast)
+          corfu-quit-no-match 'separator)
+
+    (global-corfu-mode +1))
+
+  (use-package cape
+    :ensure t
+
+    ;; Bind dedicated completion commands
+    ;; Alternative prefix keys: C-c p, M-p, M-+, ...
+    :bind
+    (("C-c p p" . completion-at-point) ;; capf
+     ("C-c p t" . complete-tag)        ;; etags
+     ("C-c p d" . cape-dabbrev)        ;; or dabbrev-completion
+     ("C-c p h" . cape-history)
+     ("C-c p f" . cape-file)
+     ("C-c p k" . cape-keyword)
+     ("C-c p s" . cape-symbol)
+     ("C-c p a" . cape-abbrev)
+     ("C-c p l" . cape-line)
+     ("C-c p w" . cape-dict)
+     ("C-c p \\" . cape-tex)
+     ("C-c p _" . cape-tex)
+     ("C-c p ^" . cape-tex)
+     ("C-c p &" . cape-sgml)
+     ("C-c p r" . cape-rfc1345))
+
+    :config
+    ;; Add `completion-at-point-functions', used by `completion-at-point'.
+    ;; NOTE: The order matters!
+    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+    (add-to-list 'completion-at-point-functions #'cape-file)
+    (add-to-list 'completion-at-point-functions #'cape-elisp-block))
+
+  (use-package tempel
+    :ensure t
+
+    :bind
+    (("M-+" . tempel-complete) ;; Alternative tempel-expand
+     ("M-*" . tempel-insert))
+
+    :config
+    ;; Setup completion at point
+    (defun tempel-setup-capf ()
+      ;; Add the Tempel Capf to `completion-at-point-functions'.
+      ;; `tempel-expand' only triggers on exact matches. Alternatively use
+      ;; `tempel-complete' if you want to see all matches, but then you
+      ;; should also configure `tempel-trigger-prefix', such that Tempel
+      ;; does not trigger too often when you don't expect it. NOTE: We add
+      ;; `tempel-expand' *before* the main programming mode Capf, such
+      ;; that it will be tried first.
+      (setq completion-at-point-functions
+            (cons #'tempel-expand
+                  completion-at-point-functions)))
+
+    (add-hook 'prog-mode-hook 'tempel-setup-capf)
+    (add-hook 'text-mode-hook 'tempel-setup-capf)
+
+    ;; Make the Tempel templates available to Abbrev, either locally or
+    ;; globally. `expand-abbrev' is bound to C-x '.
+    (global-tempel-abbrev-mode))
 
   ;;
   ;; Text Manipulation
