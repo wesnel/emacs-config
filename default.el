@@ -32,10 +32,6 @@
 
 ;;; Code:
 (let ((gc-cons-threshold most-positive-fixnum))
-  ;;
-  ;; Setup
-  ;;
-
   (eval-when-compile
     (require 'use-package))
 
@@ -49,22 +45,6 @@
   (use-package bind-key
     :ensure t)
 
-  ;; Inherit environment variables in Emacs.
-  (when (memq window-system '(mac ns x))
-    (use-package exec-path-from-shell
-      :ensure t
-
-      :config
-      (setq exec-path-from-shell-variables
-            '("SSH_AUTH_SOCK"
-              "GPG_TTY"
-              "PATH"))
-      (exec-path-from-shell-initialize)))
-
-  ;;
-  ;; Visuals
-  ;;
-
   ;; Mode line settings.
   (line-number-mode t)
   (column-number-mode t)
@@ -75,14 +55,13 @@
 
   ;; Configure whitespace preferences.
   (use-package whitespace
-    :config
-    (setq whitespace-style '(face tabs empty trailing))
+    :hook
+    ((text-mode prog-mode) . (lambda ()
+                               (add-hook 'before-save-hook 'whitespace-cleanup nil t)
+                               (whitespace-mode +1)))
 
-    (defun enable-whitespace ()
-      (add-hook 'before-save-hook 'whitespace-cleanup nil t)
-      (whitespace-mode +1))
-    (add-hook 'text-mode-hook 'enable-whitespace)
-    (add-hook 'prog-mode-hook 'enable-whitespace))
+    :config
+    (setq whitespace-style '(face tabs empty trailing)))
 
   ;; Color scheme.
   (require-theme 'modus-themes)
@@ -100,55 +79,39 @@
     :config
     (global-hl-todo-mode +1))
 
-  ;;
-  ;; Interface
-  ;;
-
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)
 
-  ;; Make a deal with the devil to avoid emacs pinky.
-  (use-package devil
-    :ensure t
+  ;; Do not allow the cursor in the minibuffer prompt.
+  (setq minibuffer-prompt-properties '(read-only t cursor-intangible t face minibuffer-prompt))
+  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
 
-    :config
-    (global-devil-mode))
+  ;; Emacs 28: Hide commands in M-x which do not work in the current mode.
+  ;; Vertico commands are hidden in normal buffers.
+  (setq read-extended-command-predicate #'command-completion-default-include-p)
+
+  ;; Enable recursive minibuffers.
+  (setq enable-recursive-minibuffers t)
 
   (use-package vertico
     :ensure t
 
-    :init
-    ;; Do not allow the cursor in the minibuffer prompt.
-    (setq minibuffer-prompt-properties '(read-only t cursor-intangible t face minibuffer-prompt))
-    (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-
-    ;; Emacs 28: Hide commands in M-x which do not work in the current mode.
-    ;; Vertico commands are hidden in normal buffers.
-    (setq read-extended-command-predicate #'command-completion-default-include-p)
-
-    ;; Enable recursive minibuffers.
-    (setq enable-recursive-minibuffers t)
-
     :config
-    (vertico-mode +1)
-
-    ;; Grow and shrink the Vertico minibuffer.
-    (setq vertico-resize t)
-
-    ;; Enable cycling for `vertico-next' and `vertico-previous'.
-    (setq vertico-cycle t))
+    (vertico-mode +1))
 
   ;; Use the `orderless' completion style.
   (use-package orderless
     :ensure t
 
-    :config
-    (setq completion-styles '(orderless basic)
-          completion-category-overrides '((file (styles partial-completion)))))
+    :custom
+    (completion-styles '(orderless basic))
+    (completion-category-overrides '((file (styles partial-completion))
+                                     (eglot (styles orderless)))))
 
   ;; Provides search and navigation based on completing-read.
   (use-package consult
     :ensure t
+    :demand t
 
     :bind
     ;; C-c bindings (mode-specific-map)
@@ -201,27 +164,7 @@
      ;; Minibuffer history
      :map minibuffer-local-map
      ("M-s" . consult-history)                 ;; orig. next-matching-history-element
-     ("M-r" . consult-history))                ;; orig. previous-matching-history-element
-
-    ;; Enable automatic preview at point in the *Completions* buffer. This is
-    ;; relevant when you use the default completion UI.
-    :hook
-    (completion-list-mode . consult-preview-at-point-mode)
-
-    :init
-    ;; Optionally configure the register formatting. This improves the register
-    ;; preview for `consult-register', `consult-register-load',
-    ;; `consult-register-store' and the Emacs built-ins.
-    (setq register-preview-delay 0.5
-          register-preview-function #'consult-register-format)
-
-    ;; Optionally tweak the register preview window.
-    ;; This adds thin lines, sorting and hides the mode line of the window.
-    (advice-add #'register-preview :override #'consult-register-window)
-
-    ;; Use Consult to select xref locations with preview
-    (setq xref-show-xrefs-function #'consult-xref
-          xref-show-definitions-function #'consult-xref))
+     ("M-r" . consult-history)))               ;; orig. previous-matching-history-element
 
   ;; Convenient jumping between windows.
   (use-package ace-window
@@ -234,26 +177,21 @@
   (use-package perspective
     :ensure t
 
-    :commands
-    (persp-mode)
-
-    :bind
-    ("C-x C-b" . persp-list-buffers)
-
     :custom
     (persp-mode-prefix-key (kbd "C-c M-p"))
 
-    :init
-    (persp-mode))
+    :config
+    (persp-mode)
+
+    (consult-customize consult--source-buffer :hidden t :default nil)
+    (add-to-list 'consult-buffer-sources persp-consult-source))
 
   (use-package dired
-    :config
-    (setq ls-lisp-use-insert-directory-program nil)
-    (require 'ls-lisp))
+    :custom
+    (ls-lisp-use-insert-directory-program nil)
 
-  ;;
-  ;; Killing and Deletion
-  ;;
+    :config
+    (require 'ls-lisp))
 
   ;; More intuitive deletion
   (delete-selection-mode +1)
@@ -271,17 +209,13 @@
     :bind
     (("M-y" . browse-kill-ring)))
 
-  ;;
-  ;; History
-  ;;
-
   ;; Persist history over Emacs restarts. Vertico sorts by history position.
   (use-package savehist
-    :config
-    (setq savehist-additional-variables '(search-ring regexp-search-ring)
-          ;; Save every minute.
-          savehist-autosave-interval 60)
+    :custom
+    (savehist-additional-variables '(search-ring regexp-search-ring))
+    (savehist-autosave-interval 60)
 
+    :config
     (savehist-mode +1))
 
   ;; Remember your location in a file when saving files.
@@ -291,28 +225,23 @@
 
   ;; Save recent files.
   (use-package recentf
-    :config
-    (setq recentf-max-saved-items 500
-          recentf-max-menu-items 15
-          ;; Disable recentf-cleanup on Emacs start, because it can cause
-          ;; problems with remote files.
-          recentf-auto-cleanup 'never)
+    :custom
+    (recentf-max-saved-items 500)
+    (recentf-max-menu-items 15)
+    (recentf-auto-cleanup 'never)
 
+    :config
     (recentf-mode +1))
 
   ;; Supercharge your undo/redo with undo-tree.
   (use-package undo-tree
     :ensure t
 
+    :custom
+    (undo-tree-auto-save-history t)
+
     :config
-    ;; Autosave the undo-tree history.
-    (setq undo-tree-auto-save-history t)
-
     (global-undo-tree-mode +1))
-
-  ;;
-  ;; Project Management
-  ;;
 
   (use-package magit
     :ensure t
@@ -320,12 +249,8 @@
     :bind
     (("C-x g" . magit)))
 
-  ;;
-  ;; Text Assistance
-  ;;
-
-  (setq-default indent-tabs-mode nil)   ;; Don't use tabs to indent,
-  (setq-default tab-width 8)            ;; but maintain correct appearance.
+  (setq indent-tabs-mode nil)   ;; Don't use tabs to indent,
+  (setq tab-width 8)            ;; but maintain correct appearance.
 
   ;; Newline at end of file.
   (setq require-final-newline t)
@@ -339,13 +264,9 @@
     ((text-mode . flyspell-mode)
      (prog-mode . flyspell-prog-mode))
 
-    :config
-    (setq ispell-program-name "@aspell@" ; use aspell instead of ispell
-          ispell-extra-args '("--sug-mode=ultra")))
-
-  ;;
-  ;; Text Movement
-  ;;
+    :custom
+    (ispell-program-name "@aspell@")
+    (ispell-extra-args '("--sug-mode=ultra")))
 
   ;; More logical movement behavior
   (use-package mwim
@@ -369,56 +290,57 @@
      ("s-." . avy-goto-word-or-subword-1)
      ("C-c v" . avy-goto-word-or-subword-1)))
 
-  ;;
-  ;; Text Expansion
-  ;;
-
   (use-package corfu
     :ensure t
+    :demand t
+
+    :bind
+    (:map corfu-map
+          ("<escape>". corfu-quit)
+          ("<return>" . corfu-insert)
+          ("TAB" . corfu-next)
+          ([tab] . corfu-next)
+          ("S-TAB" . corfu-previous)
+          ([backtab] . corfu-previous))
+
+    :custom
+    (tab-always-indent 'complete)
+    (completion-cycle-threshold nil)      ; Always show candidates in menu
+    (corfu-auto nil)
+    (corfu-separator ?\s)
+    (corfu-quit-no-match 'separator)
+    (corfu-preview-current 'insert)       ; Preview current candidate?
+    (corfu-preselect-first t)             ; Preselect first candidate?
 
     :init
-    (setq read-extended-command-predicate
-          #'command-completion-default-include-p)
-    (setq tab-always-indent 'complete)
+    (global-corfu-mode +1)
 
     :config
-    (defun orderless-fast-dispatch (word index total)
-      (and (= index 0) (= total 1) (length< word 4)
-           `(orderless-regexp . ,(concat "^" (regexp-quote word)))))
+    (corfu-popupinfo-mode +1))
 
-    (orderless-define-completion-style orderless-fast
-      (orderless-style-dispatchers '(orderless-fast-dispatch))
-      (orderless-matching-styles '(orderless-literal orderless-regexp)))
+  (use-package dabbrev
+    :bind
+    (("M-/" . dabbrev-completion)
+     ("C-M-/" . dabbrev-expand)))
 
-    (setq corfu-auto t
-          corfu-auto-delay 0
-          corfu-auto-prefix 0
-          completion-styles '(orderless-fast)
-          corfu-quit-no-match 'separator)
+  (use-package kind-icon
+    :ensure t
 
-    (global-corfu-mode +1))
+    :custom
+    (kind-icon-default-face 'corfu-default)
+
+    :config
+    (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
+
+  (use-package corfu-terminal
+    :ensure t
+
+    :config
+    (unless (display-graphic-p)
+      (corfu-terminal-mode +1)))
 
   (use-package cape
     :ensure t
-
-    ;; Bind dedicated completion commands
-    ;; Alternative prefix keys: C-c p, M-p, M-+, ...
-    :bind
-    (("C-c p p" . completion-at-point) ;; capf
-     ("C-c p t" . complete-tag)        ;; etags
-     ("C-c p d" . cape-dabbrev)        ;; or dabbrev-completion
-     ("C-c p h" . cape-history)
-     ("C-c p f" . cape-file)
-     ("C-c p k" . cape-keyword)
-     ("C-c p s" . cape-symbol)
-     ("C-c p a" . cape-abbrev)
-     ("C-c p l" . cape-line)
-     ("C-c p w" . cape-dict)
-     ("C-c p \\" . cape-tex)
-     ("C-c p _" . cape-tex)
-     ("C-c p ^" . cape-tex)
-     ("C-c p &" . cape-sgml)
-     ("C-c p r" . cape-rfc1345))
 
     :config
     ;; Add `completion-at-point-functions', used by `completion-at-point'.
@@ -429,10 +351,6 @@
 
   (use-package tempel
     :ensure t
-
-    :bind
-    (("M-+" . tempel-complete) ;; Alternative tempel-expand
-     ("M-*" . tempel-insert))
 
     :config
     ;; Setup completion at point
@@ -453,11 +371,7 @@
 
     ;; Make the Tempel templates available to Abbrev, either locally or
     ;; globally. `expand-abbrev' is bound to C-x '.
-    (global-tempel-abbrev-mode))
-
-  ;;
-  ;; Text Manipulation
-  ;;
+    (global-tempel-abbrev-mode +1))
 
   (use-package wgrep
     :ensure t
@@ -485,18 +399,10 @@
     :bind
     (("C-M-%" . vr/query-replace)))
 
-  ;;
-  ;; Shells
-  ;;
-
   (use-package eshell
     :bind
     (("C-x m" . eshell)
      ("C-x M" . (lambda () (interactive) (eshell t)))))
-
-  ;;
-  ;; Coding Assistance
-  ;;
 
   (use-package eglot
     :commands
@@ -510,36 +416,19 @@
           ("C-c C-l r" . eglot-rename)
           ("C-c C-l i" . eglot-find-implementation)
           ("C-c C-l d" . eldoc)
-          ("C-c C-l e" . eglot-code-actions)))
+          ("C-c C-l e" . eglot-code-actions))
 
-  (use-package realgud
-    :ensure t
-    :defer t
+    :config
+    (defun eglot-capf ()
+      (setq-local completion-at-point-functions
+                  (list (cape-super-capf
+                         #'eglot-completion-at-point
+                         #'tempel-expand
+                         #'cape-dabbrev
+                         #'cape-file))))
+    (add-hook 'eglot-managed-mode-hook #'eglot-capf)
 
-    :init
-    (defvar realgud-alist
-      '((realgud:bashdb    :modes (sh-mode bash-ts-mode))
-        (realgud:gdb)
-        (realgud:gub       :modes (go-mode go-ts-mode))
-        (realgud:kshdb     :modes (sh-mode bash-ts-mode))
-        (realgud:pdb       :modes (python-mode python-ts-mode))
-        (realgud:perldb    :modes (perl-mode))
-        (realgud:rdebug    :modes (ruby-mode ruby-ts-mode))
-        (realgud:remake)
-        (realgud:trepan    :modes (perl-mode))
-        (realgud:trepan2   :modes (python-mode python-ts-mode))
-        (realgud:trepan3k  :modes (python-mode python-ts-mode))
-        (realgud:trepanjs  :modes (javascript-mode js2-mode js3-mode js-ts-mode))
-        (realgud:trepanpl  :modes (perl-mode))
-        (realgud:zshdb     :modes (sh-mode bash-ts-mode))))
-
-    ;; Realgud doesn't generate its autoloads properly so we do it ourselves
-    (dolist (debugger realgud-alist)
-      (autoload (car debugger)
-        (if-let (sym (plist-get (cdr debugger) :package))
-            (symbol-name sym)
-          "realgud")
-        nil t)))
+    (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster))
 
   (use-package chatgpt-shell
     :ensure t
@@ -550,10 +439,6 @@
     :config
     (setq chatgpt-shell-openai-key (lambda ()
                                      (nth 0 (process-lines "@pass@" "show" "openai-key")))))
-
-  ;;
-  ;; Emacs Assistance
-  ;;
 
   ;; Displays available keybindings in a pop-up.
   (use-package which-key
@@ -586,32 +471,18 @@
     (("C-h M-m" . discover-my-major)
      ("C-h M-S-M" . discover-my-mode)))
 
-  ;;
-  ;; Coding Language Support
-  ;;
-
   ;; Send HTTP requests from emacs.
   (use-package restclient
     :ensure t
     :mode "\\.http\\'")
 
-  ;; Interact with Elastic from emacs.
-  (use-package es-mode
-    :ensure t
-    :mode "\\.es\\'"
-
-    :commands
-    (es-command-center)
-
-    :config
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((elasticsearch . t))))
-
   ;; Golang support.
   (use-package go-mode
     :ensure t
     :mode "\\.go\\'"
+
+    :custom
+    (gofmt-command "@goimports@")
 
     :init
     ;; Open go files with tree-sitter support.
@@ -634,9 +505,6 @@
     (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
 
     :config
-    ;; Prefer goimports to gofmt.
-    (setq gofmt-command "@goimports@")
-
     ;; CamelCase aware editing operations.
     (subword-mode +1)
 
@@ -681,10 +549,6 @@
     :mode
     (("\\.yaml\\'" . yaml-mode)
      ("\\.yml\\'" . yaml-mode)))
-
-  ;;
-  ;; Org
-  ;;
 
   ;; Send HTTP requests from org-mode.
   (use-package ob-restclient

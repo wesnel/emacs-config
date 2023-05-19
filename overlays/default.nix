@@ -48,7 +48,7 @@ final: prev:
           rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
           sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
 
-          propagatedUserEnvPkgs = with epkgs; [
+          packageRequires = with epkgs; [
             markdown-mode
           ];
         in epkgs.trivialBuild {
@@ -64,8 +64,8 @@ final: prev:
               sha256;
           };
 
-          inherit propagatedUserEnvPkgs;
-          buildInputs = propagatedUserEnvPkgs;
+          inherit
+            packageRequires;
         };
 
         devil = let
@@ -87,7 +87,9 @@ final: prev:
       };
     };
   in {
-    inherit emacs-config;
+    inherit
+      emacs-config;
+
     defaultPackage = emacs-config;
   };
 }
