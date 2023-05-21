@@ -28,7 +28,7 @@
           (import emacs-overlay)
         ];
 
-        name = "emacs-config";
+        name = "wgn-emacs";
         overlay = ./overlays;
         systems = flake-utils.lib.defaultSystems;
       };

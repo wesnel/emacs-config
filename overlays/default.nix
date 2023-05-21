@@ -1,7 +1,7 @@
 final: prev:
 
 {
-  emacs-config = let
+  wgn-emacs = let
     aspell = let
       pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
     in "${pkg}/bin/aspell";
@@ -26,16 +26,14 @@ final: prev:
       ]);
     in "${pkg}/bin/pylsp";
 
-    emacs-config = final.emacsWithPackagesFromUsePackage {
-      package = final.emacsGit-nox;
+    wgn-emacs = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
+      package = final.emacsGit-nox;
 
       defaultInitFile = final.substituteAll {
         name = "default.el";
         src = ../default.el;
 
-        inherit (final)
-          pass;
         inherit
           aspell
           goimports
@@ -43,15 +41,15 @@ final: prev:
           pylsp;
       };
 
-      override = epkgs: epkgs // {
+      override = eFinal: ePrev: {
         chatgpt-shell = let
           rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
           sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
 
-          packageRequires = with epkgs; [
+          packageRequires = with eFinal; [
             markdown-mode
           ];
-        in epkgs.trivialBuild {
+        in eFinal.trivialBuild {
           pname = "chatgpt-shell";
           version = rev;
 
@@ -71,7 +69,7 @@ final: prev:
         devil = let
           rev = "98064ffed40a86def0049d87d8412a5049d14c31";
           sha256 = "sha256-yZPtYt/9QvAtMn/3lYpmctb+hB5WmyeTovjTqVU/nhQ=";
-        in epkgs.trivialBuild {
+        in eFinal.trivialBuild {
           pname = "devil";
           version = rev;
 
@@ -84,12 +82,28 @@ final: prev:
               sha256;
           };
         };
+
+        no-littering = let
+          rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
+          sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";
+        in ePrev.no-littering.overrideAttrs (old:
+
+          {
+            src = final.fetchFromGitHub {
+              owner = "emacscollective";
+              repo = "no-littering";
+
+              inherit
+                rev
+                sha256;
+            };
+          });
       };
     };
   in {
     inherit
-      emacs-config;
+      wgn-emacs;
 
-    defaultPackage = emacs-config;
+    defaultPackage = wgn-emacs;
   };
 }
