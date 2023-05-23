@@ -14,6 +14,10 @@ final: prev:
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
 
+    multimarkdown = let
+      pkg = final.multimarkdown;
+    in "${pkg}/bin/multimarkdown";
+
     pylsp = let
       pkg = final.python3.withPackages(p: with p; [
         jedi
@@ -26,20 +30,22 @@ final: prev:
       ]);
     in "${pkg}/bin/pylsp";
 
+    emacs-config = final.substituteAll {
+      name = "default.el";
+      src = ../default.el;
+
+      inherit
+        aspell
+        goimports
+        gopls
+        multimarkdown
+        pylsp;
+    };
+
     wgn-emacs = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
       package = final.emacsGit-nox;
-
-      defaultInitFile = final.substituteAll {
-        name = "default.el";
-        src = ../default.el;
-
-        inherit
-          aspell
-          goimports
-          gopls
-          pylsp;
-      };
+      defaultInitFile = emacs-config;
 
       override = eFinal: ePrev: {
         chatgpt-shell = let
@@ -102,6 +108,7 @@ final: prev:
     };
   in {
     inherit
+      emacs-config
       wgn-emacs;
 
     defaultPackage = wgn-emacs;

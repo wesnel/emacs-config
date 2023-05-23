@@ -141,7 +141,11 @@
      ;; Minibuffer history
      :map minibuffer-local-map
      ("M-s" . consult-history)                 ;; orig. next-matching-history-element
-     ("M-r" . consult-history)))               ;; orig. previous-matching-history-element
+     ("M-r" . consult-history))                ;; orig. previous-matching-history-element
+
+    :custom
+    (xref-show-xrefs-function #'consult-xref)
+    (xref-show-definitions-function #'consult-xref))
 
   ;; Move between windows.
   (use-package window
@@ -545,16 +549,36 @@
      'org-babel-load-languages
      '((restclient . t))))
 
-  ;; Mode line settings.
-  (line-number-mode t)
-  (column-number-mode t)
-  (size-indication-mode t)
+  ;; Markdown support.
+  (use-package markdown-mode
+    :ensure t
+
+    :mode
+    (("README\\.md\\'" . gfm-mode)
+     ("\\.\\(?:md\\|markdown\\|mkd\\|mdown\\|mkdn\\|mdwn\\)\\'" . markdown-mode))
+
+    :bind
+    (:map markdown-mode-map
+          ("C-c C-e" . markdown-do))
+
+    :custom
+    (markdown-command "@multimarkdown@"))
+
+  ;; Generate table of contents in markdown files.
+  (use-package markdown-toc
+    :ensure t
+
+    :hook
+    ((markdown-mode gfm-mode) . markdown-toc-mode))
+
+  ;; Don't assume double spaces at the end of a sentence.
+  (setq-default sentence-end-double-space nil)
 
   ;; Show line numbers at the beginning of each line.
   (global-display-line-numbers-mode +1)
 
   ;; Revert buffers automatically when underlying files are changed externally.
-  (global-auto-revert-mode t)
+  (global-auto-revert-mode +1)
 
   ;; Color scheme.
   (require-theme 'modus-themes)
@@ -563,26 +587,28 @@
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)
 
-  ;; Do not allow the cursor in the minibuffer prompt.
-  (setq-default minibuffer-prompt-properties
-                '(read-only t cursor-intangible t face minibuffer-prompt))
-  (add-hook 'minibuffer-setup-hook #'cursor-intangible-mode)
-
-  ;; Hide commands in M-x which do not work in the current mode.
-  (setq-default read-extended-command-predicate
-                #'command-completion-default-include-p)
-
-  ;; Enable recursive minibuffers.
+  ;; Allow minibuffer commands while in the minibuffer.
   (setq-default enable-recursive-minibuffers t)
 
   ;; More intuitive deletion.
   (delete-selection-mode +1)
 
-  (setq-default indent-tabs-mode nil)   ; Don't use tabs to indent,
-  (setq-default tab-width 8)            ; but maintain correct appearance.
+  ;; Place newline at end of file.
+  (setq-default require-final-newline t)
 
-  ;; Newline at end of file.
-  (setq-default require-final-newline t))
+  ;; Don't use tabs to indent.
+  (setq-default indent-tabs-mode nil)
+
+  ;; Maintain correct appearance of tabs.
+  (setq-default tab-width 8)
+
+  ;; Hide commands in M-x which do not work in the current mode.
+  (setq-default read-extended-command-predicate #'command-completion-default-include-p)
+
+  ;; Mode line settings.
+  (line-number-mode +1)
+  (column-number-mode +1)
+  (size-indication-mode +1))
 
 (provide 'init)
 ;;; init.el ends here
