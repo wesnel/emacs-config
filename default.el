@@ -466,19 +466,16 @@
     :ensure t
     :mode "\\.http\\'")
 
-  ;; Golang support.
-  (use-package go-mode
-    :ensure t
-    :mode "\\.go\\'"
-
-    :custom
-    (gofmt-command "@goimports@")
+  ;; Basic Golang support.
+  ;;
+  ;; HACK: This is built-in to Emacs, but there is also a third-party
+  ;; go-mode which we will install next.
+  (use-package go-ts-mode
+    :mode
+    (("\\.go\\'" . go-ts-mode)
+     ("go\\.mod\\'" . go-mod-ts-mode))
 
     :init
-    ;; Open go files with tree-sitter support.
-    (add-to-list 'major-mode-remap-alist
-                 '(go-mode . go-ts-mode))
-
     ;; Set up syntax highlighting for go-ts-mode.
     (defun go-ts-mode-highlighting-setup ()
       (whitespace-toggle-options '(tabs))
@@ -489,17 +486,42 @@
     (defun go-ts-mode-eglot-setup ()
       (with-eval-after-load 'eglot
         (add-to-list 'eglot-server-programs
-                     '((go-mode go-dot-mod-mode go-dot-work-mode go-ts-mode go-mod-ts-mode) . ("@gopls@")))
+                     '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
         (add-hook 'before-save-hook #'eglot-format-buffer t t))
       (eglot-ensure))
     (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
 
     :config
     ;; CamelCase aware editing operations.
-    (subword-mode +1)
+    (subword-mode +1))
+
+  ;; Extra Golang support.
+  ;;
+  ;; HACK: We won't actually use this go-mode other than for importing
+  ;; some extra functions to augment the built-in go-ts-mode.
+  (use-package go-mode
+    :ensure t
+
+    :mode
+    ;; HACK: The built-in go-ts-mode does not support go.work files,
+    ;; so we actually do use the third-party go-mode for this file
+    ;; type.
+    ("go\\.work\\'" . go-dot-work-mode)
+
+    :hook
+    (go-ts-mode . (lambda ()
+                    (require 'go-mode)
+                    (defun go-ts-mode-run-gofmt ()
+                      "Use the `gofmt' function from go-mode inside go-ts-mode."
+                      (interactive)
+                      (gofmt))
+                    (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
+
+    :custom
+    (gofmt-command "@gofumpt@")
 
     :bind
-    (:map go-mode-map
+    (:map go-ts-mode-map
           ("C-c a" . go-test-current-project)
           ("C-c m" . go-test-current-file)
           ("C-c ." . go-test-current-test)
