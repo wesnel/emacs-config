@@ -552,7 +552,17 @@
   ;; Nix support.
   (use-package nix-mode
     :ensure t
-    :mode "\\.nix\\'")
+    :mode "\\.nix\\'"
+
+    :init
+    ;; Set up eglot for nix-mode.
+    (defun nix-mode-eglot-setup ()
+      (with-eval-after-load 'eglot
+        (add-to-list 'eglot-server-programs
+                     '(nix-mode . ("@nil@")))
+        (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (eglot-ensure))
+    (add-hook 'nix-mode-hook #'nix-mode-eglot-setup))
 
   ;; YAML support.
   (use-package yaml-mode

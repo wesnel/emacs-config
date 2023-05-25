@@ -18,6 +18,10 @@ final: prev:
       pkg = final.multimarkdown;
     in "${pkg}/bin/multimarkdown";
 
+    nil = let
+      pkg = final.nil;
+    in "${pkg}/bin/nil";
+
     pylsp = let
       pkg = final.python3.withPackages(p: with p; [
         jedi
@@ -39,6 +43,7 @@ final: prev:
         gofumpt
         gopls
         multimarkdown
+        nil
         pylsp;
     };
 
