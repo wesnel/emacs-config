@@ -94,6 +94,22 @@ final: prev:
           };
         };
 
+        go-mode = let
+          rev = "166dfb1e090233c4609a50c2ec9f57f113c1da72";
+          sha256 = "sha256-SEqDeF5F/DQ5/NOi3n6mYhlkYg+VxY/EPAvxtt5wUG0=";
+        in ePrev.go-mode.overrideAttrs (old:
+
+          {
+            src = final.fetchFromGitHub {
+              owner = "dominikh";
+              repo = "go-mode.el";
+
+              inherit
+                rev
+                sha256;
+            };
+          });
+
         no-littering = let
           rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
           sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";

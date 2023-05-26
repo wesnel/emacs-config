@@ -481,6 +481,7 @@
       (whitespace-toggle-options '(tabs))
       (treesit-font-lock-recompute-features))
     (add-hook 'go-ts-mode-hook #'go-ts-mode-highlighting-setup)
+    (add-hook 'go-mod-ts-mode-hook #'go-ts-mode-highlighting-setup)
 
     ;; Set up eglot for go-ts-mode.
     (defun go-ts-mode-eglot-setup ()
@@ -509,6 +510,8 @@
     ("go\\.work\\'" . go-dot-work-mode)
 
     :hook
+    (go-dot-work-mode . (lambda ()
+                          (require 'go-ts-mode)))
     (go-ts-mode . (lambda ()
                     (require 'go-mode)
                     (defun go-ts-mode-run-gofmt ()
