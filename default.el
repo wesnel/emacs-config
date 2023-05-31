@@ -568,12 +568,30 @@
     (add-hook 'nix-mode-hook #'nix-mode-eglot-setup))
 
   ;; YAML support.
-  (use-package yaml-mode
-    :ensure t
-
+  (use-package yaml-ts-mode
     :mode
-    (("\\.yaml\\'" . yaml-mode)
-     ("\\.yml\\'" . yaml-mode)))
+    (("\\.yaml\\'" . yaml-ts-mode)
+     ("\\.yml\\'" . yaml-ts-mode))
+
+    :init
+    ;; Set up eglot for yaml-mode.
+    (defun yaml-ts-mode-eglot-setup ()
+      (with-eval-after-load 'eglot
+        (add-to-list 'eglot-server-programs
+                     '(yaml-ts-mode . ("@yamlls@" "--stdio")))
+        (add-hook 'before-save-hook #'eglot-format-buffer t t)
+        (setq-local eglot-workspace-configuration
+                    '(:yaml (:format (:enable t
+                                      :singleQuote t)
+                             :validate t
+                             :keyOrdering :json-false
+                             :hover t
+                             :completion t
+                             :suggest (:parentSkeletonSelectedFirst t)
+                             :schemaStore (:enable t
+                                           :url "https://www.schemastore.org/api/json/catalog.json")))))
+      (eglot-ensure))
+    (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
 
   ;; Send HTTP requests from org-mode.
   (use-package ob-restclient

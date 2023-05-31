@@ -34,6 +34,10 @@ final: prev:
       ]);
     in "${pkg}/bin/pylsp";
 
+    yamlls = let
+      pkg = final.yaml-language-server;
+    in "${pkg}/bin/yaml-language-server";
+
     emacs-config = final.substituteAll {
       name = "default.el";
       src = ../default.el;
@@ -44,7 +48,8 @@ final: prev:
         gopls
         multimarkdown
         nil
-        pylsp;
+        pylsp
+        yamlls;
     };
 
     wgn-emacs = final.emacsWithPackagesFromUsePackage {
@@ -101,8 +106,8 @@ final: prev:
 
           {
             src = final.fetchFromGitHub {
-              owner = "dominikh";
-              repo = "go-mode.el";
+              owner = old.src.owner;
+              repo = old.src.repo;
 
               inherit
                 rev
@@ -117,8 +122,8 @@ final: prev:
 
           {
             src = final.fetchFromGitHub {
-              owner = "emacscollective";
-              repo = "no-littering";
+              owner = old.src.owner;
+              repo = old.src.repo;
 
               inherit
                 rev
@@ -133,5 +138,12 @@ final: prev:
       wgn-emacs;
 
     defaultPackage = wgn-emacs;
+
+    shell = final.mkShell {
+      buildInputs = [
+        emacs-config
+        wgn-emacs
+      ];
+    };
   };
 }
