@@ -227,7 +227,10 @@
     :ensure t
 
     :bind
-    (("C-x g" . magit)))
+    (("C-x g" . magit))
+
+    :config
+    (add-hook 'magit-mode-hook #'whitespace-mode))
 
   ;; Maintain balanced parentheses.
   (use-package elec-pair
