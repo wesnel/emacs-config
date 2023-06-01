@@ -412,7 +412,12 @@
   (use-package eshell
     :bind
     (("C-x m" . eshell)
-     ("C-x M" . (lambda () (interactive) (eshell t)))))
+     ("C-x M" . (lambda () (interactive) (eshell t))))
+
+    :config
+    (add-hook 'eshell-mode-hook (lambda ()
+                                  ;; Disable line numbers.
+                                  (display-line-numbers-mode -1))))
 
   ;; Language server integration.
   (use-package eglot
