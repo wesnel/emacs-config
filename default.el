@@ -245,7 +245,7 @@
     (ispell-program-name "@aspell@")
 
     :config
-    (spell-fu-global-mode))
+    (global-spell-fu-mode))
 
   ;; More convenient options for cursor movement.
   (use-package mwim
