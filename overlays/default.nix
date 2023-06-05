@@ -54,7 +54,7 @@ final: prev:
 
     wgn-emacs = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
-      package = final.emacsGit-nox;
+      package = final.emacsUnstable-nox;
       defaultInitFile = emacs-config;
 
       override = eFinal: ePrev: {
