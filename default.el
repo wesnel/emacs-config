@@ -642,8 +642,15 @@
   (global-auto-revert-mode +1)
 
   ;; Color scheme.
-  (require-theme 'modus-themes)
-  (modus-themes-load-theme 'modus-vivendi-tinted)
+  (use-package modus-themes
+    :ensure t
+
+    :custom
+    (modus-themes-italic-constructs t)
+    (modus-themes-bold-constructs t)
+
+    :config
+    (load-theme 'modus-vivendi-tinted :no-confirm))
 
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)
