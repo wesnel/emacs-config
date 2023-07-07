@@ -530,14 +530,18 @@
 
     :custom
     (gofmt-command "@gofumpt@")
+    (godef-command "@godef@"))
 
-    :bind
-    (:map go-ts-mode-map
-          ("C-c a" . go-test-current-project)
-          ("C-c m" . go-test-current-file)
-          ("C-c ." . go-test-current-test)
-          ("C-c b" . go-run)
-          ("C-h f" . godoc-at-point)))
+  ;; Run Golang tests.
+  (use-package gotest
+    :ensure t
+
+    :commands
+    (go-test-current-file
+     go-test-current-test
+     go-test-current-project
+     go-test-current-benchmark
+     go-run))
 
   ;; Python support.
   (use-package python
@@ -631,6 +635,16 @@
 
     :hook
     ((markdown-mode gfm-mode) . markdown-toc-mode))
+
+  ;; Convert buffers to HTML (including org-mode).
+  (use-package htmlize
+    :ensure t
+
+    :commands
+    (htmlize-buffer
+     htmlize-file
+     htmlize-many-files
+     htmlize-many-files-dired))
 
   ;; Don't assume double spaces at the end of a sentence.
   (setq-default sentence-end-double-space nil)

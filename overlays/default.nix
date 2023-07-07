@@ -6,6 +6,10 @@ final: prev:
       pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
     in "${pkg}/bin/aspell";
 
+    godef = let
+      pkg = final.godef;
+    in "${pkg}/bin/godef";
+
     gofumpt = let
       pkg = final.gofumpt;
     in "${pkg}/bin/gofumpt";
@@ -44,6 +48,7 @@ final: prev:
 
       inherit
         aspell
+        godef
         gofumpt
         gopls
         multimarkdown
