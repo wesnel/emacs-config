@@ -245,7 +245,7 @@
     (ispell-program-name "@aspell@")
 
     :config
-    (global-spell-fu-mode))
+    (spell-fu-global-mode))
 
   ;; More convenient options for cursor movement.
   (use-package mwim
@@ -605,6 +605,27 @@
       (eglot-ensure))
     (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
 
+  ;; Note taking, time tracking, etc.
+  (use-package org
+    :ensure t
+
+    :custom
+    (org-auto-align-tags nil)
+    (org-tags-column 0)
+    (org-catch-invisible-edits 'show-and-error)
+    (org-special-ctrl-a/e t)
+    (org-insert-heading-respect-content t)
+    (org-hide-emphasis-markers t)
+    (org-pretty-entities t)
+    (org-ellipsis "…")
+    (org-agenda-tags-column 0)
+    (org-agenda-time-grid
+     '((daily today require-timed)
+       (800 1000 1200 1400 1600 1800 2000)
+       " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
+    (org-agenda-current-time-string
+     "⭠ now ─────────────────────────────────────────────────"))
+
   ;; Send HTTP requests from org-mode.
   (use-package ob-restclient
     :ensure t
@@ -646,14 +667,21 @@
      htmlize-many-files
      htmlize-many-files-dired))
 
-  ;; Don't assume double spaces at the end of a sentence.
-  (setq-default sentence-end-double-space nil)
+  ;; Pretty styling in org-mode buffers.
+  (use-package org-modern
+    :ensure t
 
-  ;; Show line numbers at the beginning of each line.
-  (global-display-line-numbers-mode +1)
+    :hook
+    ((org-mode . org-modern-mode)
+     (org-agenda-finalize . org-modern-agenda)))
 
-  ;; Revert buffers automatically when underlying files are changed externally.
-  (global-auto-revert-mode +1)
+  ;; Indicate the git diff in the margin.
+  (use-package diff-hl
+    :ensure t
+
+    :config
+    (diff-hl-margin-mode)
+    (global-diff-hl-mode))
 
   ;; Color scheme.
   (use-package modus-themes
@@ -665,6 +693,19 @@
 
     :config
     (load-theme 'modus-vivendi-tinted :no-confirm))
+
+  ;; Remove some UI elements.
+  (menu-bar-no-scroll-bar)
+  (menu-bar-no-window-divider)
+
+  ;; Don't assume double spaces at the end of a sentence.
+  (setq-default sentence-end-double-space nil)
+
+  ;; Show line numbers at the beginning of each line.
+  (global-display-line-numbers-mode +1)
+
+  ;; Revert buffers automatically when underlying files are changed externally.
+  (global-auto-revert-mode +1)
 
   ;; Enable y/n answers.
   (fset 'yes-or-no-p 'y-or-n-p)

@@ -42,6 +42,81 @@ final: prev:
       pkg = final.yaml-language-server;
     in "${pkg}/bin/yaml-language-server";
 
+    override = eFinal: ePrev: {
+      chatgpt-shell = let
+        rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
+        sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
+
+        packageRequires = with eFinal; [
+          markdown-mode
+        ];
+      in eFinal.trivialBuild {
+        pname = "chatgpt-shell";
+        version = rev;
+
+        src = final.fetchFromGitHub {
+          owner = "xenodium";
+          repo = "chatgpt-shell";
+
+          inherit
+            rev
+            sha256;
+        };
+
+        inherit
+          packageRequires;
+      };
+
+      devil = let
+        rev = "98064ffed40a86def0049d87d8412a5049d14c31";
+        sha256 = "sha256-yZPtYt/9QvAtMn/3lYpmctb+hB5WmyeTovjTqVU/nhQ=";
+      in eFinal.trivialBuild {
+        pname = "devil";
+        version = rev;
+
+        src = final.fetchFromGitHub {
+          owner = "susam";
+          repo = "devil";
+
+          inherit
+            rev
+            sha256;
+        };
+      };
+
+      go-mode = let
+        rev = "166dfb1e090233c4609a50c2ec9f57f113c1da72";
+        sha256 = "sha256-SEqDeF5F/DQ5/NOi3n6mYhlkYg+VxY/EPAvxtt5wUG0=";
+      in ePrev.go-mode.overrideAttrs (old:
+
+        {
+          src = final.fetchFromGitHub {
+            owner = old.src.owner;
+            repo = old.src.repo;
+
+            inherit
+              rev
+              sha256;
+          };
+        });
+
+      no-littering = let
+        rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
+        sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";
+      in ePrev.no-littering.overrideAttrs (old:
+
+        {
+          src = final.fetchFromGitHub {
+            owner = old.src.owner;
+            repo = old.src.repo;
+
+            inherit
+              rev
+              sha256;
+          };
+        });
+    };
+
     emacs-config = final.substituteAll {
       name = "default.el";
       src = ../default.el;
@@ -59,95 +134,33 @@ final: prev:
 
     wgn-emacs = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
+      package = final.emacsUnstable;
+      defaultInitFile = emacs-config;
+
+      inherit
+        override;
+    };
+
+    wgn-emacs-nox = final.emacsWithPackagesFromUsePackage {
+      config = ../default.el;
       package = final.emacsUnstable-nox;
       defaultInitFile = emacs-config;
 
-      override = eFinal: ePrev: {
-        chatgpt-shell = let
-          rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
-          sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
-
-          packageRequires = with eFinal; [
-            markdown-mode
-          ];
-        in eFinal.trivialBuild {
-          pname = "chatgpt-shell";
-          version = rev;
-
-          src = final.fetchFromGitHub {
-            owner = "xenodium";
-            repo = "chatgpt-shell";
-
-            inherit
-              rev
-              sha256;
-          };
-
-          inherit
-            packageRequires;
-        };
-
-        devil = let
-          rev = "98064ffed40a86def0049d87d8412a5049d14c31";
-          sha256 = "sha256-yZPtYt/9QvAtMn/3lYpmctb+hB5WmyeTovjTqVU/nhQ=";
-        in eFinal.trivialBuild {
-          pname = "devil";
-          version = rev;
-
-          src = final.fetchFromGitHub {
-            owner = "susam";
-            repo = "devil";
-
-            inherit
-              rev
-              sha256;
-          };
-        };
-
-        go-mode = let
-          rev = "166dfb1e090233c4609a50c2ec9f57f113c1da72";
-          sha256 = "sha256-SEqDeF5F/DQ5/NOi3n6mYhlkYg+VxY/EPAvxtt5wUG0=";
-        in ePrev.go-mode.overrideAttrs (old:
-
-          {
-            src = final.fetchFromGitHub {
-              owner = old.src.owner;
-              repo = old.src.repo;
-
-              inherit
-                rev
-                sha256;
-            };
-          });
-
-        no-littering = let
-          rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
-          sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";
-        in ePrev.no-littering.overrideAttrs (old:
-
-          {
-            src = final.fetchFromGitHub {
-              owner = old.src.owner;
-              repo = old.src.repo;
-
-              inherit
-                rev
-                sha256;
-            };
-          });
-      };
+      inherit
+        override;
     };
   in {
     inherit
       emacs-config
-      wgn-emacs;
+      wgn-emacs
+      wgn-emacs-nox;
 
-    defaultPackage = wgn-emacs;
+    defaultPackage = wgn-emacs-nox;
 
     shell = final.mkShell {
       buildInputs = [
         emacs-config
-        wgn-emacs
+        wgn-emacs-nox
       ];
     };
   };
