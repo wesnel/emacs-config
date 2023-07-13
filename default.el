@@ -152,18 +152,12 @@
     :bind
     (("M-o" . other-window)))
 
-  ;; Divide buffers and window configurations into workspaces.
-  (use-package perspective
+  ;; Divide window configurations into workspaces.
+  (use-package eyebrowse
     :ensure t
 
-    :custom
-    (persp-mode-prefix-key (kbd "C-c M-p"))
-
     :config
-    (persp-mode)
-
-    (consult-customize consult--source-buffer :hidden t :default nil)
-    (add-to-list 'consult-buffer-sources persp-consult-source))
+    (eyebrowse-mode +1))
 
   ;; Open directory as buffer.
   (use-package dired
@@ -419,6 +413,14 @@
                                   ;; Disable line numbers.
                                   (display-line-numbers-mode -1))))
 
+  ;; Terminal emulator.
+  (use-package vterm
+    :ensure t
+
+    :commands
+    (vterm
+     vterm-other-window))
+
   ;; Language server integration.
   (use-package eglot
     :commands
@@ -657,6 +659,13 @@
     :hook
     ((markdown-mode gfm-mode) . markdown-toc-mode))
 
+  ;; Reading EPUB files.
+  (use-package nov
+    :ensure t
+
+    :mode
+    ("\\.epub\\'" . nov-mode))
+
   ;; Convert buffers to HTML (including org-mode).
   (use-package htmlize
     :ensure t
@@ -693,6 +702,11 @@
 
     :config
     (load-theme 'modus-vivendi-tinted :no-confirm))
+
+  ;; Highlight the current line.
+  (use-package hl-line
+    :hook
+    ((text-mode prog-mode) . hl-line-mode))
 
   ;; Remove some UI elements.
   (menu-bar-no-scroll-bar)
