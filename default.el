@@ -419,7 +419,12 @@
 
     :commands
     (vterm
-     vterm-other-window))
+     vterm-other-window)
+
+    :config
+    (add-hook 'vterm-mode-hook (lambda ()
+                                 ;; Disable line numbers.
+                                 (display-line-numbers-mode -1))))
 
   ;; Language server integration.
   (use-package eglot
