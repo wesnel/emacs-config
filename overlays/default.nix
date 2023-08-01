@@ -26,6 +26,10 @@ final: prev:
       pkg = final.nil;
     in "${pkg}/bin/nil";
 
+    parinfer = let
+      pkg = final.parinfer-rust;
+    in "${pkg}/lib/libparinfer_rust.so";
+
     pylsp = let
       pkg = final.python3.withPackages(p: with p; [
         jedi
@@ -42,41 +46,21 @@ final: prev:
       pkg = final.yaml-language-server;
     in "${pkg}/bin/yaml-language-server";
 
+    extraEmacsPackages = ePkgs: with ePkgs; [
+      treesit-grammars.with-all-grammars
+    ];
+
     override = eFinal: ePrev: {
-      chatgpt-shell = let
-        rev = "60e3b05220acff858a5b6fc43b8fa49dd886548a";
-        sha256 = "sha256-hXt2KClUvZa8M6AobUrpSBUtf4uk4WiLO/tHtc6eSuE=";
-
-        packageRequires = with eFinal; [
-          markdown-mode
-        ];
+      elsewhere = let
+        rev = "85300095abd8f227413f80b3185c96874fd05002";
+        sha256 = "sha256-GdarA9ac2UvJPphkictyM/k1SXlxE0qhCPJzh96nv3A=";
       in eFinal.trivialBuild {
-        pname = "chatgpt-shell";
+        pname = "elsewhere";
         version = rev;
 
         src = final.fetchFromGitHub {
-          owner = "xenodium";
-          repo = "chatgpt-shell";
-
-          inherit
-            rev
-            sha256;
-        };
-
-        inherit
-          packageRequires;
-      };
-
-      devil = let
-        rev = "98064ffed40a86def0049d87d8412a5049d14c31";
-        sha256 = "sha256-yZPtYt/9QvAtMn/3lYpmctb+hB5WmyeTovjTqVU/nhQ=";
-      in eFinal.trivialBuild {
-        pname = "devil";
-        version = rev;
-
-        src = final.fetchFromGitHub {
-          owner = "susam";
-          repo = "devil";
+          owner = "wesnel";
+          repo = "elsewhere";
 
           inherit
             rev
@@ -115,6 +99,22 @@ final: prev:
               sha256;
           };
         });
+
+      which-key = let
+        rev = "6abe544835d67f92a633fbf2622b9a8b6eb10a3c";
+        sha256 = "sha256-FzTdq3WXDzXJKXgSG9ctJLSCnsR9nnlV+wY3eNaEWYU=";
+      in ePrev.which-key.overrideAttrs (old:
+
+        {
+          src = final.fetchFromGitHub {
+            owner = "wesnel";
+            repo = "emacs-which-key";
+
+            inherit
+              rev
+              sha256;
+          };
+        });
     };
 
     emacs-config = final.substituteAll {
@@ -128,25 +128,28 @@ final: prev:
         gopls
         multimarkdown
         nil
+        parinfer
         pylsp
         yamlls;
     };
 
     wgn-emacs = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
-      package = final.emacsUnstable;
+      package = final.emacs-unstable;
       defaultInitFile = emacs-config;
 
       inherit
+        extraEmacsPackages
         override;
     };
 
     wgn-emacs-nox = final.emacsWithPackagesFromUsePackage {
       config = ../default.el;
-      package = final.emacsUnstable-nox;
+      package = final.emacs-unstable-nox;
       defaultInitFile = emacs-config;
 
       inherit
+        extraEmacsPackages
         override;
     };
   in {

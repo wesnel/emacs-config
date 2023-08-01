@@ -25,6 +25,22 @@
 
         preOverlays = [
           (import emacs-overlay)
+
+          (final: prev:
+
+            {
+              parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
+
+                {
+                  postInstall = ''
+                    ${old.postInstall}
+
+                    if [ -e $out/lib/libparinfer_rust.dylib ]
+                      then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
+                    fi
+                  '';
+                });
+            })
         ];
 
         name = "wgn-emacs";

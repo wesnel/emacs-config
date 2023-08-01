@@ -110,7 +110,7 @@
      ("M-'" . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
      ("C-M-#" . consult-register)
      ;; Other custom bindings
-     ("M-y" . consult-yank-pop)                ;; orig. yank-pop
+     ;; ("M-y" . consult-yank-pop)                ;; orig. yank-pop
      ;; M-g bindings in `goto-map'
      ("M-g e" . consult-compile-error)
      ("M-g f" . consult-flymake)               ;; Alternative: consult-flycheck
@@ -226,10 +226,13 @@
     :config
     (add-hook 'magit-mode-hook #'whitespace-mode))
 
-  ;; Maintain balanced parentheses.
-  (use-package elec-pair
-    :hook
-    (prog-mode . electric-pair-local-mode))
+  (use-package parinfer-rust-mode
+    :ensure t
+    :defer t
+    :hook lisp-data-mode
+
+    :custom
+    (parinfer-rust-library "@parinfer@"))
 
   ;; Spell checxing and correction.
   (use-package spell-fu
@@ -240,6 +243,13 @@
 
     :config
     (spell-fu-global-mode))
+
+  ;; Avoid need for modifier keys.
+  (use-package devil
+    :ensure t
+
+    :config
+    (global-devil-mode +1))
 
   ;; More convenient options for cursor movement.
   (use-package mwim
@@ -255,12 +265,6 @@
 
     :bind
     (:map corfu-map
-          ("<escape>". corfu-quit)
-          ("<return>" . corfu-insert)
-          ("TAB" . corfu-next)
-          ([tab] . corfu-next)
-          ("S-TAB" . corfu-previous)
-          ([backtab] . corfu-previous)
           ("SPC" . corfu-insert-separator))
 
     :custom
@@ -393,7 +397,7 @@
 
     :bind
     (:map selected-keymap
-          ("C-x c" . mc/edit-lines)))
+          ("C-x c" . mc/mark-all-like-this)))
 
   ;; Visual `query-replace' with regular expressions.
   (use-package visual-regexp
@@ -406,7 +410,9 @@
   (use-package eshell
     :bind
     (("C-x m" . eshell)
-     ("C-x M" . (lambda () (interactive) (eshell t))))
+     ("C-x M" . (lambda ()
+                  (interactive)
+                  (eshell t))))
 
     :config
     (add-hook 'eshell-mode-hook (lambda ()
@@ -425,6 +431,11 @@
     (add-hook 'vterm-mode-hook (lambda ()
                                  ;; Disable line numbers.
                                  (display-line-numbers-mode -1))))
+
+  ;; Error checking.
+  (use-package flymake
+    :hook
+    (prog-mode . flymake-mode))
 
   ;; Language server integration.
   (use-package eglot
@@ -456,7 +467,8 @@
     :ensure t
 
     :config
-    (which-key-mode +1))
+    (which-key-mode +1)
+    (which-key-enable-devil-support))
 
   ;; Rich annotations in the minibuffer completion.
   (use-package marginalia
@@ -475,6 +487,14 @@
      ("C-h k" . helpful-key)
      ("C-h x" . helpful-command)
      ("C-c C-d" . helpful-at-point)))
+
+  ;; Open code from Emacs in the web browser.
+  (use-package elsewhere
+    :ensure t
+
+    :commands
+    (elsewhere-open
+     elsewhere-build-url))
 
   ;; Send HTTP requests from Emacs.
   (use-package restclient
@@ -752,5 +772,5 @@
   (column-number-mode +1)
   (size-indication-mode +1))
 
-(provide 'init)
-;;; init.el ends here
+(provide 'default)
+;;; default.el ends here
