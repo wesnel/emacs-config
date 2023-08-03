@@ -51,6 +51,23 @@ final: prev:
     ];
 
     override = eFinal: ePrev: {
+      combobulate = let
+        rev = "e3370c97bcd1eb9b5dcba03014b246948c6e7126";
+        sha256 = "sha256-4KNlyftCuniP4DDXDBsDQmB1KReYz3xzRzkr/awx9eA=";
+      in eFinal.trivialBuild {
+        pname = "combobulate";
+        version = rev;
+
+        src = final.fetchFromGitHub {
+          owner = "mickeynp";
+          repo = "combobulate";
+
+          inherit
+            rev
+            sha256;
+        };
+      };
+
       elsewhere = let
         rev = "85300095abd8f227413f80b3185c96874fd05002";
         sha256 = "sha256-GdarA9ac2UvJPphkictyM/k1SXlxE0qhCPJzh96nv3A=";

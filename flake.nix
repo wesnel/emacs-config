@@ -3,7 +3,7 @@
 
   inputs = {
     emacs-overlay = {
-      url = github:nix-community/emacs-overlay;
+      url = "github:nix-community/emacs-overlay";
     };
 
     flake-utils = {
@@ -11,40 +11,42 @@
     };
 
     nixpkgs = {
-      url = github:nixos/nixpkgs/nixos-unstable;
+      url = "github:nixos/nixpkgs/nixos-unstable";
     };
   };
 
-  outputs = inputs@
-    { self
-    , emacs-overlay
-    , flake-utils
-    , nixpkgs }:
-      flake-utils.lib.simpleFlake {
-        inherit self nixpkgs;
+  outputs = { self
+            , emacs-overlay
+            , flake-utils
+            , nixpkgs }:
 
-        preOverlays = [
-          (import emacs-overlay)
+              flake-utils.lib.simpleFlake {
+                inherit
+                  nixpkgs
+                  self;
 
-          (final: prev:
+                preOverlays = [
+                  (import emacs-overlay)
 
-            {
-              parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
+                  (final: prev:
 
-                {
-                  postInstall = ''
-                    ${old.postInstall}
+                    {
+                      parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
 
-                    if [ -e $out/lib/libparinfer_rust.dylib ]
-                      then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
-                    fi
-                  '';
-                });
-            })
-        ];
+                        {
+                          postInstall = ''
+                            ${old.postInstall}
 
-        name = "wgn-emacs";
-        overlay = ./overlays;
-        systems = flake-utils.lib.defaultSystems;
-      };
+                            if [ -e $out/lib/libparinfer_rust.dylib ]
+                              then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
+                            fi
+                          '';
+                        });
+                    })
+                ];
+
+                name = "wgn-emacs";
+                overlay = ./overlays;
+                systems = flake-utils.lib.defaultSystems;
+              };
 }

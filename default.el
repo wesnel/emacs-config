@@ -226,6 +226,7 @@
     :config
     (add-hook 'magit-mode-hook #'whitespace-mode))
 
+  ;; Automatically manage parentheses in lisps.
   (use-package parinfer-rust-mode
     :ensure t
     :defer t
@@ -398,6 +399,18 @@
     :bind
     (:map selected-keymap
           ("C-x c" . mc/mark-all-like-this)))
+
+  ;; Structured editing and navigation based on tree sitter.
+  (use-package combobulate
+    :ensure t
+
+    :hook
+    ((python-ts-mode . combobulate-mode)
+     (js-ts-mode . combobulate-mode)
+     (css-ts-mode . combobulate-mode)
+     (yaml-ts-mode . combobulate-mode)
+     (typescript-ts-mode . combobulate-mode)
+     (tsx-ts-mode . combobulate-mode)))
 
   ;; Visual `query-replace' with regular expressions.
   (use-package visual-regexp
