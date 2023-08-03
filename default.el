@@ -42,7 +42,6 @@
     :config
     (no-littering-theme-backups))
 
-  ;; Keybindings.
   ;; Required for :bind in use-package.
   (use-package bind-key
     :ensure t)
@@ -221,10 +220,7 @@
     :ensure t
 
     :bind
-    (("C-x g" . magit))
-
-    :config
-    (add-hook 'magit-mode-hook #'whitespace-mode))
+    (("C-x g" . magit)))
 
   ;; Automatically manage parentheses in lisps.
   (use-package parinfer-rust-mode
