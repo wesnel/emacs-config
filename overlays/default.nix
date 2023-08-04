@@ -18,10 +18,6 @@ final: prev:
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
 
-    mujmap = let
-      pkg = final.mujmap;
-    in "${pkg}/bin/mujmap";
-
     multimarkdown = let
       pkg = final.multimarkdown;
     in "${pkg}/bin/multimarkdown";
@@ -147,7 +143,6 @@ final: prev:
         godef
         gofumpt
         gopls
-        mujmap
         multimarkdown
         nil
         parinfer

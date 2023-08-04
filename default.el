@@ -765,14 +765,18 @@
   ;; - user-mail-address
   ;; - user-full-name
   ;; - mml-secure-openpgp-signers
+  ;; - sendmail-program
   ;; - message-sendmail-extra-arguments
   (use-package notmuch
     :ensure t
 
     :custom
-    (sendmail-program "@mujmap@")
-    (mml-secure-openpgp-encrypt-to-self t)
     (mail-specify-envelope-from t)
+    (message-send-mail-function #'message-send-mail-with-sendmail)
+    (notmuch-crypto-process-mime t)
+    (mml-secure-openpgp-encrypt-to-self t)
+    (mml-secure-smime-sign-with-sender t)
+    (notmuch-search-oldest-first nil)
 
     :config
     (add-hook 'message-setup-hook #'mml-secure-message-sign)
@@ -785,7 +789,7 @@
     :ensure t
 
     :hook
-    (notmuch-mode . notmuch-indicator-mode)
+    (notmuch-hello-mode . notmuch-indicator-mode)
 
     :custom
     (notmuch-indicator-args '((:terms "tag:unread and tag:inbox" :label "📨"))))
