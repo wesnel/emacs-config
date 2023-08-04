@@ -1,3 +1,8 @@
+{ mail_address
+, mail_name
+, mail_maildir
+, mail_keyid }:
+
 final: prev:
 
 {
@@ -17,6 +22,10 @@ final: prev:
     gopls = let
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
+
+    mujmap = let
+      pkg = final.mujmap;
+    in "${pkg}/bin/mujmap";
 
     multimarkdown = let
       pkg = final.multimarkdown;
@@ -143,6 +152,11 @@ final: prev:
         godef
         gofumpt
         gopls
+        mail_address
+        mail_name
+        mail_maildir
+        mail_keyid
+        mujmap
         multimarkdown
         nil
         parinfer

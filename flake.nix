@@ -13,13 +13,21 @@
     nixpkgs = {
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
+
+    # TODO: how can i make these configurable by an external user
+    #       of this flake?
+    mail_address = "wgn@wesnel.dev";
+    mail_name = "Wesley Nelson";
+    mail_maildir = "$HOME/Maildir";
+    mail_keyid = "0x8AB4F50FF6C15D42";
   };
 
-  outputs =
+  outputs = inputs@
     { self
     , emacs-overlay
     , flake-utils
-    , nixpkgs }:
+    , nixpkgs
+    , ... }:
 
     flake-utils.lib.simpleFlake {
       inherit
@@ -35,6 +43,8 @@
             parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
 
               {
+                # HACK: on mac, the file has the extension ".dylib",
+                #       but it needs to be ".so":
                 postInstall = ''
                   ${old.postInstall}
 
@@ -47,7 +57,13 @@
       ];
 
       name = "wgn-emacs";
-      overlay = ./overlays;
+      overlay = import ./overlays {
+        inherit (inputs)
+          mail_address
+          mail_name
+          mail_maildir
+          mail_keyid;
+      };
       systems = flake-utils.lib.defaultSystems;
     };
 }

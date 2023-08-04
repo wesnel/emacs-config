@@ -67,7 +67,7 @@
   (use-package whitespace
     :hook
     ((text-mode prog-mode) . (lambda ()
-                               (add-hook 'before-save-hook 'whitespace-cleanup nil t)
+                               (add-hook 'before-save-hook #'whitespace-cleanup nil t)
                                (whitespace-mode +1)))
 
     :custom
@@ -758,6 +758,36 @@
   (use-package hl-line
     :hook
     ((text-mode prog-mode) . hl-line-mode))
+
+  ;; Email client.
+  (use-package notmuch
+    :ensure t
+
+    :custom
+    (user-mail-address "@mail_address@")
+    (user-full-name "@mail_name@")
+    (send-mail-function #'sendmail-send-it)
+    (sendmail-program "@mujmap@")
+    (messasge-sendmail-extra-arguments '("-C" "@mail_maildir@" "send"))
+    (mml-secure-openpgp-signers '("@mail_keyid@"))
+    (mml-secure-openpgp-encrypt-to-self t)
+    (mail-specify-envelope-from t)
+
+    :config
+    (add-hook 'message-setup-hook #'mml-secure-message-sign)
+
+    :bind
+    (("C-c m" . notmuch-hello)))
+
+  ;; Show notmuch counts on the mode line.
+  (use-package notmuch-indicator
+    :ensure t
+
+    :hook
+    (notmuch-mode . notmuch-indicator-mode)
+
+    :custom
+    (notmuch-indicator-args '((:terms "tag:unread and tag:inbox" :label "📨"))))
 
   ;; Remove some UI elements.
   (menu-bar-no-scroll-bar)
