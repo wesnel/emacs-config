@@ -15,7 +15,7 @@
     };
   };
 
-  outputs = inputs@
+  outputs =
     { self
     , emacs-overlay
     , flake-utils

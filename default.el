@@ -768,13 +768,14 @@
     (user-full-name "@mail_name@")
     (send-mail-function #'sendmail-send-it)
     (sendmail-program "@mujmap@")
-    (messasge-sendmail-extra-arguments '("-C" "@mail_maildir@" "send"))
     (mml-secure-openpgp-signers '("@mail_keyid@"))
     (mml-secure-openpgp-encrypt-to-self t)
     (mail-specify-envelope-from t)
 
     :config
     (add-hook 'message-setup-hook #'mml-secure-message-sign)
+    (setq-default messasge-sendmail-extra-arguments
+                  '("-C" "@mail_maildir@" "send"))
 
     :bind
     (("C-c m" . notmuch-hello)))

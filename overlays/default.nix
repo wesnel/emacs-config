@@ -1,6 +1,13 @@
 final: prev:
 
-{
+let
+  # TODO: how can i make these configurable by an external user
+  #       of this flake?
+  mail_address = "wgn@wesnel.dev";
+  mail_name = "Wesley Nelson";
+  mail_maildir = "/Users/wesleynelson/Maildir/fastmail";
+  mail_keyid = "0x8AB4F50FF6C15D42";
+in {
   wgn-emacs = let
     aspell = let
       pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
@@ -18,9 +25,9 @@ final: prev:
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
 
-    mujmap = let
-      pkg = final.mujmap;
-    in "${pkg}/bin/mujmap";
+    # TODO: how can i make it so external users of this flake can pass
+    #       in their own value?
+    mujmap = "mujmap";
 
     multimarkdown = let
       pkg = final.multimarkdown;
@@ -137,13 +144,6 @@ final: prev:
           };
         });
     };
-
-    # TODO: how can i make these configurable by an external user
-    #       of this flake?
-    mail_address = "wgn@wesnel.dev";
-    mail_name = "Wesley Nelson";
-    mail_maildir = "$HOME/Maildir";
-    mail_keyid = "0x8AB4F50FF6C15D42";
 
     emacs-config = final.substituteAll {
       name = "default.el";
