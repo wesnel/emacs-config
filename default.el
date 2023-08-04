@@ -760,22 +760,22 @@
     ((text-mode prog-mode) . hl-line-mode))
 
   ;; Email client.
+  ;;
+  ;; NOTE: set the following variables with customize:
+  ;; - user-mail-address
+  ;; - user-full-name
+  ;; - mml-secure-openpgp-signers
+  ;; - message-sendmail-extra-arguments
   (use-package notmuch
     :ensure t
 
     :custom
-    (user-mail-address "@mail_address@")
-    (user-full-name "@mail_name@")
-    (send-mail-function #'sendmail-send-it)
     (sendmail-program "@mujmap@")
-    (mml-secure-openpgp-signers '("@mail_keyid@"))
     (mml-secure-openpgp-encrypt-to-self t)
     (mail-specify-envelope-from t)
 
     :config
     (add-hook 'message-setup-hook #'mml-secure-message-sign)
-    (setq-default messasge-sendmail-extra-arguments
-                  '("-C" "@mail_maildir@" "send"))
 
     :bind
     (("C-c m" . notmuch-hello)))
