@@ -15,38 +15,39 @@
     };
   };
 
-  outputs = { self
-            , emacs-overlay
-            , flake-utils
-            , nixpkgs }:
+  outputs =
+    { self
+    , emacs-overlay
+    , flake-utils
+    , nixpkgs }:
 
-              flake-utils.lib.simpleFlake {
-                inherit
-                  nixpkgs
-                  self;
+    flake-utils.lib.simpleFlake {
+      inherit
+        nixpkgs
+        self;
 
-                preOverlays = [
-                  (import emacs-overlay)
+      preOverlays = [
+        (import emacs-overlay)
 
-                  (final: prev:
+        (final: prev:
 
-                    {
-                      parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
+          {
+            parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
 
-                        {
-                          postInstall = ''
+              {
+                postInstall = ''
                             ${old.postInstall}
 
                             if [ -e $out/lib/libparinfer_rust.dylib ]
                               then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
                             fi
                           '';
-                        });
-                    })
-                ];
+              });
+          })
+      ];
 
-                name = "wgn-emacs";
-                overlay = ./overlays;
-                systems = flake-utils.lib.defaultSystems;
-              };
+      name = "wgn-emacs";
+      overlay = ./overlays;
+      systems = flake-utils.lib.defaultSystems;
+    };
 }
