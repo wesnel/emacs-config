@@ -36,12 +36,12 @@
 
               {
                 postInstall = ''
-                            ${old.postInstall}
+                  ${old.postInstall}
 
-                            if [ -e $out/lib/libparinfer_rust.dylib ]
-                              then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
-                            fi
-                          '';
+                  if [ -e $out/lib/libparinfer_rust.dylib ]
+                    then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
+                  fi
+                '';
               });
           })
       ];
