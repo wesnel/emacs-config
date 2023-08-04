@@ -66,9 +66,9 @@
   ;; Whitespace preferences.
   (use-package whitespace
     :hook
-    ((text-mode prog-mode) . (lambda ()
-                               (add-hook 'before-save-hook #'whitespace-cleanup nil t)
-                               (whitespace-mode +1)))
+    ((text-mode prog-mode) . #'(lambda ()
+                                 (add-hook 'before-save-hook #'whitespace-cleanup nil t)
+                                 (whitespace-mode +1)))
 
     :custom
     (whitespace-style '(face tabs empty trailing)))
@@ -108,56 +108,56 @@
 
     :bind
     (;; C-c bindings in `mode-specific-map'
-     ("C-c M-x" . consult-mode-command)
-     ("C-c h" . consult-history)
-     ("C-c k" . consult-kmacro)
-     ("C-c m" . consult-man)
-     ("C-c i" . consult-info)
+     ("C-c M-x" . #'consult-mode-command)
+     ("C-c h" . #'consult-history)
+     ("C-c k" . #'consult-kmacro)
+     ("C-c m" . #'consult-man)
+     ("C-c i" . #'consult-info)
      ([remap Info-search] . consult-info)
      ;; C-x bindings in `ctl-x-map'
-     ("C-x M-:" . consult-complex-command)     ;; orig. repeat-complex-command
-     ("C-x b" . consult-buffer)                ;; orig. switch-to-buffer
-     ("C-x 4 b" . consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
-     ("C-x 5 b" . consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
-     ("C-x r b" . consult-bookmark)            ;; orig. bookmark-jump
-     ("C-x p b" . consult-project-buffer)      ;; orig. project-switch-to-buffer
+     ("C-x M-:" . #'consult-complex-command)     ;; orig. repeat-complex-command
+     ("C-x b" . #'consult-buffer)                ;; orig. switch-to-buffer
+     ("C-x 4 b" . #'consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
+     ("C-x 5 b" . #'consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
+     ("C-x r b" . #'consult-bookmark)            ;; orig. bookmark-jump
+     ("C-x p b" . #'consult-project-buffer)      ;; orig. project-switch-to-buffer
      ;; Custom M-# bindings for fast register access
-     ("M-#" . consult-register-load)
-     ("M-'" . consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
-     ("C-M-#" . consult-register)
+     ("M-#" . #'consult-register-load)
+     ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
+     ("C-M-#" . #'consult-register)
      ;; Other custom bindings
-     ;; ("M-y" . consult-yank-pop)                ;; orig. yank-pop
+     ;; ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
      ;; M-g bindings in `goto-map'
-     ("M-g e" . consult-compile-error)
-     ("M-g f" . consult-flymake)               ;; Alternative: consult-flycheck
-     ("M-g g" . consult-goto-line)             ;; orig. goto-line
-     ("M-g M-g" . consult-goto-line)           ;; orig. goto-line
-     ("M-g o" . consult-outline)               ;; Alternative: consult-org-heading
-     ("M-g m" . consult-mark)
-     ("M-g k" . consult-global-mark)
-     ("M-g i" . consult-imenu)
-     ("M-g I" . consult-imenu-multi)
+     ("M-g e" . #'consult-compile-error)
+     ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
+     ("M-g g" . #'consult-goto-line)             ;; orig. goto-line
+     ("M-g M-g" . #'consult-goto-line)           ;; orig. goto-line
+     ("M-g o" . #'consult-outline)               ;; Alternative: consult-org-heading
+     ("M-g m" . #'consult-mark)
+     ("M-g k" . #'consult-global-mark)
+     ("M-g i" . #'consult-imenu)
+     ("M-g I" . #'consult-imenu-multi)
      ;; M-s bindings in `search-map'
-     ("M-s d" . consult-find)
-     ("M-s D" . consult-locate)
-     ("M-s g" . consult-grep)
-     ("M-s G" . consult-git-grep)
-     ("M-s r" . consult-ripgrep)
-     ("M-s l" . consult-line)
-     ("M-s L" . consult-line-multi)
-     ("M-s k" . consult-keep-lines)
-     ("M-s u" . consult-focus-lines)
+     ("M-s d" . #'consult-find)
+     ("M-s D" . #'consult-locate)
+     ("M-s g" . #'consult-grep)
+     ("M-s G" . #'consult-git-grep)
+     ("M-s r" . #'consult-ripgrep)
+     ("M-s l" . #'consult-line)
+     ("M-s L" . #'consult-line-multi)
+     ("M-s k" . #'consult-keep-lines)
+     ("M-s u" . #'consult-focus-lines)
      ;; Isearch integration
-     ("M-s e" . consult-isearch-history)
+     ("M-s e" . #'consult-isearch-history)
      :map isearch-mode-map
-     ("M-e" . consult-isearch-history)         ;; orig. isearch-edit-string
-     ("M-s e" . consult-isearch-history)       ;; orig. isearch-edit-string
-     ("M-s l" . consult-line)                  ;; needed by consult-line to detect isearch
-     ("M-s L" . consult-line-multi)            ;; needed by consult-line to detect isearch
+     ("M-e" . #'consult-isearch-history)         ;; orig. isearch-edit-string
+     ("M-s e" . #'consult-isearch-history)       ;; orig. isearch-edit-string
+     ("M-s l" . #'consult-line)                  ;; needed by consult-line to detect isearch
+     ("M-s L" . #'consult-line-multi)            ;; needed by consult-line to detect isearch
      ;; Minibuffer history
      :map minibuffer-local-map
-     ("M-s" . consult-history)                 ;; orig. next-matching-history-element
-     ("M-r" . consult-history))                ;; orig. previous-matching-history-element
+     ("M-s" . #'consult-history)                 ;; orig. next-matching-history-element
+     ("M-r" . #'consult-history))                ;; orig. previous-matching-history-element
 
     :custom
     (xref-show-xrefs-function #'consult-xref)
@@ -166,7 +166,7 @@
   ;; Move between windows.
   (use-package window
     :bind
-    (("M-o" . other-window)))
+    (("M-o" . #'other-window)))
 
   ;; Divide window configurations into workspaces.
   (use-package eyebrowse
@@ -188,15 +188,15 @@
     :ensure t
 
     :bind
-    (([remap kill-ring-save] . easy-kill)
-     ([remap mark-sexp] . easy-mark)))
+    (([remap kill-ring-save] . #'easy-kill)
+     ([remap mark-sexp] . #'easy-mark)))
 
   ;; Browse through killed regions.
   (use-package browse-kill-ring
     :ensure t
 
     :bind
-    (("M-y" . browse-kill-ring)))
+    (("M-y" . #'browse-kill-ring)))
 
   ;; Persist history over Emacs restarts.
   (use-package savehist
@@ -236,8 +236,15 @@
   (use-package magit
     :ensure t
 
+    :commands
+    (magit
+     magit-project-status)
+
+    :init
+    (define-key project-prefix-map "m" #'magit-project-status)
+
     :bind
-    (("C-x g" . magit)))
+    (("C-x g" . #'magit)))
 
   ;; Automatically manage parentheses in lisps.
   (use-package parinfer-rust-mode
@@ -270,8 +277,8 @@
     :ensure t
 
     :bind
-    (("C-a" . mwim-beginning)
-     ("C-e" . mwim-end)))
+    (("C-a" . #'mwim-beginning)
+     ("C-e" . #'mwim-end)))
 
   ;; In-buffer completion with `completion-in-region'.
   (use-package corfu
@@ -279,7 +286,7 @@
 
     :bind
     (:map corfu-map
-          ("SPC" . corfu-insert-separator))
+          ("SPC" . #'corfu-insert-separator))
 
     :custom
     (tab-always-indent 'complete)         ; Show completions with tab key.
@@ -358,10 +365,10 @@
     :ensure t
 
     :hook
-    ((prog-mode text-mode) . (lambda ()
-                               (setq-local completion-at-point-functions
-                                           (cons #'tempel-expand
-                                                 completion-at-point-functions)))))
+    ((prog-mode text-mode) . #'(lambda ()
+                                 (setq-local completion-at-point-functions
+                                             (cons #'tempel-expand
+                                                   completion-at-point-functions)))))
 
   ;; Pre-made templates for tempel.
   (use-package tempel-collection
@@ -372,9 +379,9 @@
     :ensure t
 
     :bind
-    (("C-." . embark-act)
-     ("M-." . embark-dwim)        ; orig. `xref-find-definitions'.
-     ("C-h B" . embark-bindings)) ; orig. `describe-bindings'.
+    (("C-." . #'embark-act)
+     ("M-." . #'embark-dwim)        ; orig. `xref-find-definitions'.
+     ("C-h B" . #'embark-bindings)) ; orig. `describe-bindings'.
 
     :config
     ;; Hide the mode line of the Embark live/completions buffers
@@ -396,7 +403,7 @@
 
     :bind
     (:map grep-mode-map
-          ("C-c C-p" . wgrep-change-to-wgrep-mode)))
+          ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
 
   ;; Creates a minor mode for when the point is in a selection.
   (use-package selected
@@ -411,7 +418,7 @@
 
     :bind
     (:map selected-keymap
-          ("C-x c" . mc/mark-all-like-this)))
+          ("C-x c" . #'mc/mark-all-like-this)))
 
   ;; Structured editing and navigation based on tree sitter.
   (use-package combobulate
@@ -435,15 +442,15 @@
   ;; Shell written in Emacs Lisp.
   (use-package eshell
     :bind
-    (("C-x m" . eshell)
-     ("C-x M" . (lambda ()
-                  (interactive)
-                  (eshell t))))
+    (("C-x m" . #'eshell)
+     ("C-x M" . #'(lambda ()
+                    (interactive)
+                    (eshell t))))
 
     :config
-    (add-hook 'eshell-mode-hook (lambda ()
-                                  ;; Disable line numbers.
-                                  (display-line-numbers-mode -1))))
+    (add-hook 'eshell-mode-hook #'(lambda ()
+                                    ;; Disable line numbers.
+                                    (display-line-numbers-mode -1))))
 
   ;; Terminal emulator.
   (use-package vterm
@@ -454,9 +461,9 @@
      vterm-other-window)
 
     :config
-    (add-hook 'vterm-mode-hook (lambda ()
-                                 ;; Disable line numbers.
-                                 (display-line-numbers-mode -1))))
+    (add-hook 'vterm-mode-hook #'(lambda ()
+                                   ;; Disable line numbers.
+                                   (display-line-numbers-mode -1))))
 
   ;; Error checking.
   (use-package flymake
@@ -471,17 +478,20 @@
 
     :bind
     (:map eglot-mode-map
-          ("C-c C-l ." . xref-find-definitions)
-          ("C-c C-l ?" . xref-find-references)
-          ("C-c C-l r" . eglot-rename)
-          ("C-c C-l i" . eglot-find-implementation)
-          ("C-c C-l d" . eldoc)
-          ("C-c C-l e" . eglot-code-actions))
+          ("C-c C-l ." . #'xref-find-definitions)
+          ("C-c C-l ?" . #'xref-find-references)
+          ("C-c C-l r" . #'eglot-rename)
+          ("C-c C-l i" . #'eglot-find-implementation)
+          ("C-c C-l d" . #'eldoc)
+          ("C-c C-l e" . #'eglot-code-actions))
 
     :config
     (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster))
 
   ;; Interface for talking to ChatGPT.
+  ;;
+  ;; NOTE: set the following variables with customize:
+  ;; - chatgpt-shell-openai-key
   (use-package chatgpt-shell
     :ensure t
 
@@ -508,11 +518,11 @@
     :ensure t
 
     :bind
-    (("C-h f" . helpful-callable)
-     ("C-h v" . helpful-variable)
-     ("C-h k" . helpful-key)
-     ("C-h x" . helpful-command)
-     ("C-c C-d" . helpful-at-point)))
+    (("C-h f" . #'helpful-callable)
+     ("C-h v" . #'helpful-variable)
+     ("C-h k" . #'helpful-key)
+     ("C-h x" . #'helpful-command)
+     ("C-c C-d" . #'helpful-at-point)))
 
   ;; Open code from Emacs in the web browser.
   (use-package elsewhere
@@ -571,15 +581,15 @@
     ("go\\.work\\'" . go-dot-work-mode)
 
     :hook
-    (go-dot-work-mode . (lambda ()
-                          (require 'go-ts-mode)))
-    (go-ts-mode . (lambda ()
-                    (require 'go-mode)
-                    (defun go-ts-mode-run-gofmt ()
-                      "Use the `gofmt' function from go-mode inside go-ts-mode."
-                      (interactive)
-                      (gofmt))
-                    (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
+    (go-dot-work-mode . #'(lambda ()
+                            (require 'go-ts-mode)))
+    (go-ts-mode . #'(lambda ()
+                      (require 'go-mode)
+                      (defun go-ts-mode-run-gofmt ()
+                        "Use the `gofmt' function from go-mode inside go-ts-mode."
+                        (interactive)
+                        (gofmt))
+                      (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
 
     :custom
     (gofmt-command "@gofumpt@")
@@ -698,7 +708,7 @@
 
     :bind
     (:map markdown-mode-map
-          ("C-c C-e" . markdown-do))
+          ("C-c C-e" . #'markdown-do))
 
     :custom
     (markdown-command "@multimarkdown@"))
@@ -782,7 +792,7 @@
     (add-hook 'message-setup-hook #'mml-secure-message-sign)
 
     :bind
-    (("C-c m" . notmuch-hello)))
+    (("C-c m" . #'notmuch-hello)))
 
   ;; Show notmuch counts on the mode line.
   (use-package notmuch-indicator
