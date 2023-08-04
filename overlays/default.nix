@@ -1,8 +1,3 @@
-{ mail_address
-, mail_name
-, mail_maildir
-, mail_keyid }:
-
 final: prev:
 
 {
@@ -142,6 +137,13 @@ final: prev:
           };
         });
     };
+
+    # TODO: how can i make these configurable by an external user
+    #       of this flake?
+    mail_address = "wgn@wesnel.dev";
+    mail_name = "Wesley Nelson";
+    mail_maildir = "$HOME/Maildir";
+    mail_keyid = "0x8AB4F50FF6C15D42";
 
     emacs-config = final.substituteAll {
       name = "default.el";
