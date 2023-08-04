@@ -551,7 +551,7 @@
     :init
     ;; Set up syntax highlighting for go-ts-mode.
     (defun go-ts-mode-highlighting-setup ()
-      (whitespace-toggle-options '(tabs))
+      (whitespace-toggle-options '(tabs lines))
       (treesit-font-lock-recompute-features))
     (add-hook 'go-ts-mode-hook #'go-ts-mode-highlighting-setup)
     (add-hook 'go-mod-ts-mode-hook #'go-ts-mode-highlighting-setup)
