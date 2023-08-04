@@ -241,7 +241,9 @@
      magit-project-status)
 
     :init
-    (define-key project-prefix-map "m" #'magit-project-status)
+    (with-eval-after-load 'project
+      (define-key project-prefix-map "m" #'magit-project-status)
+      (add-to-list 'project-switch-commands '(magit-project-status "Magit") t))
 
     :bind
     (("C-x g" . #'magit)))
@@ -269,7 +271,7 @@
   (use-package devil
     :ensure t
 
-    :config
+    :init
     (global-devil-mode +1))
 
   ;; More convenient options for cursor movement.
