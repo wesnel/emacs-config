@@ -77,9 +77,9 @@
   ;; Whitespace preferences.
   (use-package whitespace
     :hook
-    ((text-mode prog-mode) . #'(lambda ()
-                                 (add-hook 'before-save-hook #'whitespace-cleanup nil t)
-                                 (whitespace-mode +1)))
+    ((text-mode prog-mode) . (lambda ()
+                               (add-hook 'before-save-hook #'whitespace-cleanup nil t)
+                               (whitespace-mode +1)))
 
     :custom
     (whitespace-style '(face tabs empty trailing)))
@@ -378,10 +378,10 @@
     :ensure t
 
     :hook
-    ((prog-mode text-mode) . #'(lambda ()
-                                 (setq-local completion-at-point-functions
-                                             (cons #'tempel-expand
-                                                   completion-at-point-functions)))))
+    ((prog-mode text-mode) . (lambda ()
+                               (setq-local completion-at-point-functions
+                                           (cons #'tempel-expand
+                                                 completion-at-point-functions)))))
 
   ;; Pre-made templates for tempel.
   (use-package tempel-collection
@@ -455,9 +455,9 @@
   ;; Shell written in Emacs Lisp.
   (use-package eshell
     :config
-    (add-hook 'eshell-mode-hook #'(lambda ()
-                                    ;; Disable line numbers.
-                                    (display-line-numbers-mode -1))))
+    (add-hook 'eshell-mode-hook (lambda ()
+                                  ;; Disable line numbers.
+                                  (display-line-numbers-mode -1))))
 
   ;; Terminal emulator.
   (use-package vterm
@@ -468,9 +468,9 @@
      vterm-other-window)
 
     :config
-    (add-hook 'vterm-mode-hook #'(lambda ()
-                                   ;; Disable line numbers.
-                                   (display-line-numbers-mode -1))))
+    (add-hook 'vterm-mode-hook (lambda ()
+                                 ;; Disable line numbers.
+                                 (display-line-numbers-mode -1))))
 
   ;; Error checking.
   (use-package flymake
@@ -588,15 +588,15 @@
     ("go\\.work\\'" . go-dot-work-mode)
 
     :hook
-    (go-dot-work-mode . #'(lambda ()
-                            (require 'go-ts-mode)))
-    (go-ts-mode . #'(lambda ()
-                      (require 'go-mode)
-                      (defun go-ts-mode-run-gofmt ()
-                        "Use the `gofmt' function from go-mode inside go-ts-mode."
-                        (interactive)
-                        (gofmt))
-                      (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
+    (go-dot-work-mode . (lambda ()
+                          (require 'go-ts-mode)))
+    (go-ts-mode . (lambda ()
+                    (require 'go-mode)
+                    (defun go-ts-mode-run-gofmt ()
+                      "Use the `gofmt' function from go-mode inside go-ts-mode."
+                      (interactive)
+                      (gofmt))
+                    (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
 
     :custom
     (gofmt-command "@gofumpt@")
