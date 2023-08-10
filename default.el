@@ -79,10 +79,7 @@
     :hook
     ((text-mode prog-mode) . (lambda ()
                                (add-hook 'before-save-hook #'whitespace-cleanup nil t)
-                               (whitespace-mode +1)))
-
-    :custom
-    (whitespace-style '(face tabs empty trailing)))
+                               (whitespace-toggle-options '(lines)))))
 
   ;; Syntax highlighting.
   (use-package treesit
@@ -554,13 +551,6 @@
      ("go\\.mod\\'" . go-mod-ts-mode))
 
     :init
-    ;; Set up syntax highlighting for go-ts-mode.
-    (defun go-ts-mode-highlighting-setup ()
-      (whitespace-toggle-options '(tabs lines))
-      (treesit-font-lock-recompute-features))
-    (add-hook 'go-ts-mode-hook #'go-ts-mode-highlighting-setup)
-    (add-hook 'go-mod-ts-mode-hook #'go-ts-mode-highlighting-setup)
-
     ;; Set up eglot for go-ts-mode.
     (defun go-ts-mode-eglot-setup ()
       (with-eval-after-load 'eglot
