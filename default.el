@@ -48,9 +48,20 @@
                      "LANG"
                      "LC_CTYPE"
                      "NIX_SSL_CERT_FILE"
-                     "NIX_PATH"))
+                     "NIX_PATH"
+                     "PASSWORD_STORE_DIR"
+                     "PASSWORD_STORE_KEY"
+                     "PASSWORD_STORE_SIGNING_KEY"))
         (add-to-list 'exec-path-from-shell-variables var))
       (exec-path-from-shell-initialize)))
+
+  ;; Store secrets in Emacs.
+  (use-package auth-source
+    :custom
+    (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
+
+    :config
+    (auth-source-pass-enable))
 
   ;; Avoid putting files in weird places.
   (use-package no-littering
@@ -443,12 +454,6 @@
 
   ;; Shell written in Emacs Lisp.
   (use-package eshell
-    :bind
-    (("C-x m" . #'eshell)
-     ("C-x M" . #'(lambda ()
-                    (interactive)
-                    (eshell t))))
-
     :config
     (add-hook 'eshell-mode-hook #'(lambda ()
                                     ;; Disable line numbers.
@@ -800,11 +805,23 @@
   (use-package notmuch-indicator
     :ensure t
 
-    :hook
-    (notmuch-hello-mode . notmuch-indicator-mode)
+    :config
+    (notmuch-indicator-mode +1)
 
     :custom
     (notmuch-indicator-args '((:terms "tag:unread and tag:inbox" :label "📨"))))
+
+  ;; Transient interface for notmuch commands.
+  (use-package notmuch-transient
+    :ensure t)
+
+  ;; Link between org-mode and notmuch buffers.
+  (use-package ol-notmuch
+    :ensure t)
+
+  ;; Adds various transient interfaces.
+  (use-package tray
+    :ensure t)
 
   ;; Remove some UI elements.
   (menu-bar-no-scroll-bar)
