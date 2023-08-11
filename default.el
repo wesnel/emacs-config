@@ -812,6 +812,22 @@
   (use-package tray
     :ensure t)
 
+  (use-package proced
+    :commands
+    (proced)
+
+    :custom
+    (proced-auto-update-flag t)
+    (proced-goal-attribute nil)
+    (proced-show-remote-processes t)
+    (proced-enable-color-flag t)
+    (proced-format 'custom)
+
+    :config
+    (add-to-list
+     'proced-format-alist
+     '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
+
   (use-package emacs
     :custom
     ;; Don't assume double spaces at the end of a sentence.
