@@ -784,22 +784,21 @@
     (mml-secure-openpgp-encrypt-to-self t)
     (mml-secure-smime-sign-with-sender t)
     (notmuch-search-oldest-first nil)
+    (read-mail-command
+     (lambda ()
+       (interactive)
+       (notmuch-search "tag:unread and tag:inbox")))
+    (display-time-mail-function
+     (lambda () (replace-regexp-in-string
+                 "\n" " "
+                 (shell-command-to-string
+                  "notmuch count tag:unread and tag:inbox"))))
 
-    :config
-    (add-hook 'message-setup-hook #'mml-secure-message-sign)
+   :config
+   (add-hook 'message-setup-hook #'mml-secure-message-sign)
 
-    :bind
-    (("C-c m" . #'notmuch-hello)))
-
-  ;; Show notmuch counts on the mode line.
-  (use-package notmuch-indicator
-    :ensure t
-
-    :config
-    (notmuch-indicator-mode +1)
-
-    :custom
-    (notmuch-indicator-args '((:terms "tag:unread and tag:inbox" :label "📨"))))
+   :bind
+   (("C-c m" . #'notmuch-hello)))
 
   ;; Transient interface for notmuch commands.
   (use-package notmuch-transient
@@ -813,44 +812,47 @@
   (use-package tray
     :ensure t)
 
-  ;; Remove some UI elements.
-  (menu-bar-no-scroll-bar)
-  (menu-bar-no-window-divider)
+  (use-package emacs
+    :custom
+    ;; Don't assume double spaces at the end of a sentence.
+    (sentence-end-double-space nil)
+    ;; Allow minibuffer commands while in the minibuffer.
+    (enable-recursive-minibuffers t)
+    ;; Place newline at end of file.
+    (require-final-newline t)
+    ;; Don't use tabs to indent.
+    (indent-tabs-mode nil)
+    ;; Maintain correct appearance of tabs.
+    (tab-width 8)
+    ;; Hide commands in M-x which do not work in the current mode.
+    (read-extended-command-predicate #'command-completion-default-include-p)
+    ;; Configure the time display on the mode line.
+    (display-time-day-and-date t)
+    (display-time-24hr-format t)
+    (display-time-use-mail-icon t)
 
-  ;; Don't assume double spaces at the end of a sentence.
-  (setq-default sentence-end-double-space nil)
+    :config
+    ;; Remove some UI elements.
+    (menu-bar-no-scroll-bar)
+    (menu-bar-no-window-divider)
 
-  ;; Show line numbers at the beginning of each line.
-  (global-display-line-numbers-mode +1)
+    ;; Show line numbers at the beginning of each line.
+    (global-display-line-numbers-mode +1)
 
-  ;; Revert buffers automatically when underlying files are changed externally.
-  (global-auto-revert-mode +1)
+    ;; Revert buffers automatically when underlying files are changed externally.
+    (global-auto-revert-mode +1)
 
-  ;; Enable y/n answers.
-  (fset 'yes-or-no-p 'y-or-n-p)
+    ;; Enable y/n answers.
+    (fset 'yes-or-no-p 'y-or-n-p)
 
-  ;; Allow minibuffer commands while in the minibuffer.
-  (setq-default enable-recursive-minibuffers t)
+    ;; More intuitive deletion.
+    (delete-selection-mode +1)
 
-  ;; More intuitive deletion.
-  (delete-selection-mode +1)
-
-  ;; Place newline at end of file.
-  (setq-default require-final-newline t)
-
-  ;; Don't use tabs to indent.
-  (setq-default indent-tabs-mode nil)
-
-  ;; Maintain correct appearance of tabs.
-  (setq-default tab-width 8)
-
-  ;; Hide commands in M-x which do not work in the current mode.
-  (setq-default read-extended-command-predicate #'command-completion-default-include-p)
-
-  ;; Mode line settings.
-  (line-number-mode +1)
-  (column-number-mode +1)
-  (size-indication-mode +1))
+    ;; Mode line settings.
+    (line-number-mode +1)
+    (column-number-mode +1)
+    (size-indication-mode +1)
+    (display-time)))
 
 (provide 'default)
 ;;; default.el ends here
