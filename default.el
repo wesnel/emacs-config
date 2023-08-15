@@ -338,7 +338,12 @@
    magit-project-status)
 
   :bind
-  (("C-x g" . #'magit)))
+  (("C-x g" . #'magit))
+
+  :init
+  (with-eval-after-load 'project
+    (define-key project-prefix-map "m" #'magit-project-status)
+    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
 ;; Automatically manage parentheses in lisps.
 (use-package parinfer-rust-mode
