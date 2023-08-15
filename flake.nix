@@ -67,6 +67,10 @@
 
                 withNativeCompilation = true;
                 withTreeSitter = true;
+
+                passthru = old.passthru // {
+                  treeSitter = true;
+                };
               });
           })
       ];

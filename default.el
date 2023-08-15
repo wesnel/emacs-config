@@ -49,7 +49,7 @@
     :defines
     (exec-path-from-shell-variables)
 
-    :config
+    :init
     (dolist (var '("SSH_AUTH_SOCK"
                    "SSH_AGENT_PID"
                    "GPG_AGENT_INFO"
@@ -80,7 +80,7 @@
   :functions
   (no-littering-theme-backups)
 
-  :config
+  :init
   (no-littering-theme-backups))
 
 ;; Required for :bind in use-package.
@@ -119,7 +119,7 @@
   :functions
   (global-hl-todo-mode)
 
-  :config
+  :init
   (global-hl-todo-mode +1))
 
 ;; Completion engine based on `completing-read'.
@@ -130,7 +130,7 @@
   :functions
   (vertico-mode)
 
-  :config
+  :init
   (vertico-mode +1))
 
 ;; Completion style that allows for multiple regular expressions.
@@ -320,7 +320,7 @@
   :custom
   (undo-tree-auto-save-history t)
 
-  :config
+  :init
   (global-undo-tree-mode +1))
 
 ;; Project management.
@@ -360,7 +360,7 @@
   :custom
   (ispell-program-name "@aspell@")
 
-  :config
+  :init
   (spell-fu-global-mode))
 
 ;; Avoid need for modifier keys.
@@ -422,7 +422,7 @@
   (corfu-preview-current 'insert)       ; Preview current candidate.
   (corfu-preselect-first t)             ; Pre-select first candidate.
 
-  :config
+  :init
   (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
 
   ;; Show docs in popup.
@@ -440,7 +440,7 @@
     :functions
     (corfu-terminal-mode)
 
-    :config
+    :init
     (corfu-terminal-mode +1)))
 
 ;; Extra `completion-at-point-functions'.
@@ -463,7 +463,7 @@
    cape-symbol
    cape-line)
 
-  :config
+  :init
   ;; Add `completion-at-point-functions', used by `completion-at-point'.
   ;; NOTE: The order matters!
   (add-to-list 'completion-at-point-functions #'cape-dabbrev)
@@ -662,7 +662,7 @@
   (which-key-mode
    which-key-enable-devil-support)
 
-  :config
+  :init
   (which-key-mode +1)
   (which-key-enable-devil-support))
 
@@ -674,7 +674,7 @@
   :commands
   (marginalia-mode)
 
-  :config
+  :init
   (marginalia-mode +1))
 
 ;; More helpful documentation for Emacs Lisp.
@@ -909,7 +909,7 @@
   (diff-hl-margin-mode
    global-diff-hl-mode)
 
-  :config
+  :init
   (diff-hl-margin-mode)
   (global-diff-hl-mode))
 
@@ -939,7 +939,7 @@
     (auto-dark-dark-theme 'modus-vivendi-tinted)
     (auto-dark-light-theme 'modus-operandi-tinted)
 
-    :config
+    :init
     (auto-dark-mode +1)))
 
 ;; Highlight the current line.
