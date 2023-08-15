@@ -49,7 +49,7 @@
     :defines
     (exec-path-from-shell-variables)
 
-    :init
+    :config
     (dolist (var '("SSH_AUTH_SOCK"
                    "SSH_AGENT_PID"
                    "GPG_AGENT_INFO"
@@ -80,7 +80,7 @@
   :functions
   (no-littering-theme-backups)
 
-  :init
+  :config
   (no-littering-theme-backups))
 
 ;; Required for :bind in use-package.
