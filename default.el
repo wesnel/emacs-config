@@ -772,11 +772,16 @@
   ("go\\.mod\\'" . go-mod-ts-mode)
 
   :preface
+  (defun apply-eglot-format ()
+    (unless (and (fboundp 'magit-rebase-in-progress-p)
+                 (magit-rebase-in-progress-p))
+      (eglot-format-buffer)))
+
   (defun go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
-      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -801,6 +806,12 @@
   :commands
   (gofmt)
 
+  :preface
+  (defun apply-gofmt ()
+    (unless (and (fboundp 'magit-rebase-in-progress-p)
+                 (magit-rebase-in-progress-p))
+      (gofmt)))
+
   :mode
   ;; HACK: The built-in go-ts-mode does not support go.work files,
   ;; so we actually do use the third-party go-mode for this file
@@ -812,7 +823,7 @@
   :hook
   (go-ts-mode . (lambda ()
                   (require 'go-mode)
-                  (add-hook 'before-save-hook #'gofmt t t)))
+                  (add-hook 'before-save-hook #'apply-gofmt t t)))
 
   :custom
   (gofmt-command "@gofumpt@")
@@ -836,7 +847,7 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
-      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -857,7 +868,7 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(nix-mode . ("@nil@")))
-      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -875,7 +886,7 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(yaml-ts-mode . ("@yamlls@" "--stdio")))
-      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 
   :init
