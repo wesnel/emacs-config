@@ -508,24 +508,6 @@
 (use-package tempel-collection
   :ensure t)
 
-;; Show current command and key chord.
-(use-package keycast
-  :ensure t
-  :demand t
-
-  :defines
-  (keycast--this-command-keys
-   keycast--this-command-desc)
-
-  :functions
-  (keycast--update)
-
-  :commands
-  (keycast-mode-line-mode)
-
-  :init
-  (keycast-mode-line-mode))
-
 ;; Contextual actions based on what is near point.
 (use-package embark
   :ensure t
@@ -556,15 +538,6 @@
            (remq #'embark-which-key-indicator embark-indicators)))
       (apply fn args)))
 
-  (defun store-action-key+cmd (cmd)
-    (force-mode-line-update t)
-    (setq this-command cmd
-          keycast--this-command-keys (this-single-command-keys)
-          keycast--this-command-desc cmd))
-
-  (defun force-keycast-update (&rest _)
-    (keycast--update))
-
   :functions
   (embark--truncate-target
    embark-completing-read-prompter)
@@ -585,11 +558,6 @@
   :config
   (advice-add #'embark-completing-read-prompter
               :around #'embark-hide-which-key-indicator)
-
-  (advice-add 'embark-keymap-prompter
-              :filter-return #'store-action-key+cmd)
-
-  (advice-add 'embark-act :before #'force-keycast-update)
 
   :bind
   (("C-." . #'embark-act)
