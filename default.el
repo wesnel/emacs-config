@@ -43,7 +43,7 @@
     :ensure t
     :demand t
 
-    :functions
+    :commands
     (exec-path-from-shell-initialize)
 
     :defines
@@ -116,7 +116,7 @@
   :ensure t
   :demand t
 
-  :functions
+  :commands
   (global-hl-todo-mode)
 
   :init
@@ -127,7 +127,7 @@
   :ensure t
   :demand t
 
-  :functions
+  :commands
   (vertico-mode)
 
   :init
@@ -314,6 +314,10 @@
   :demand t
   :diminish undo-tree-mode
 
+  :custom
+  (undo-tree-enable-undo-in-region t)
+  (undo-tree-visualizer-diff t)
+
   :commands
   (global-undo-tree-mode)
 
@@ -359,7 +363,7 @@
   :ensure t
   :demand t
 
-  :functions
+  :commands
   (spell-fu-global-mode)
 
   :custom
@@ -373,7 +377,7 @@
   :ensure t
   :demand t
 
-  :functions
+  :commands
   (global-devil-mode)
 
   :init
@@ -400,12 +404,10 @@
   :variables
   (corfu-continue-commands)
 
-  :functions
-  (corfu-mode
-   global-corfu-mode)
-
   :commands
-  (corfu-insert-separator
+  (corfu-mode
+   global-corfu-mode
+   corfu-insert-separator
    corfu-popupinfo-mode)
 
   :preface
@@ -442,7 +444,7 @@
     :ensure t
     :demand t
 
-    :functions
+    :commands
     (corfu-terminal-mode)
 
     :init
@@ -453,9 +455,8 @@
   :ensure t
   :demand t
 
-  :functions
-  (cape-wrap-buster
-   cape-dabbrev
+  :commands
+  (cape-dabbrev
    cape-file
    cape-elisp-block
    cape-history
@@ -467,6 +468,9 @@
    cape-dict
    cape-symbol
    cape-line)
+
+  :functions
+  (cape-wrap-buster)
 
   :init
   ;; Add `completion-at-point-functions', used by `completion-at-point'.
@@ -495,7 +499,7 @@
   :preface
   (defun add-tempel-to-completion-at-point ()
     (setq-local completion-at-point-functions
-     (cons #'tempel-expand completion-at-point-functions)))
+                (cons #'tempel-expand completion-at-point-functions)))
 
   :hook
   ((prog-mode text-mode) . add-tempel-to-completion-at-point))
@@ -504,14 +508,88 @@
 (use-package tempel-collection
   :ensure t)
 
+;; Show current command and key chord.
+(use-package keycast
+  :ensure t
+  :demand t
+
+  :defines
+  (keycast--this-command-keys
+   keycast--this-command-desc)
+
+  :functions
+  (keycast--update)
+
+  :commands
+  (keycast-mode-line-mode)
+
+  :init
+  (keycast-mode-line-mode))
+
 ;; Contextual actions based on what is near point.
 (use-package embark
   :ensure t
+
+  :preface
+  (defun embark-which-key-indicator ()
+    (lambda (&optional keymap targets prefix)
+      (if (null keymap)
+          (which-key--hide-popup-ignore-command)
+        (which-key--show-keymap
+         (if (eq (plist-get (car targets) :type) 'embark-become)
+             "Become"
+           (format "Act on %s '%s'%s"
+                   (plist-get (car targets) :type)
+                   (embark--truncate-target (plist-get (car targets) :target))
+                   (if (cdr targets) "…" "")))
+         (if prefix
+             (pcase (lookup-key keymap prefix 'accept-default)
+               ((and (pred keymapp) km) km)
+               (_ (key-binding prefix 'accept-default)))
+           keymap)
+         nil nil t (lambda (binding)
+                     (not (string-suffix-p "-argument" (cdr binding))))))))
+
+  (defun embark-hide-which-key-indicator (fn &rest args)
+    (which-key--hide-popup-ignore-command)
+    (let ((embark-indicators
+           (remq #'embark-which-key-indicator embark-indicators)))
+      (apply fn args)))
+
+  (defun store-action-key+cmd (cmd)
+    (force-mode-line-update t)
+    (setq this-command cmd
+          keycast--this-command-keys (this-single-command-keys)
+          keycast--this-command-desc cmd))
+
+  (defun force-keycast-update (&rest _)
+    (keycast--update))
+
+  :functions
+  (embark--truncate-target
+   embark-completing-read-prompter)
 
   :commands
   (embark-act
    embark-dwim
    embark-bindings)
+
+  :defines
+  (embark-indicators)
+
+  :custom
+  (embark-indicators '(embark-which-key-indicator
+                       embark-highlight-indicator
+                       embark-isearch-highlight-indicator))
+
+  :config
+  (advice-add #'embark-completing-read-prompter
+              :around #'embark-hide-which-key-indicator)
+
+  (advice-add 'embark-keymap-prompter
+              :filter-return #'store-action-key+cmd)
+
+  (advice-add 'embark-act :before #'force-keycast-update)
 
   :bind
   (("C-." . #'embark-act)
@@ -547,7 +625,7 @@
   :demand t
   :diminish selected-minor-mode
 
-  :functions
+  :commands
   (selected-global-mode)
 
   :defines
@@ -662,6 +740,10 @@
   :ensure t
   :demand t
   :diminish which-key-mode
+
+  :functions
+  (which-key--show-keymap
+   which-key--hide-popup-ignore-command)
 
   :commands
   (which-key-mode
@@ -910,7 +992,7 @@
   :ensure t
   :demand t
 
-  :functions
+  :commands
   (diff-hl-margin-mode
    global-diff-hl-mode)
 
@@ -936,7 +1018,7 @@
     :demand t
     :diminish auto-dark-mode
 
-    :functions
+    :commands
     (auto-dark-mode)
 
     :custom
