@@ -30,7 +30,8 @@
       preOverlays = [
         (import emacs-overlay)
 
-        (final: prev:
+        (final:
+          prev:
 
           {
             parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
@@ -45,6 +46,27 @@
                     then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
                   fi
                 '';
+              });
+          })
+
+        (final:
+          prev:
+
+          {
+            emacs-macport = prev.emacs-macport.overrideAttrs (old:
+
+              {
+                version = "29.1";
+
+                src = final.fetchFromBitbucket {
+                  owner = "mituharu";
+                  repo = "emacs-mac";
+                  rev = "emacs-29.1-mac-10.0";
+                  sha256 = "sha256-TE829qJdPjeOQ+kD0SfyO8d5YpJjBge/g+nScwj+XVU=";
+                };
+
+                withNativeCompilation = true;
+                withTreeSitter = true;
               });
           })
       ];

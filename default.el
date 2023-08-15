@@ -6,13 +6,15 @@
 ;; Maintainer: Wesley Nelson <wgn@wesnel.dev>
 ;; URL: https://git.sr.ht/~wgn/emacs-config
 
+;; Package-Requires: ((emacs "29.1"))
+
 ;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
 
 ;; This is an Emacs configuration which is intended to be used in
-;; conjunction with Nix. It contains template variables wrapped with @
-;; which need to be substituted with real values using something
+;; conjunction with Nix.  It contains template variables wrapped with
+;; @ which need to be substituted with real values using something
 ;; similar to the substituteAll function provided by nixpkgs.
 
 ;;; License:
@@ -31,844 +33,1032 @@
 ;; along with this program. If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Code:
-(let ((gc-cons-threshold most-positive-fixnum))
-  (eval-when-compile
-    (require 'use-package))
 
-  ;; Use user shell $PATH
+(eval-when-compile
+  (require 'use-package))
+
+;; Use user shell $PATH.
+(when (memq window-system '(mac ns x))
   (use-package exec-path-from-shell
-    :ensure t
-
-    :config
-    (when (memq window-system '(mac ns x))
-      (dolist (var '("SSH_AUTH_SOCK"
-                     "SSH_AGENT_PID"
-                     "GPG_AGENT_INFO"
-                     "GPG_TTY"
-                     "LANG"
-                     "LC_CTYPE"
-                     "NIX_SSL_CERT_FILE"
-                     "NIX_PATH"
-                     "PASSWORD_STORE_DIR"
-                     "PASSWORD_STORE_KEY"
-                     "PASSWORD_STORE_SIGNING_KEY"))
-        (add-to-list 'exec-path-from-shell-variables var))
-      (exec-path-from-shell-initialize)))
-
-  ;; Store secrets in Emacs.
-  (use-package auth-source
-    :custom
-    (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
-
-    :config
-    (auth-source-pass-enable))
-
-  ;; Avoid putting files in weird places.
-  (use-package no-littering
-    :ensure t
-
-    :config
-    (no-littering-theme-backups))
-
-  ;; Required for :bind in use-package.
-  (use-package bind-key
-    :ensure t)
-
-  ;; Whitespace preferences.
-  (use-package whitespace
-    :hook
-    ((text-mode prog-mode) . (lambda ()
-                               (add-hook 'before-save-hook #'whitespace-cleanup nil t)
-                               (whitespace-toggle-options '(lines)))))
-
-  ;; Syntax highlighting.
-  (use-package treesit
-    :custom
-    (treesit-font-lock-level 4))
-
-  ;; Highlight TODO comments.
-  (use-package hl-todo
-    :ensure t
-
-    :config
-    (global-hl-todo-mode +1))
-
-  ;; Completion engine based on `completing-read'.
-  (use-package vertico
-    :ensure t
-
-    :config
-    (vertico-mode +1))
-
-  ;; Completion style that allows for multiple regular expressions.
-  (use-package orderless
-    :ensure t
-
-    :custom
-    (completion-styles '(orderless basic))
-    (completion-category-overrides '((file (styles partial-completion))
-                                     (eglot (styles orderless)))))
-
-  ;; Provides search and navigation based on `completing-read'.
-  (use-package consult
     :ensure t
     :demand t
 
-    :bind
-    (;; C-c bindings in `mode-specific-map'
-     ("C-c M-x" . #'consult-mode-command)
-     ("C-c h" . #'consult-history)
-     ("C-c k" . #'consult-kmacro)
-     ("C-c m" . #'consult-man)
-     ("C-c i" . #'consult-info)
-     ([remap Info-search] . consult-info)
-     ;; C-x bindings in `ctl-x-map'
-     ("C-x M-:" . #'consult-complex-command)     ;; orig. repeat-complex-command
-     ("C-x b" . #'consult-buffer)                ;; orig. switch-to-buffer
-     ("C-x 4 b" . #'consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
-     ("C-x 5 b" . #'consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
-     ("C-x r b" . #'consult-bookmark)            ;; orig. bookmark-jump
-     ("C-x p b" . #'consult-project-buffer)      ;; orig. project-switch-to-buffer
-     ;; Custom M-# bindings for fast register access
-     ("M-#" . #'consult-register-load)
-     ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
-     ("C-M-#" . #'consult-register)
-     ;; Other custom bindings
-     ;; ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
-     ;; M-g bindings in `goto-map'
-     ("M-g e" . #'consult-compile-error)
-     ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
-     ("M-g g" . #'consult-goto-line)             ;; orig. goto-line
-     ("M-g M-g" . #'consult-goto-line)           ;; orig. goto-line
-     ("M-g o" . #'consult-outline)               ;; Alternative: consult-org-heading
-     ("M-g m" . #'consult-mark)
-     ("M-g k" . #'consult-global-mark)
-     ("M-g i" . #'consult-imenu)
-     ("M-g I" . #'consult-imenu-multi)
-     ;; M-s bindings in `search-map'
-     ("M-s d" . #'consult-find)
-     ("M-s D" . #'consult-locate)
-     ("M-s g" . #'consult-grep)
-     ("M-s G" . #'consult-git-grep)
-     ("M-s r" . #'consult-ripgrep)
-     ("M-s l" . #'consult-line)
-     ("M-s L" . #'consult-line-multi)
-     ("M-s k" . #'consult-keep-lines)
-     ("M-s u" . #'consult-focus-lines)
-     ;; Isearch integration
-     ("M-s e" . #'consult-isearch-history)
-     :map isearch-mode-map
-     ("M-e" . #'consult-isearch-history)         ;; orig. isearch-edit-string
-     ("M-s e" . #'consult-isearch-history)       ;; orig. isearch-edit-string
-     ("M-s l" . #'consult-line)                  ;; needed by consult-line to detect isearch
-     ("M-s L" . #'consult-line-multi)            ;; needed by consult-line to detect isearch
-     ;; Minibuffer history
-     :map minibuffer-local-map
-     ("M-s" . #'consult-history)                 ;; orig. next-matching-history-element
-     ("M-r" . #'consult-history))                ;; orig. previous-matching-history-element
+    :functions
+    (exec-path-from-shell-initialize)
 
-    :custom
-    (xref-show-xrefs-function #'consult-xref)
-    (xref-show-definitions-function #'consult-xref))
-
-  ;; Move between windows.
-  (use-package window
-    :bind
-    (("M-o" . #'other-window)))
-
-  ;; Divide window configurations into workspaces.
-  (use-package eyebrowse
-    :ensure t
+    :defines
+    (exec-path-from-shell-variables)
 
     :config
-    (eyebrowse-mode +1))
+    (dolist (var '("SSH_AUTH_SOCK"
+                   "SSH_AGENT_PID"
+                   "GPG_AGENT_INFO"
+                   "GPG_TTY"
+                   "LANG"
+                   "LC_CTYPE"
+                   "NIX_SSL_CERT_FILE"
+                   "NIX_PATH"
+                   "PASSWORD_STORE_DIR"
+                   "PASSWORD_STORE_KEY"
+                   "PASSWORD_STORE_SIGNING_KEY"))
+      (add-to-list 'exec-path-from-shell-variables var))
+    (exec-path-from-shell-initialize)))
 
-  ;; Open directory as buffer.
-  (use-package dired
-    :custom
-    (ls-lisp-use-insert-directory-program nil)
+;; Store secrets in Emacs.
+(use-package auth-source
+  :custom
+  (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
 
-    :config
-    (require 'ls-lisp))
+  :config
+  (auth-source-pass-enable))
 
-  ;; Easily mark and kill regions.
-  (use-package easy-kill
-    :ensure t
+;; Avoid putting files in weird places.
+(use-package no-littering
+  :ensure t
+  :demand t
 
-    :bind
-    (([remap kill-ring-save] . #'easy-kill)
-     ([remap mark-sexp] . #'easy-mark)))
+  :functions
+  (no-littering-theme-backups)
 
-  ;; Browse through killed regions.
-  (use-package browse-kill-ring
-    :ensure t
+  :config
+  (no-littering-theme-backups))
 
-    :bind
-    (("M-y" . #'browse-kill-ring)))
+;; Required for :bind in use-package.
+(use-package bind-key
+  :ensure t)
 
-  ;; Persist history over Emacs restarts.
-  (use-package savehist
-    :custom
-    (savehist-additional-variables '(search-ring regexp-search-ring))
-    (savehist-autosave-interval 60)
+;; Required for :diminish in use-package.
+(use-package diminish
+  :ensure t)
 
-    :config
-    (savehist-mode +1))
+;; Whitespace preferences.
+(use-package whitespace
+  :diminish whitespace-mode
 
-  ;; Remember your location in a file.
-  (use-package saveplace
-    :config
-    (save-place-mode +1))
+  :preface
+  (defun set-up-whitespace ()
+    (add-hook 'before-save-hook #'whitespace-cleanup nil t)
+    (whitespace-toggle-options '(lines)))
 
-  ;; Save recent files.
-  (use-package recentf
-    :custom
-    (recentf-max-saved-items 500)
-    (recentf-max-menu-items 15)
-    (recentf-auto-cleanup 'never)
+  :hook
+  ((text-mode prog-mode) . set-up-whitespace))
 
-    :config
-    (recentf-mode +1))
+;; Syntax highlighting.
+(use-package treesit
+  :commands
+  (treesit-font-lock-recompute-features)
 
-  ;; Undo history as a tree.
-  (use-package undo-tree
-    :ensure t
+  :custom
+  (treesit-font-lock-level 4))
 
-    :custom
-    (undo-tree-auto-save-history t)
+;; Highlight TODO comments.
+(use-package hl-todo
+  :ensure t
+  :demand t
 
-    :config
-    (global-undo-tree-mode +1))
+  :functions
+  (global-hl-todo-mode)
 
-  ;; Git interface.
-  (use-package magit
-    :ensure t
+  :config
+  (global-hl-todo-mode +1))
 
-    :commands
-    (magit
-     magit-project-status)
+;; Completion engine based on `completing-read'.
+(use-package vertico
+  :ensure t
+  :demand t
 
-    :init
-    (with-eval-after-load 'project
-      (define-key project-prefix-map "m" #'magit-project-status)
-      (add-to-list 'project-switch-commands '(magit-project-status "Magit") t))
+  :functions
+  (vertico-mode)
 
-    :bind
-    (("C-x g" . #'magit)))
+  :config
+  (vertico-mode +1))
 
-  ;; Automatically manage parentheses in lisps.
-  (use-package parinfer-rust-mode
-    :ensure t
-    :defer t
-    :hook lisp-data-mode
+;; Completion style that allows for multiple regular expressions.
+(use-package orderless
+  :ensure t
 
-    :custom
-    (parinfer-rust-library "@parinfer@"))
+  :custom
+  ;; Allow minibuffer commands while in the minibuffer.
+  (enable-recursive-minibuffers t)
+  (resize-mini-windows t)
+  (completion-styles '(basic substring initials flex orderless))
+  (completion-category-defaults nil)
+  (completion-category-overrides '((file (styles . (basic partial-completion orderless)))
+                                   (bookmark (styles . (basic substring)))
+                                   (library (styles . (basic substring)))
+                                   (embark-keybinding (styles . (basic substring)))
+                                   (imenu (styles . (basic substring orderless)))
+                                   (consult-location (styles . (basic substring orderless)))
+                                   (kill-ring (styles . (emacs22 orderless)))
+                                   (eglot (styles . (emacs22 substring orderless))))))
 
-  ;; Spell checxing and correction.
-  (use-package spell-fu
-    :ensure t
+;; Provides search and navigation based on `completing-read'.
+(use-package consult
+  :ensure t
+  :demand t
 
-    :custom
-    (ispell-program-name "@aspell@")
+  :commands
+  (consult-find
+   consult-locate
+   consult-grep
+   consult-git-grep
+   consult-ripgrep
+   consult-line
+   consult-line-multi
+   consult-keep-lines
+   consult-focus-lines
+   consult-isearch-history
+   consult-outline
+   consult-mark
+   consult-global-mark
+   consult-imenu
+   consult-imenu-multi
+   consult-complex-command
+   consult-buffer
+   consult-buffer-other-window
+   consult-buffer-other-frame
+   consult-bookmark
+   consult-project-buffer
+   consult-register-load
+   consult-register-store
+   consult-register
+   consult-compile-error
+   consult-flymake
+   consult-goto-line
+   consult-mode-command
+   consult-history
+   consult-kmacro
+   consult-man)
 
-    :config
-    (spell-fu-global-mode))
+  :bind
+  (;; C-c bindings in `mode-specific-map'
+   ("C-c M-x" . #'consult-mode-command)
+   ("C-c h" . #'consult-history)
+   ("C-c k" . #'consult-kmacro)
+   ("C-c m" . #'consult-man)
+   ("C-c i" . #'consult-info)
+   ([remap Info-search] . consult-info)
+   ;; C-x bindings in `ctl-x-map'
+   ("C-x M-:" . #'consult-complex-command)     ;; orig. repeat-complex-command
+   ("C-x b" . #'consult-buffer)                ;; orig. switch-to-buffer
+   ("C-x 4 b" . #'consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
+   ("C-x 5 b" . #'consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
+   ("C-x r b" . #'consult-bookmark)            ;; orig. bookmark-jump
+   ("C-x p b" . #'consult-project-buffer)      ;; orig. project-switch-to-buffer
+   ;; Custom M-# bindings for fast register access
+   ("M-#" . #'consult-register-load)
+   ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
+   ("C-M-#" . #'consult-register)
+   ;; Other custom bindings
+   ;; ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
+   ;; M-g bindings in `goto-map'
+   ("M-g e" . #'consult-compile-error)
+   ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
+   ("M-g g" . #'consult-goto-line)             ;; orig. goto-line
+   ("M-g M-g" . #'consult-goto-line)           ;; orig. goto-line
+   ("M-g o" . #'consult-outline)               ;; Alternative: consult-org-heading
+   ("M-g m" . #'consult-mark)
+   ("M-g k" . #'consult-global-mark)
+   ("M-g i" . #'consult-imenu)
+   ("M-g I" . #'consult-imenu-multi)
+   ;; M-s bindings in `search-map'
+   ("M-s d" . #'consult-find)
+   ("M-s D" . #'consult-locate)
+   ("M-s g" . #'consult-grep)
+   ("M-s G" . #'consult-git-grep)
+   ("M-s r" . #'consult-ripgrep)
+   ("M-s l" . #'consult-line)
+   ("M-s L" . #'consult-line-multi)
+   ("M-s k" . #'consult-keep-lines)
+   ("M-s u" . #'consult-focus-lines)
+   ;; Isearch integration
+   ("M-s e" . #'consult-isearch-history)
+   :map isearch-mode-map
+   ("M-e" . #'consult-isearch-history)         ;; orig. isearch-edit-string
+   ("M-s e" . #'consult-isearch-history)       ;; orig. isearch-edit-string
+   ("M-s l" . #'consult-line)                  ;; needed by consult-line to detect isearch
+   ("M-s L" . #'consult-line-multi)            ;; needed by consult-line to detect isearch
+   ;; Minibuffer history
+   :map minibuffer-local-map
+   ("M-s" . #'consult-history)                 ;; orig. next-matching-history-element
+   ("M-r" . #'consult-history))                ;; orig. previous-matching-history-element
 
-  ;; Avoid need for modifier keys.
-  (use-package devil
-    :ensure t
+  :custom
+  (xref-show-xrefs-function #'consult-xref)
+  (xref-show-definitions-function #'consult-xref))
 
-    :init
-    (global-devil-mode +1))
+;; Move between windows.
+(use-package window
+  :bind
+  (("M-o" . #'other-window)))
 
-  ;; More convenient options for cursor movement.
-  (use-package mwim
-    :ensure t
+;; Open directory as buffer.
+(use-package dired
+  :custom
+  (ls-lisp-use-insert-directory-program nil)
 
-    :bind
-    (("C-a" . #'mwim-beginning)
-     ("C-e" . #'mwim-end)))
+  :config
+  (require 'ls-lisp))
 
-  ;; In-buffer completion with `completion-in-region'.
-  (use-package corfu
-    :ensure t
+;; Easily mark and kill regions.
+(use-package easy-kill
+  :ensure t
+  :demand t
 
-    :bind
-    (:map corfu-map
-          ("SPC" . #'corfu-insert-separator))
+  :commands
+  (easy-kill
+   easy-mark)
 
-    :custom
-    (tab-always-indent 'complete)         ; Show completions with tab key.
-    (completion-cycle-threshold nil)      ; Always show candidates in menu.
-    (corfu-auto nil)                      ; Don't auto-complete.
-    (corfu-preview-current 'insert)       ; Preview current candidate.
-    (corfu-preselect-first t)             ; Pre-select first candidate.
+  :bind
+  (([remap kill-ring-save] . #'easy-kill)
+   ([remap mark-sexp] . #'easy-mark)))
 
-    :init
-    (global-corfu-mode +1)
+;; Browse through killed regions.
+(use-package browse-kill-ring
+  :ensure t
+  :demand t
 
-    :config
-    (defun corfu-enable-in-minibuffer ()
-      "Enable corfu in the minibuffer if `completion-at-point' is bound."
-      (when (where-is-internal #'completion-at-point (list (current-local-map)))
-        (setq-local corfu-echo-delay nil
-                    corfu-popupinfo-delay nil)
-        (corfu-mode +1)))
-    (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
+  :commands
+  (browse-kill-ring)
 
-    (defun corfu-move-to-minibuffer ()
-      "Transfer corfu completions to the minibuffer."
-      (interactive)
-      (when completion-in-region--data
-        (let ((completion-extra-properties corfu--extra)
-              completion-cycle-threshold completion-cycling)
-          (apply #'consult-completion-in-region completion-in-region--data))))
-    (keymap-set corfu-map "M-m" #'corfu-move-to-minibuffer)
-    (add-to-list 'corfu-continue-commands #'corfu-move-to-minibuffer)
+  :bind
+  (("M-y" . #'browse-kill-ring)))
 
-    ;; Show docs in popup.
-    ;; NOTE: Does not currently work with terminal Emacs.
-    ;;       https://github.com/minad/corfu/issues/248
-    (corfu-popupinfo-mode +1))
+;; Persist history over Emacs restarts.
+(use-package savehist
+  :custom
+  (savehist-additional-variables '(search-ring regexp-search-ring))
+  (savehist-autosave-interval 60)
 
-  ;; Show icons in corfu completion popup.
-  (use-package kind-icon
-    :ensure t
+  :config
+  (savehist-mode +1))
 
-    :custom
-    (kind-icon-default-face 'corfu-default)
+;; Remember your location in a file.
+(use-package saveplace
+  :config
+  (save-place-mode +1))
 
-    :config
-    (add-to-list 'corfu-margin-formatters #'kind-icon-margin-formatter))
+;; Save recent files.
+(use-package recentf
+  :custom
+  (recentf-max-saved-items 500)
+  (recentf-max-menu-items 15)
+  (recentf-auto-cleanup 'never)
 
-  ;; Allows corfu completion popup to work in terminal Emacs.
+  :config
+  (recentf-mode +1))
+
+;; Undo history as a tree.
+(use-package undo-tree
+  :ensure t
+  :demand t
+  :diminish undo-tree-mode
+
+  :commands
+  (global-undo-tree-mode)
+
+  :custom
+  (undo-tree-auto-save-history t)
+
+  :config
+  (global-undo-tree-mode +1))
+
+;; Project management.
+(use-package project
+  :commands
+  (project-switch-commands))
+
+;; Git interface.
+(use-package magit
+  :ensure t
+  :demand t
+
+  :commands
+  (magit
+   magit-project-status)
+
+  :bind
+  (("C-x g" . #'magit)))
+
+;; Automatically manage parentheses in lisps.
+(use-package parinfer-rust-mode
+  :ensure t
+  :defer t
+  :hook lisp-data-mode
+
+  :custom
+  (parinfer-rust-library "@parinfer@"))
+
+;; Spell checxing and correction.
+(use-package spell-fu
+  :ensure t
+  :demand t
+
+  :functions
+  (spell-fu-global-mode)
+
+  :custom
+  (ispell-program-name "@aspell@")
+
+  :config
+  (spell-fu-global-mode))
+
+;; Avoid need for modifier keys.
+(use-package devil
+  :ensure t
+  :demand t
+
+  :functions
+  (global-devil-mode)
+
+  :init
+  (global-devil-mode +1))
+
+;; More convenient options for cursor movement.
+(use-package mwim
+  :ensure t
+  :demand t
+
+  :commands
+  (mwim-beginning
+   mwim-end)
+
+  :bind
+  (("C-a" . #'mwim-beginning)
+   ("C-e" . #'mwim-end)))
+
+;; In-buffer completion with `completion-in-region'.
+(use-package corfu
+  :ensure t
+  :demand t
+
+  :variables
+  (corfu-continue-commands)
+
+  :functions
+  (corfu-mode
+   global-corfu-mode)
+
+  :commands
+  (corfu-insert-separator
+   corfu-popupinfo-mode)
+
+  :preface
+  (defun corfu-enable-in-minibuffer ()
+    "Enable corfu in the minibuffer if `completion-at-point' is bound."
+    (when (where-is-internal #'completion-at-point (list (current-local-map)))
+      (setq-local corfu-echo-delay nil
+                  corfu-popupinfo-delay nil)
+      (corfu-mode +1)))
+
+  :bind
+  (:map corfu-map
+        ("SPC" . #'corfu-insert-separator))
+
+  :custom
+  (tab-always-indent 'complete)         ; Show completions with tab key.
+  (completion-cycle-threshold nil)      ; Always show candidates in menu.
+  (corfu-auto nil)                      ; Don't auto-complete.
+  (corfu-preview-current 'insert)       ; Preview current candidate.
+  (corfu-preselect-first t)             ; Pre-select first candidate.
+
+  :config
+  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
+
+  ;; Show docs in popup.
+  ;; NOTE: Does not currently work with terminal Emacs.
+  ;;       https://github.com/minad/corfu/issues/248
+  (corfu-popupinfo-mode +1)
+  (global-corfu-mode +1))
+
+;; Allows corfu completion popup to work in terminal Emacs.
+(unless (display-graphic-p)
   (use-package corfu-terminal
     :ensure t
+    :demand t
+
+    :functions
+    (corfu-terminal-mode)
 
     :config
-    (unless (display-graphic-p)
-      (corfu-terminal-mode +1)))
+    (corfu-terminal-mode +1)))
 
-  ;; Extra `completion-at-point-functions'.
-  (use-package cape
+;; Extra `completion-at-point-functions'.
+(use-package cape
+  :ensure t
+  :demand t
+
+  :functions
+  (cape-wrap-buster
+   cape-dabbrev
+   cape-file
+   cape-elisp-block
+   cape-history
+   cape-keyword
+   cape-tex
+   cape-sgml
+   cape-rfc1345
+   cape-abbrev
+   cape-dict
+   cape-symbol
+   cape-line)
+
+  :config
+  ;; Add `completion-at-point-functions', used by `completion-at-point'.
+  ;; NOTE: The order matters!
+  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  (add-to-list 'completion-at-point-functions #'cape-file)
+  (add-to-list 'completion-at-point-functions #'cape-elisp-block)
+  (add-to-list 'completion-at-point-functions #'cape-history)
+  (add-to-list 'completion-at-point-functions #'cape-keyword)
+  (add-to-list 'completion-at-point-functions #'cape-tex)
+  (add-to-list 'completion-at-point-functions #'cape-sgml)
+  (add-to-list 'completion-at-point-functions #'cape-rfc1345)
+  (add-to-list 'completion-at-point-functions #'cape-abbrev)
+  (add-to-list 'completion-at-point-functions #'cape-dict)
+  (add-to-list 'completion-at-point-functions #'cape-symbol)
+  (add-to-list 'completion-at-point-functions #'cape-line))
+
+;; Make templates available via `completion-at-point-functions'.
+(use-package tempel
+  :ensure t
+  :demand t
+
+  :commands
+  (tempel-expand)
+
+  :preface
+  (defun add-tempel-to-completion-at-point ()
+    (setq-local completion-at-point-functions
+     (cons #'tempel-expand completion-at-point-functions)))
+
+  :hook
+  ((prog-mode text-mode) . add-tempel-to-completion-at-point))
+
+;; Pre-made templates for tempel.
+(use-package tempel-collection
+  :ensure t)
+
+;; Contextual actions based on what is near point.
+(use-package embark
+  :ensure t
+
+  :commands
+  (embark-act
+   embark-dwim
+   embark-bindings)
+
+  :bind
+  (("C-." . #'embark-act)
+   ("M-." . #'embark-dwim)         ; orig. `xref-find-definitions'.
+   ("C-h B" . #'embark-bindings))) ; orig. `describe-bindings'.
+
+;; Integration between Embark and Consult.
+(use-package embark-consult
+  :ensure t
+  :demand t
+
+  :hook
+  (embark-collect-mode . consult-preview-at-point-mode))
+
+(use-package grep
+  :defines
+  (grep-mode-map))
+
+;; Editable grep buffers.
+(use-package wgrep
+  :ensure t
+
+  :commands
+  (wgrep-change-to-wgrep-mode)
+
+  :bind
+  (:map grep-mode-map
+        ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
+
+;; Creates a minor mode for when the point is in a selection.
+(use-package selected
+  :ensure t
+  :demand t
+  :diminish selected-minor-mode
+
+  :functions
+  (selected-global-mode)
+
+  :defines
+  (selected-keymap)
+
+  :config
+  (selected-global-mode +1))
+
+;; Edit text with multiple cursors.
+(use-package multiple-cursors
+  :ensure t
+
+  :commands
+  (mc/mark-all-like-this)
+
+  :bind
+  (:map selected-keymap
+        ("C-x c" . #'mc/mark-all-like-this)))
+
+;; Structured editing and navigation based on tree-sitter.
+(use-package combobulate
+  :ensure t
+
+  :hook
+  ((python-ts-mode . combobulate-mode)
+   (js-ts-mode . combobulate-mode)
+   (css-ts-mode . combobulate-mode)
+   (yaml-ts-mode . combobulate-mode)
+   (typescript-ts-mode . combobulate-mode)
+   (tsx-ts-mode . combobulate-mode)))
+
+;; Visual `query-replace' with regular expressions.
+(use-package visual-regexp
+  :ensure t
+
+  :bind
+  (("C-M-%" . vr/query-replace)))
+
+;; Shell written in Emacs Lisp.
+(use-package eshell
+  :preface
+  (defun disable-line-numbers ()
+    (display-line-numbers-mode -1))
+
+  :config
+  (add-hook 'eshell-mode-hook #'disable-line-numbers))
+
+;; Terminal emulator.
+(use-package vterm
+  :ensure t
+
+  :commands
+  (vterm
+   vterm-other-window)
+
+  :config
+  (add-hook 'vterm-mode-hook #'disable-line-numbers))
+
+;; Error checking.
+(use-package flymake
+  :hook
+  (prog-mode . flymake-mode))
+
+;; Language server integration.
+(use-package eglot
+  :commands
+  (eglot
+   eglot-ensure
+   eglot-rename
+   eglot-find-implementation
+   eglot-code-actions
+   eglot-format-buffer)
+
+  :bind
+  (:map eglot-mode-map
+        ("C-c C-l ." . #'xref-find-definitions)
+        ("C-c C-l ?" . #'xref-find-references)
+        ("C-c C-l r" . #'eglot-rename)
+        ("C-c C-l i" . #'eglot-find-implementation)
+        ("C-c C-l d" . #'eldoc)
+        ("C-c C-l e" . #'eglot-code-actions))
+
+  :config
+  (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster))
+
+;; Interface for talking to ChatGPT.
+(use-package chatgpt-shell
+  :ensure t
+
+  :commands
+  (chatgpt-shell)
+
+  :preface
+  (defun get-openai-key ()
+    (let* ((default (notmuch-user-primary-email))
+           (user (completing-read (format "Choose user (default %s):" default)
+                                  (notmuch-user-emails)
+                                  nil
+                                  nil
+                                  nil
+                                  nil
+                                  default)))
+      (setq-local chatgpt-shell-openai-key (auth-source-pick-first-password
+                                            :host "openai.com"
+                                            :user user))))
+
+  :config
+  (add-hook 'chatgpt-shell-mode-hook #'get-openai-key))
+
+;; Displays available keybindings in a pop-up.
+(use-package which-key
+  :ensure t
+  :demand t
+  :diminish which-key-mode
+
+  :commands
+  (which-key-mode
+   which-key-enable-devil-support)
+
+  :config
+  (which-key-mode +1)
+  (which-key-enable-devil-support))
+
+;; Rich annotations in the minibuffer completion.
+(use-package marginalia
+  :ensure t
+  :demand t
+
+  :commands
+  (marginalia-mode)
+
+  :config
+  (marginalia-mode +1))
+
+;; More helpful documentation for Emacs Lisp.
+(use-package helpful
+  :ensure t
+
+  :commands
+  (helpful-callable
+   helpful-variable
+   helpful-key
+   helpful-command
+   helpful-at-point)
+
+  :bind
+  (("C-h f" . #'helpful-callable)
+   ("C-h v" . #'helpful-variable)
+   ("C-h k" . #'helpful-key)
+   ("C-h x" . #'helpful-command)
+   ("C-c C-d" . #'helpful-at-point)))
+
+;; Open code from Emacs in the web browser.
+(use-package elsewhere
+  :ensure t
+
+  :commands
+  (elsewhere-open
+   elsewhere-build-url))
+
+;; Send HTTP requests from Emacs.
+(use-package restclient
+  :ensure t
+  :mode "\\.http\\'")
+
+;; Basic Golang support.
+;;
+;; HACK: This is built-in to Emacs, but there is also a third-party
+;; go-mode which we will install next.
+(use-package go-ts-mode
+  :mode
+  ("go\\.mod\\'" . go-mod-ts-mode)
+
+  :preface
+  (defun go-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
+      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+    (eglot-ensure))
+
+  :init
+  ;; Open go files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(go-mode . go-ts-mode))
+
+  ;; Set up eglot for go-ts-mode.
+  (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
+
+  :config
+  ;; CamelCase aware editing operations.
+  (subword-mode +1))
+
+;; Extra Golang support.
+;;
+;; HACK: We won't actually use this go-mode other than for importing
+;; some extra functions to augment the built-in go-ts-mode.
+(use-package go-mode
+  :ensure t
+
+  :commands
+  (gofmt)
+
+  :mode
+  ;; HACK: The built-in go-ts-mode does not support go.work files,
+  ;; so we actually do use the third-party go-mode for this file
+  ;; type.
+  ("go\\.work\\'" . (lambda ()
+                      (require 'go-ts-mode)
+                      (go-dot-work-mode)))
+
+  :hook
+  (go-ts-mode . (lambda ()
+                  (require 'go-mode)
+                  (add-hook 'before-save-hook #'gofmt t t)))
+
+  :custom
+  (gofmt-command "@gofumpt@")
+  (godef-command "@godef@"))
+
+;; Run Golang tests.
+(use-package gotest
+  :ensure t
+
+  :commands
+  (go-test-current-file
+   go-test-current-test
+   go-test-current-project
+   go-test-current-benchmark
+   go-run))
+
+;; Python support.
+(use-package python
+  :preface
+  (defun python-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '((python-mode python-ts-mode) . ("@pylsp@")))
+      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+    (eglot-ensure))
+
+  :init
+  ;; Open python files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(python-mode . python-ts-mode))
+
+  ;; Set up eglot for python-ts-mode.
+  (add-hook 'python-ts-mode-hook #'python-ts-mode-eglot-setup))
+
+;; Nix support.
+(use-package nix-mode
+  :ensure t
+  :mode "\\.nix\\'"
+
+  :preface
+  (defun nix-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(nix-mode . ("@nil@")))
+      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+    (eglot-ensure))
+
+  :init
+  ;; Set up eglot for nix-mode.
+  (add-hook 'nix-mode-hook #'nix-mode-eglot-setup))
+
+;; YAML support.
+(use-package yaml-ts-mode
+  :mode
+  (("\\.yaml\\'" . yaml-ts-mode)
+   ("\\.yml\\'" . yaml-ts-mode))
+
+  :preface
+  (defun yaml-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(yaml-ts-mode . ("@yamlls@" "--stdio")))
+      (add-hook 'before-save-hook #'eglot-format-buffer t t))
+    (eglot-ensure))
+
+  :init
+  ;; Set up eglot for yaml-mode.
+  (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
+
+;; Note taking, time tracking, etc.
+(use-package org
+  :ensure t
+
+  :custom
+  (org-catch-invisible-edits 'show-and-error)
+  (org-special-ctrl-a/e t)
+  (org-insert-heading-respect-content t)
+  (org-hide-emphasis-markers t)
+  (org-pretty-entities t))
+
+;; Send HTTP requests from org-mode.
+(use-package ob-restclient
+  :ensure t
+
+  :config
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((restclient . t))))
+
+;; Markdown support.
+(use-package markdown-mode
+  :ensure t
+
+  :commands
+  (markdown-do)
+
+  :defines
+  (markdown-mode-map)
+
+  :mode
+  (("README\\.\\(?:md\\|markdown\\|mkd\\|mdown\\|mkdn\\|mdwn\\)\\'" . gfm-mode)
+   ("\\.\\(?:md\\|markdown\\|mkd\\|mdown\\|mkdn\\|mdwn\\)\\'" . markdown-mode))
+
+  :bind
+  (:map markdown-mode-map
+        ("C-c C-e" . #'markdown-do))
+
+  :custom
+  (markdown-command "@multimarkdown@"))
+
+;; Generate table of contents in markdown files.
+(use-package markdown-toc
+  :ensure t
+
+  :hook
+  ((markdown-mode gfm-mode) . markdown-toc-mode))
+
+;; Reading EPUB files.
+(use-package nov
+  :ensure t
+
+  :mode
+  ("\\.epub\\'" . nov-mode))
+
+;; Convert buffers to HTML (including org-mode).
+(use-package htmlize
+  :ensure t
+
+  :commands
+  (htmlize-buffer
+   htmlize-file
+   htmlize-many-files
+   htmlize-many-files-dired))
+
+;; Pretty styling in org-mode buffers.
+(use-package org-modern
+  :ensure t
+
+  :hook
+  ((org-mode . org-modern-mode)
+   (org-agenda-finalize . org-modern-agenda)))
+
+;; Indicate the git diff in the margin.
+(use-package diff-hl
+  :ensure t
+  :demand t
+
+  :functions
+  (diff-hl-margin-mode
+   global-diff-hl-mode)
+
+  :config
+  (diff-hl-margin-mode)
+  (global-diff-hl-mode))
+
+;; Color scheme.
+(use-package modus-themes
+  :ensure t
+
+  :custom
+  (modus-themes-italic-constructs t)
+  (modus-themes-bold-constructs t)
+
+  :config
+  (load-theme 'modus-vivendi-tinted :no-confirm))
+
+;; Use system dark mode settings for theme.
+(when (memq system-type '(darwin))
+  (use-package auto-dark
     :ensure t
+    :demand t
+    :diminish auto-dark-mode
 
-    :config
-    ;; Add `completion-at-point-functions', used by `completion-at-point'.
-    ;; NOTE: The order matters!
-    (add-to-list 'completion-at-point-functions #'cape-dabbrev)
-    (add-to-list 'completion-at-point-functions #'cape-file)
-    (add-to-list 'completion-at-point-functions #'cape-elisp-block)
-    (add-to-list 'completion-at-point-functions #'cape-history)
-    (add-to-list 'completion-at-point-functions #'cape-keyword)
-    (add-to-list 'completion-at-point-functions #'cape-tex)
-    (add-to-list 'completion-at-point-functions #'cape-sgml)
-    (add-to-list 'completion-at-point-functions #'cape-rfc1345)
-    (add-to-list 'completion-at-point-functions #'cape-abbrev)
-    (add-to-list 'completion-at-point-functions #'cape-dict)
-    (add-to-list 'completion-at-point-functions #'cape-symbol)
-    (add-to-list 'completion-at-point-functions #'cape-line))
-
-  ;; Make templates available via `completion-at-point-functions'.
-  (use-package tempel
-    :ensure t
-
-    :hook
-    ((prog-mode text-mode) . (lambda ()
-                               (setq-local completion-at-point-functions
-                                           (cons #'tempel-expand
-                                                 completion-at-point-functions)))))
-
-  ;; Pre-made templates for tempel.
-  (use-package tempel-collection
-    :ensure t)
-
-  ;; Contextual actions based on what is near point.
-  (use-package embark
-    :ensure t
-
-    :bind
-    (("C-." . #'embark-act)
-     ("M-." . #'embark-dwim)        ; orig. `xref-find-definitions'.
-     ("C-h B" . #'embark-bindings)) ; orig. `describe-bindings'.
-
-    :config
-    ;; Hide the mode line of the Embark live/completions buffers
-    (add-to-list 'display-buffer-alist
-                 '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
-                   nil
-                   (window-parameters (mode-line-format . none)))))
-
-  ;; Integration between Embark and Consult.
-  (use-package embark-consult
-    :ensure t
-
-    :hook
-    (embark-collect-mode . consult-preview-at-point-mode))
-
-  ;; Editable grep buffers.
-  (use-package wgrep
-    :ensure t
-
-    :bind
-    (:map grep-mode-map
-          ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
-
-  ;; Creates a minor mode for when the point is in a selection.
-  (use-package selected
-    :ensure t
-
-    :config
-    (selected-global-mode +1))
-
-  ;; Edit text with multiple cursors.
-  (use-package multiple-cursors
-    :ensure t
-
-    :bind
-    (:map selected-keymap
-          ("C-x c" . #'mc/mark-all-like-this)))
-
-  ;; Structured editing and navigation based on tree sitter.
-  (use-package combobulate
-    :ensure t
-
-    :hook
-    ((python-ts-mode . combobulate-mode)
-     (js-ts-mode . combobulate-mode)
-     (css-ts-mode . combobulate-mode)
-     (yaml-ts-mode . combobulate-mode)
-     (typescript-ts-mode . combobulate-mode)
-     (tsx-ts-mode . combobulate-mode)))
-
-  ;; Visual `query-replace' with regular expressions.
-  (use-package visual-regexp
-    :ensure t
-
-    :bind
-    (("C-M-%" . vr/query-replace)))
-
-  ;; Shell written in Emacs Lisp.
-  (use-package eshell
-    :config
-    (add-hook 'eshell-mode-hook (lambda ()
-                                  ;; Disable line numbers.
-                                  (display-line-numbers-mode -1))))
-
-  ;; Terminal emulator.
-  (use-package vterm
-    :ensure t
-
-    :commands
-    (vterm
-     vterm-other-window)
-
-    :config
-    (add-hook 'vterm-mode-hook (lambda ()
-                                 ;; Disable line numbers.
-                                 (display-line-numbers-mode -1))))
-
-  ;; Error checking.
-  (use-package flymake
-    :hook
-    (prog-mode . flymake-mode))
-
-  ;; Language server integration.
-  (use-package eglot
-    :commands
-    (eglot
-     eglot-ensure)
-
-    :bind
-    (:map eglot-mode-map
-          ("C-c C-l ." . #'xref-find-definitions)
-          ("C-c C-l ?" . #'xref-find-references)
-          ("C-c C-l r" . #'eglot-rename)
-          ("C-c C-l i" . #'eglot-find-implementation)
-          ("C-c C-l d" . #'eldoc)
-          ("C-c C-l e" . #'eglot-code-actions))
-
-    :config
-    (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster))
-
-  ;; Interface for talking to ChatGPT.
-  ;;
-  ;; NOTE: set the following variables with customize:
-  ;; - chatgpt-shell-openai-key
-  (use-package chatgpt-shell
-    :ensure t
-
-    :commands
-    (chatgpt-shell))
-
-  ;; Displays available keybindings in a pop-up.
-  (use-package which-key
-    :ensure t
-
-    :config
-    (which-key-mode +1)
-    (which-key-enable-devil-support))
-
-  ;; Rich annotations in the minibuffer completion.
-  (use-package marginalia
-    :ensure t
-
-    :config
-    (marginalia-mode +1))
-
-  ;; More helpful documentation for Emacs Lisp.
-  (use-package helpful
-    :ensure t
-
-    :bind
-    (("C-h f" . #'helpful-callable)
-     ("C-h v" . #'helpful-variable)
-     ("C-h k" . #'helpful-key)
-     ("C-h x" . #'helpful-command)
-     ("C-c C-d" . #'helpful-at-point)))
-
-  ;; Open code from Emacs in the web browser.
-  (use-package elsewhere
-    :ensure t
-
-    :commands
-    (elsewhere-open
-     elsewhere-build-url))
-
-  ;; Send HTTP requests from Emacs.
-  (use-package restclient
-    :ensure t
-    :mode "\\.http\\'")
-
-  ;; Basic Golang support.
-  ;;
-  ;; HACK: This is built-in to Emacs, but there is also a third-party
-  ;; go-mode which we will install next.
-  (use-package go-ts-mode
-    :mode
-    (("\\.go\\'" . go-ts-mode)
-     ("go\\.mod\\'" . go-mod-ts-mode))
-
-    :init
-    ;; Set up eglot for go-ts-mode.
-    (defun go-ts-mode-eglot-setup ()
-      (with-eval-after-load 'eglot
-        (add-to-list 'eglot-server-programs
-                     '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
-        (add-hook 'before-save-hook #'eglot-format-buffer t t))
-      (eglot-ensure))
-    (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
-
-    :config
-    ;; CamelCase aware editing operations.
-    (subword-mode +1))
-
-  ;; Extra Golang support.
-  ;;
-  ;; HACK: We won't actually use this go-mode other than for importing
-  ;; some extra functions to augment the built-in go-ts-mode.
-  (use-package go-mode
-    :ensure t
-
-    :mode
-    ;; HACK: The built-in go-ts-mode does not support go.work files,
-    ;; so we actually do use the third-party go-mode for this file
-    ;; type.
-    ("go\\.work\\'" . go-dot-work-mode)
-
-    :hook
-    (go-dot-work-mode . (lambda ()
-                          (require 'go-ts-mode)))
-    (go-ts-mode . (lambda ()
-                    (require 'go-mode)
-                    (defun go-ts-mode-run-gofmt ()
-                      "Use the `gofmt' function from go-mode inside go-ts-mode."
-                      (interactive)
-                      (gofmt))
-                    (add-hook 'before-save-hook #'go-ts-mode-run-gofmt t t)))
+    :functions
+    (auto-dark-mode)
 
     :custom
-    (gofmt-command "@gofumpt@")
-    (godef-command "@godef@"))
-
-  ;; Run Golang tests.
-  (use-package gotest
-    :ensure t
-
-    :commands
-    (go-test-current-file
-     go-test-current-test
-     go-test-current-project
-     go-test-current-benchmark
-     go-run))
-
-  ;; Python support.
-  (use-package python
-    :init
-    ;; Open python files with tree-sitter support.
-    (add-to-list 'major-mode-remap-alist
-                 '(python-mode . python-ts-mode))
-
-    ;; Set up syntax highlighting for python-ts-mode.
-    (defun python-ts-mode-highlighting-setup ()
-      (treesit-font-lock-recompute-features))
-    (add-hook 'python-ts-mode-hook #'python-ts-mode-highlighting-setup)
-
-    ;; Set up eglot for python-ts-mode.
-    (defun python-ts-mode-eglot-setup ()
-      (with-eval-after-load 'eglot
-        (add-to-list 'eglot-server-programs
-                     '((python-mode python-ts-mode) . ("@pylsp@")))
-        (add-hook 'before-save-hook #'eglot-format-buffer t t))
-      (eglot-ensure))
-    (add-hook 'python-ts-mode-hook #'python-ts-mode-eglot-setup))
-
-  ;; Nix support.
-  (use-package nix-mode
-    :ensure t
-    :mode "\\.nix\\'"
-
-    :init
-    ;; Set up eglot for nix-mode.
-    (defun nix-mode-eglot-setup ()
-      (with-eval-after-load 'eglot
-        (add-to-list 'eglot-server-programs
-                     '(nix-mode . ("@nil@")))
-        (add-hook 'before-save-hook #'eglot-format-buffer t t))
-      (eglot-ensure))
-    (add-hook 'nix-mode-hook #'nix-mode-eglot-setup))
-
-  ;; YAML support.
-  (use-package yaml-ts-mode
-    :mode
-    (("\\.yaml\\'" . yaml-ts-mode)
-     ("\\.yml\\'" . yaml-ts-mode))
-
-    :init
-    ;; Set up eglot for yaml-mode.
-    (defun yaml-ts-mode-eglot-setup ()
-      (with-eval-after-load 'eglot
-        (add-to-list 'eglot-server-programs
-                     '(yaml-ts-mode . ("@yamlls@" "--stdio")))
-        (add-hook 'before-save-hook #'eglot-format-buffer t t)
-        (setq-local eglot-workspace-configuration
-                    '(:yaml (:format (:enable t
-                                      :singleQuote t)
-                             :validate t
-                             :keyOrdering :json-false
-                             :hover t
-                             :completion t
-                             :suggest (:parentSkeletonSelectedFirst t)
-                             :schemaStore (:enable t
-                                           :url "https://www.schemastore.org/api/json/catalog.json")))))
-      (eglot-ensure))
-    (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
-
-  ;; Note taking, time tracking, etc.
-  (use-package org
-    :ensure t
-
-    :custom
-    (org-auto-align-tags nil)
-    (org-tags-column 0)
-    (org-catch-invisible-edits 'show-and-error)
-    (org-special-ctrl-a/e t)
-    (org-insert-heading-respect-content t)
-    (org-hide-emphasis-markers t)
-    (org-pretty-entities t)
-    (org-ellipsis "…")
-    (org-agenda-tags-column 0)
-    (org-agenda-time-grid
-     '((daily today require-timed)
-       (800 1000 1200 1400 1600 1800 2000)
-       " ┄┄┄┄┄ " "┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄"))
-    (org-agenda-current-time-string
-     "⭠ now ─────────────────────────────────────────────────"))
-
-  ;; Send HTTP requests from org-mode.
-  (use-package ob-restclient
-    :ensure t
+    (auto-dark-allow-osascript t)
+    (auto-dark-dark-theme 'modus-vivendi-tinted)
+    (auto-dark-light-theme 'modus-operandi-tinted)
 
     :config
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((restclient . t))))
+    (auto-dark-mode +1)))
 
-  ;; Markdown support.
-  (use-package markdown-mode
-    :ensure t
+;; Highlight the current line.
+(use-package hl-line
+  :hook
+  ((text-mode prog-mode) . hl-line-mode))
 
-    :mode
-    (("README\\.md\\'" . gfm-mode)
-     ("\\.\\(?:md\\|markdown\\|mkd\\|mdown\\|mkdn\\|mdwn\\)\\'" . markdown-mode))
+;; Email client.
+;;
+;; NOTE: set the following variables with customize:
+;; - user-mail-address
+;; - user-full-name
+;; - mml-secure-openpgp-signers
+;; - sendmail-program
+;; - message-sendmail-extra-arguments
+(use-package notmuch
+  :ensure t
 
-    :bind
-    (:map markdown-mode-map
-          ("C-c C-e" . #'markdown-do))
+  :functions
+  (notmuch-user-emails
+   notmuch-user-primary-email)
 
-    :custom
-    (markdown-command "@multimarkdown@"))
+  :commands
+  (notmuch-hello
+   notmuch-search)
 
-  ;; Generate table of contents in markdown files.
-  (use-package markdown-toc
-    :ensure t
+  :custom
+  (mail-specify-envelope-from t)
+  (message-send-mail-function #'message-send-mail-with-sendmail)
+  (notmuch-crypto-process-mime t)
+  (mml-secure-openpgp-encrypt-to-self t)
+  (mml-secure-smime-sign-with-sender t)
+  (notmuch-search-oldest-first nil)
+  ;; Determines whether or not to show the mail icon in the mode line.
+  (display-time-mail-function
+   (lambda ()
+     (replace-regexp-in-string
+      "\n" " "
+      (shell-command-to-string
+       "notmuch count tag:unread and tag:inbox"))))
+  ;; Determines what happens when you click the mail icon in the mode line.
+  (read-mail-command
+   (lambda ()
+     (interactive)
+     (notmuch-search "tag:unread and tag:inbox")))
 
-    :hook
-    ((markdown-mode gfm-mode) . markdown-toc-mode))
+  :config
+  (add-hook 'message-setup-hook #'mml-secure-message-sign)
 
-  ;; Reading EPUB files.
-  (use-package nov
-    :ensure t
+  :bind
+  (("C-c m" . #'notmuch-hello)))
 
-    :mode
-    ("\\.epub\\'" . nov-mode))
+;; Transient interface for notmuch commands.
+(use-package notmuch-transient
+  :ensure t)
 
-  ;; Convert buffers to HTML (including org-mode).
-  (use-package htmlize
-    :ensure t
+;; Link between org-mode and notmuch buffers.
+(use-package ol-notmuch
+  :ensure t)
 
-    :commands
-    (htmlize-buffer
-     htmlize-file
-     htmlize-many-files
-     htmlize-many-files-dired))
+;; Adds various transient interfaces.
+(use-package tray
+  :ensure t)
 
-  ;; Pretty styling in org-mode buffers.
-  (use-package org-modern
-    :ensure t
+;; Monitor and act upon system processes.
+(use-package proced
+  :commands
+  (proced)
 
-    :hook
-    ((org-mode . org-modern-mode)
-     (org-agenda-finalize . org-modern-agenda)))
+  :custom
+  (proced-auto-update-flag t)
+  (proced-goal-attribute nil)
+  (proced-show-remote-processes t)
+  (proced-enable-color-flag t)
+  (proced-format 'custom)
 
-  ;; Indicate the git diff in the margin.
-  (use-package diff-hl
-    :ensure t
+  :config
+  (add-to-list
+   'proced-format-alist
+   '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
 
-    :config
-    (diff-hl-margin-mode)
-    (global-diff-hl-mode))
+;; Miscellaneous Emacs configuration.
+(use-package emacs
+  :custom
+  (use-short-answers t)
+  (initial-buffer-choice t)
+  ;; Place newline at end of file.
+  (require-final-newline t)
+  ;; Don't use tabs to indent.
+  (indent-tabs-mode nil)
+  ;; Maintain correct appearance of tabs.
+  (tab-width 8)
+  ;; Hide commands in M-x which do not work in the current mode.
+  (read-extended-command-predicate #'command-completion-default-include-p)
+  ;; Configure the time display on the mode line.
+  (display-time-day-and-date t)
+  (display-time-24hr-format t)
+  (display-time-use-mail-icon t)
 
-  ;; Color scheme.
-  (use-package modus-themes
-    :ensure t
+  :config
+  ;; Remove some UI elements.
+  (menu-bar-no-scroll-bar)
+  (menu-bar-no-window-divider)
 
-    :custom
-    (modus-themes-italic-constructs t)
-    (modus-themes-bold-constructs t)
+  ;; Show line numbers at the beginning of each line.
+  (global-display-line-numbers-mode +1)
 
-    :config
-    (load-theme 'modus-vivendi-tinted :no-confirm))
+  ;; Revert buffers automatically when underlying files are changed externally.
+  (global-auto-revert-mode +1)
 
-  ;; Highlight the current line.
-  (use-package hl-line
-    :hook
-    ((text-mode prog-mode) . hl-line-mode))
+  ;; More intuitive deletion.
+  (delete-selection-mode +1)
 
-  ;; Email client.
-  ;;
-  ;; NOTE: set the following variables with customize:
-  ;; - user-mail-address
-  ;; - user-full-name
-  ;; - mml-secure-openpgp-signers
-  ;; - sendmail-program
-  ;; - message-sendmail-extra-arguments
-  (use-package notmuch
-    :ensure t
-
-    :custom
-    (mail-specify-envelope-from t)
-    (message-send-mail-function #'message-send-mail-with-sendmail)
-    (notmuch-crypto-process-mime t)
-    (mml-secure-openpgp-encrypt-to-self t)
-    (mml-secure-smime-sign-with-sender t)
-    (notmuch-search-oldest-first nil)
-    (read-mail-command
-     (lambda ()
-       (interactive)
-       (notmuch-search "tag:unread and tag:inbox")))
-    (display-time-mail-function
-     (lambda () (replace-regexp-in-string
-                 "\n" " "
-                 (shell-command-to-string
-                  "notmuch count tag:unread and tag:inbox"))))
-
-   :config
-   (add-hook 'message-setup-hook #'mml-secure-message-sign)
-
-   :bind
-   (("C-c m" . #'notmuch-hello)))
-
-  ;; Transient interface for notmuch commands.
-  (use-package notmuch-transient
-    :ensure t)
-
-  ;; Link between org-mode and notmuch buffers.
-  (use-package ol-notmuch
-    :ensure t)
-
-  ;; Adds various transient interfaces.
-  (use-package tray
-    :ensure t)
-
-  (use-package proced
-    :commands
-    (proced)
-
-    :custom
-    (proced-auto-update-flag t)
-    (proced-goal-attribute nil)
-    (proced-show-remote-processes t)
-    (proced-enable-color-flag t)
-    (proced-format 'custom)
-
-    :config
-    (add-to-list
-     'proced-format-alist
-     '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
-
-  (use-package emacs
-    :custom
-    ;; Don't assume double spaces at the end of a sentence.
-    (sentence-end-double-space nil)
-    ;; Allow minibuffer commands while in the minibuffer.
-    (enable-recursive-minibuffers t)
-    ;; Place newline at end of file.
-    (require-final-newline t)
-    ;; Don't use tabs to indent.
-    (indent-tabs-mode nil)
-    ;; Maintain correct appearance of tabs.
-    (tab-width 8)
-    ;; Hide commands in M-x which do not work in the current mode.
-    (read-extended-command-predicate #'command-completion-default-include-p)
-    ;; Configure the time display on the mode line.
-    (display-time-day-and-date t)
-    (display-time-24hr-format t)
-    (display-time-use-mail-icon t)
-
-    :config
-    ;; Remove some UI elements.
-    (menu-bar-no-scroll-bar)
-    (menu-bar-no-window-divider)
-
-    ;; Show line numbers at the beginning of each line.
-    (global-display-line-numbers-mode +1)
-
-    ;; Revert buffers automatically when underlying files are changed externally.
-    (global-auto-revert-mode +1)
-
-    ;; Enable y/n answers.
-    (fset 'yes-or-no-p 'y-or-n-p)
-
-    ;; More intuitive deletion.
-    (delete-selection-mode +1)
-
-    ;; Mode line settings.
-    (line-number-mode +1)
-    (column-number-mode +1)
-    (size-indication-mode +1)
-    (display-time)))
+  ;; Mode line settings.
+  (line-number-mode +1)
+  (column-number-mode +1)
+  (size-indication-mode +1)
+  (display-time))
 
 (provide 'default)
+
 ;;; default.el ends here

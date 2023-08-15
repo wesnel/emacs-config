@@ -2,6 +2,7 @@ final: prev:
 
 {
   wgn-emacs = let
+
     aspell = let
       pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
     in "${pkg}/bin/aspell";
@@ -31,15 +32,19 @@ final: prev:
     in "${pkg}/lib/libparinfer_rust.so";
 
     pylsp = let
-      pkg = final.python3.withPackages(p: with p; [
-        jedi
-        mccabe
-        pycodestyle
-        pyflakes
-        python-lsp-server
-        rope
-        yapf
-      ]);
+
+      pkg = final.python3.withPackages(p:
+
+        with p; [
+          jedi
+          mccabe
+          pycodestyle
+          pyflakes
+          python-lsp-server
+          rope
+          yapf
+        ]);
+
     in "${pkg}/bin/pylsp";
 
     yamlls = let
@@ -150,8 +155,8 @@ final: prev:
         yamlls;
     };
 
-    wgn-emacs = final.emacsWithPackagesFromUsePackage {
-      config = ../default.el;
+    wgn-emacs-unstable = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
       package = final.emacs-unstable;
       defaultInitFile = emacs-config;
 
@@ -160,8 +165,8 @@ final: prev:
         override;
     };
 
-    wgn-emacs-nox = final.emacsWithPackagesFromUsePackage {
-      config = ../default.el;
+    wgn-emacs-unstable-nox = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
       package = final.emacs-unstable-nox;
       defaultInitFile = emacs-config;
 
@@ -169,18 +174,30 @@ final: prev:
         extraEmacsPackages
         override;
     };
-  in {
+
+    wgn-emacs-macport = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
+      package = final.emacs-macport;
+      defaultInitFile = emacs-config;
+
+      inherit
+        extraEmacsPackages
+        override;
+    };
+
+  in rec {
     inherit
       emacs-config
-      wgn-emacs
-      wgn-emacs-nox;
+      wgn-emacs-macport
+      wgn-emacs-unstable
+      wgn-emacs-unstable-nox;
 
-    defaultPackage = wgn-emacs-nox;
+    defaultPackage = wgn-emacs-unstable-nox;
 
     shell = final.mkShell {
       buildInputs = [
+        defaultPackage
         emacs-config
-        wgn-emacs-nox
       ];
     };
   };
