@@ -53,7 +53,11 @@
           prev:
 
           {
-            emacs-macport = prev.emacs-macport.overrideAttrs (old:
+            # HACK: yikes
+            emacs-macport = (prev.emacs-macport.override {
+              withNativeCompilation = true;
+              withTreeSitter = true;
+            }).overrideAttrs (old:
 
               {
                 version = "29.1";
@@ -63,13 +67,6 @@
                   repo = "emacs-mac";
                   rev = "emacs-29.1-mac-10.0";
                   sha256 = "sha256-TE829qJdPjeOQ+kD0SfyO8d5YpJjBge/g+nScwj+XVU=";
-                };
-
-                withNativeCompilation = true;
-                withTreeSitter = true;
-
-                passthru = old.passthru // {
-                  treeSitter = true;
                 };
               });
           })
