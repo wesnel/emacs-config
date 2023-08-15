@@ -401,8 +401,9 @@
   :ensure t
   :demand t
 
-  :variables
-  (corfu-continue-commands)
+  :defines
+  (corfu-continue-commands
+   corfu-map)
 
   :commands
   (corfu-mode
@@ -412,7 +413,6 @@
 
   :preface
   (defun corfu-enable-in-minibuffer ()
-    "Enable corfu in the minibuffer if `completion-at-point' is bound."
     (when (where-is-internal #'completion-at-point (list (current-local-map)))
       (setq-local corfu-echo-delay nil
                   corfu-popupinfo-delay nil)
@@ -1079,6 +1079,8 @@
 ;; Miscellaneous Emacs configuration.
 (use-package emacs
   :custom
+  ;; Disable package archives.
+  (package-archives nil)
   (use-short-answers t)
   (initial-buffer-choice t)
   ;; Place newline at end of file.
