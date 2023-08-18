@@ -37,6 +37,46 @@
 (eval-when-compile
   (require 'use-package))
 
+;; Miscellaneous Emacs configuration.
+(use-package emacs
+  :custom
+  ;; Disable package archives.
+  (package-archives nil)
+  (use-short-answers t)
+  (initial-buffer-choice t)
+  ;; Place newline at end of file.
+  (require-final-newline t)
+  ;; Don't use tabs to indent.
+  (indent-tabs-mode nil)
+  ;; Maintain correct appearance of tabs.
+  (tab-width 8)
+  ;; Hide commands in M-x which do not work in the current mode.
+  (read-extended-command-predicate #'command-completion-default-include-p)
+  ;; Configure the time display on the mode line.
+  (display-time-day-and-date t)
+  (display-time-24hr-format t)
+  (display-time-use-mail-icon t)
+
+  :config
+  ;; Remove some UI elements.
+  (menu-bar-no-scroll-bar)
+  (menu-bar-no-window-divider)
+
+  ;; Show line numbers at the beginning of each line.
+  (global-display-line-numbers-mode +1)
+
+  ;; Revert buffers automatically when underlying files are changed externally.
+  (global-auto-revert-mode +1)
+
+  ;; More intuitive deletion.
+  (delete-selection-mode +1)
+
+  ;; Mode line settings.
+  (line-number-mode +1)
+  (column-number-mode +1)
+  (size-indication-mode +1)
+  (display-time))
+
 ;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
   (use-package exec-path-from-shell
@@ -352,7 +392,6 @@
 ;; Automatically manage parentheses in lisps.
 (use-package parinfer-rust-mode
   :ensure t
-  :defer t
   :hook lisp-data-mode
 
   :custom
@@ -659,6 +698,12 @@
 
 ;; Language server integration.
 (use-package eglot
+  :preface
+  (defun apply-eglot-format ()
+    (unless (and (fboundp 'magit-rebase-in-progress-p)
+                 (magit-rebase-in-progress-p))
+      (eglot-format-buffer)))
+
   :commands
   (eglot
    eglot-ensure
@@ -766,17 +811,12 @@
 ;; Basic Golang support.
 ;;
 ;; HACK: This is built-in to Emacs, but there is also a third-party
-;; go-mode which we will install next.
+;;       go-mode which we will install next.
 (use-package go-ts-mode
   :mode
   ("go\\.mod\\'" . go-mod-ts-mode)
 
   :preface
-  (defun apply-eglot-format ()
-    (unless (and (fboundp 'magit-rebase-in-progress-p)
-                 (magit-rebase-in-progress-p))
-      (eglot-format-buffer)))
-
   (defun go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
@@ -799,7 +839,7 @@
 ;; Extra Golang support.
 ;;
 ;; HACK: We won't actually use this go-mode other than for importing
-;; some extra functions to augment the built-in go-ts-mode.
+;;       some extra functions to augment the built-in go-ts-mode.
 (use-package go-mode
   :ensure t
 
@@ -813,9 +853,9 @@
       (gofmt)))
 
   :mode
-  ;; HACK: The built-in go-ts-mode does not support go.work files,
-  ;; so we actually do use the third-party go-mode for this file
-  ;; type.
+  ;; HACK: The built-in go-ts-mode does not support go.work files, so
+  ;;       we actually do use the third-party go-mode for this file
+  ;;       type.
   ("go\\.work\\'" . (lambda ()
                       (require 'go-ts-mode)
                       (go-dot-work-mode)))
@@ -826,8 +866,11 @@
                   (add-hook 'before-save-hook #'apply-gofmt t t)))
 
   :custom
+  (go-command "@go@")
+  (godoc-command "@godoc@")
   (gofmt-command "@gofumpt@")
-  (godef-command "@godef@"))
+  (godef-command "@godef@")
+  (godoc-and-godef-command "@godoc@"))
 
 ;; Run Golang tests.
 (use-package gotest
@@ -842,6 +885,8 @@
 
 ;; Python support.
 (use-package python
+  :defer t
+
   :preface
   (defun python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
@@ -892,6 +937,118 @@
   :init
   ;; Set up eglot for yaml-mode.
   (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
+
+;; Support for HTML with embedded JS and CSS.
+(use-package mhtml-mode
+  :defer t
+
+  :preface
+  (defun mhtml-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(mhtml-mode . ("@htmlls@" "--stdio")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  ;; Set up eglot for mhtml-mode.
+  (add-hook 'mhtml-mode-hook #'mhtml-mode-eglot-setup))
+
+;; JSX and TSX support.
+(use-package tsx-ts-mode
+  :mode
+  (("\\.tsx\\'" . tsx-ts-mode)
+   ("\\.jsx\\'" . tsx-ts-mode))
+
+  :preface
+  (defun tsx-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(tsx-ts-mode . ("@tsxls@" "--stdio")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  ;; Open JSX files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(js-jsx-mode . tsx-ts-mode))
+
+  ;; Set up eglot for tsx-ts-mode.
+  (add-hook 'tsx-ts-mode-hook #'tsx-ts-mode-eglot-setup))
+
+;; Javascript support.
+(use-package js-ts-mode
+  :mode "\\.js\\'"
+
+  :preface
+  (defun js-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(js-ts-mode . ("@tsxls@" "--stdio")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  (defun js-ts-mode-fix-auto-mode-alist ()
+    (setq auto-mode-alist
+          (assoc-delete-all "\\.jsx\\'" auto-mode-alist))
+    (add-to-list 'auto-mode-alist
+                 '("\\.jsx\\'" . tsx-ts-mode)))
+
+  :init
+  ;; Set up eglot for js-ts-mode.
+  (add-hook 'js-ts-mode-hook #'js-ts-mode-eglot-setup)
+
+  ;; HACK: `js-ts-mode' modifies `auto-mode-alist' when it is
+  ;;       loaded. In particular, it configures JSX files to be opened
+  ;;       with `js-ts-mode'. This takes precedence over my own
+  ;;       configuration, which is for JSX files to be opened with
+  ;;       `tsx-ts-mode'. The consequence of this is confusing
+  ;;       behavior:
+  ;;
+  ;;       - Open a JSX file.
+  ;;           -> the JSX file will be in `tsx-ts-mode'.
+  ;;       - Open a JS file and then a JSX file.
+  ;;           -> the JSX file will be in `js-ts-mode'.
+  ;;
+  ;;       Hence, we need to re-affirm our JSX configuration after
+  ;;       `js-ts-mode' has loaded.
+  (add-hook 'js-ts-mode-hook #'js-ts-mode-fix-auto-mode-alist))
+
+;; Typescript support.
+(use-package typescript-ts-mode
+  :mode "\\.ts\\'"
+
+  :preface
+  (defun typescript-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(typescript-ts-mode . ("@tsxls@" "--stdio")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  ;; Set up eglot for typescript-ts-mode.
+  (add-hook 'typescript-ts-mode-hook #'typescript-ts-mode-eglot-setup))
+
+;; CSS support.
+(use-package css-ts-mode
+  :defer t
+
+  :preface
+  (defun css-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(css-ts-mode . ("@cssls@" "--stdio")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  ;; Open CSS files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(css-mode . css-ts-mode))
+
+  ;; Set up eglot for css-ts-mode.
+  (add-hook 'css-ts-mode-hook #'css-ts-mode-eglot-setup))
 
 ;; Note taking, time tracking, etc.
 (use-package org
@@ -1086,46 +1243,6 @@
   (add-to-list
    'proced-format-alist
    '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
-
-;; Miscellaneous Emacs configuration.
-(use-package emacs
-  :custom
-  ;; Disable package archives.
-  (package-archives nil)
-  (use-short-answers t)
-  (initial-buffer-choice t)
-  ;; Place newline at end of file.
-  (require-final-newline t)
-  ;; Don't use tabs to indent.
-  (indent-tabs-mode nil)
-  ;; Maintain correct appearance of tabs.
-  (tab-width 8)
-  ;; Hide commands in M-x which do not work in the current mode.
-  (read-extended-command-predicate #'command-completion-default-include-p)
-  ;; Configure the time display on the mode line.
-  (display-time-day-and-date t)
-  (display-time-24hr-format t)
-  (display-time-use-mail-icon t)
-
-  :config
-  ;; Remove some UI elements.
-  (menu-bar-no-scroll-bar)
-  (menu-bar-no-window-divider)
-
-  ;; Show line numbers at the beginning of each line.
-  (global-display-line-numbers-mode +1)
-
-  ;; Revert buffers automatically when underlying files are changed externally.
-  (global-auto-revert-mode +1)
-
-  ;; More intuitive deletion.
-  (delete-selection-mode +1)
-
-  ;; Mode line settings.
-  (line-number-mode +1)
-  (column-number-mode +1)
-  (size-indication-mode +1)
-  (display-time))
 
 (provide 'default)
 

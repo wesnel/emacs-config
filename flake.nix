@@ -53,8 +53,20 @@
           prev:
 
           {
-            # HACK: yikes
             emacs-macport = (prev.emacs-macport.override {
+              # HACK: if you look inside the derivation for emacs, you
+              #       see that these options are set to be true if the
+              #       major version of emacs is at least 29. in this
+              #       overlay, we override the version attribute of
+              #       emacs-macport to have a major version of 29
+              #       rather than 28, so you would think that these
+              #       options would be consequently set to
+              #       true. however, this is not the case. instead,
+              #       they are still set to be false due to the major
+              #       version being 28 *before* we override the
+              #       version attribute. therefore, we need to
+              #       manually override these values to be true in
+              #       addition to overriding the version attribute.
               withNativeCompilation = true;
               withTreeSitter = true;
             }).overrideAttrs (old:

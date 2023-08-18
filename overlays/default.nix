@@ -7,9 +7,21 @@ final: prev:
       pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
     in "${pkg}/bin/aspell";
 
+    cssls = let
+      pkg = final.vscode-langservers-extracted;
+    in "${pkg}/bin/vscode-css-language-server";
+
+    go = let
+      pkg = final.go;
+    in "${pkg}/bin/go";
+
     godef = let
       pkg = final.godef;
     in "${pkg}/bin/godef";
+
+    godoc = let
+      pkg = final.go;
+    in "${pkg}/bin/go doc";
 
     gofumpt = let
       pkg = final.gofumpt;
@@ -18,6 +30,10 @@ final: prev:
     gopls = let
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
+
+    htmlls = let
+      pkg = final.vscode-langservers-extracted;
+    in "${pkg}/bin/vscode-html-language-server";
 
     multimarkdown = let
       pkg = final.multimarkdown;
@@ -46,6 +62,10 @@ final: prev:
         ]);
 
     in "${pkg}/bin/pylsp";
+
+    tsxls = let
+      pkg = final.nodePackages.typescript-language-server;
+    in "${pkg}/bin/typescript-language-server";
 
     yamlls = let
       pkg = final.yaml-language-server;
@@ -145,13 +165,18 @@ final: prev:
 
       inherit
         aspell
+        cssls
+        go
         godef
+        godoc
         gofumpt
         gopls
+        htmlls
         multimarkdown
         nil
         parinfer
         pylsp
+        tsxls
         yamlls;
     };
 
