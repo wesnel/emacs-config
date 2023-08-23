@@ -138,7 +138,7 @@
   :preface
   (defun set-up-whitespace ()
     (add-hook 'before-save-hook #'whitespace-cleanup nil t)
-    (whitespace-toggle-options '(lines)))
+    (whitespace-toggle-options '(lines newline-mark)))
 
   :hook
   ((text-mode prog-mode) . set-up-whitespace))
