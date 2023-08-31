@@ -8,6 +8,11 @@ Technically, there is no need to even clone this repository. All you need is [ni
 
 ``` shell
 nix build github:wesnel/emacs-config
+```
+
+Then,
+
+``` shell
 ./result/bin/emacs -nw
 ```
 
@@ -15,6 +20,11 @@ nix build github:wesnel/emacs-config
 
 ``` shell
 nix build github:wesnel/emacs-config#wgn-emacs-unstable
+```
+
+Then,
+
+``` shell
 ./result/bin/emacs
 ```
 
@@ -22,6 +32,11 @@ nix build github:wesnel/emacs-config#wgn-emacs-unstable
 
 ``` shell
 nix build github:wesnel/emacs-config#wgn-emacs-macport
+```
+
+Then,
+
+``` shell
 open ./result/Applications/Emacs.app
 ```
 
@@ -29,5 +44,10 @@ open ./result/Applications/Emacs.app
 
 ``` shell
 nix build github:wesnel/emacs-config#emacs-config
+```
+
+Then,
+
+``` shell
 cat ./result
 ```
