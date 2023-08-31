@@ -57,7 +57,7 @@
   (display-time-24hr-format t)
   (display-time-use-mail-icon t)
 
-  :config
+  :init
   ;; Remove some UI elements.
   (menu-bar-no-scroll-bar)
   (menu-bar-no-window-divider)
@@ -101,15 +101,16 @@
                    "PASSWORD_STORE_DIR"
                    "PASSWORD_STORE_KEY"
                    "PASSWORD_STORE_SIGNING_KEY"))
-      (add-to-list 'exec-path-from-shell-variables var))
-    (exec-path-from-shell-initialize)))
+          (add-to-list 'exec-path-from-shell-variables var)
+
+        (exec-path-from-shell-initialize))))
 
 ;; Store secrets in Emacs.
 (use-package auth-source
   :custom
   (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
 
-  :config
+  :init
   (auth-source-pass-enable))
 
 ;; Avoid putting files in weird places.
@@ -143,6 +144,17 @@
   :hook
   ((text-mode prog-mode) . set-up-whitespace))
 
+;; Support for CamelCase.
+(use-package subword
+  :diminish subword-mode)
+
+;; Navigate code based on an outline.
+(use-package outline
+  :diminish outline-minor-mode
+
+  :hook
+  ((text-mode prog-mode) . outline-minor-mode))
+
 ;; Syntax highlighting.
 (use-package treesit
   :commands
@@ -154,7 +166,6 @@
 ;; Highlight TODO comments.
 (use-package hl-todo
   :ensure t
-  :demand t
 
   :commands
   (global-hl-todo-mode)
@@ -165,7 +176,6 @@
 ;; Completion engine based on `completing-read'.
 (use-package vertico
   :ensure t
-  :demand t
 
   :commands
   (vertico-mode)
@@ -195,7 +205,9 @@
 ;; Provides search and navigation based on `completing-read'.
 (use-package consult
   :ensure t
-  :demand t
+
+  :defines
+  (consult-preview-key)
 
   :commands
   (consult-find
@@ -222,6 +234,8 @@
    consult-register-load
    consult-register-store
    consult-register
+   consult-register-window
+   consult-yank-pop
    consult-compile-error
    consult-flymake
    consult-goto-line
@@ -250,7 +264,7 @@
    ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
    ("C-M-#" . #'consult-register)
    ;; Other custom bindings
-   ;; ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
+   ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
    ;; M-g bindings in `goto-map'
    ("M-g e" . #'consult-compile-error)
    ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
@@ -284,8 +298,13 @@
    ("M-r" . #'consult-history))                ;; orig. previous-matching-history-element
 
   :custom
+  (register-preview-function #'consult-register-format)
   (xref-show-xrefs-function #'consult-xref)
-  (xref-show-definitions-function #'consult-xref))
+  (xref-show-definitions-function #'consult-xref)
+  (consult-narrow-key "<")
+
+  :init
+  (advice-add #'register-preview :override #'consult-register-window))
 
 ;; Move between windows.
 (use-package window
@@ -297,13 +316,16 @@
   :custom
   (ls-lisp-use-insert-directory-program nil)
 
-  :config
-  (require 'ls-lisp))
+  :preface
+  (defun fix-dired-ls ()
+    (require 'ls-lisp))
+
+  :init
+  (add-hook 'dired-mode-hook #'fix-dired-ls))
 
 ;; Easily mark and kill regions.
 (use-package easy-kill
   :ensure t
-  :demand t
 
   :commands
   (easy-kill
@@ -313,29 +335,18 @@
   (([remap kill-ring-save] . #'easy-kill)
    ([remap mark-sexp] . #'easy-mark)))
 
-;; Browse through killed regions.
-(use-package browse-kill-ring
-  :ensure t
-  :demand t
-
-  :commands
-  (browse-kill-ring)
-
-  :bind
-  (("M-y" . #'browse-kill-ring)))
-
 ;; Persist history over Emacs restarts.
 (use-package savehist
   :custom
   (savehist-additional-variables '(search-ring regexp-search-ring))
   (savehist-autosave-interval 60)
 
-  :config
+  :init
   (savehist-mode +1))
 
 ;; Remember your location in a file.
 (use-package saveplace
-  :config
+  :init
   (save-place-mode +1))
 
 ;; Save recent files.
@@ -345,13 +356,12 @@
   (recentf-max-menu-items 15)
   (recentf-auto-cleanup 'never)
 
-  :config
+  :init
   (recentf-mode +1))
 
 ;; Undo history as a tree.
 (use-package undo-tree
   :ensure t
-  :demand t
   :diminish undo-tree-mode
 
   :custom
@@ -370,12 +380,12 @@
 ;; Project management.
 (use-package project
   :commands
-  (project-switch-commands))
+  (project-switch-commands
+   project-prefixed-buffer-name))
 
 ;; Git interface.
 (use-package magit
   :ensure t
-  :demand t
 
   :commands
   (magit
@@ -397,24 +407,71 @@
   :custom
   (parinfer-rust-library "@parinfer@"))
 
-;; Spell checxing and correction.
-(use-package spell-fu
+;; Show matching parentheses.
+(use-package paren
+  :custom
+  (show-paren-context-when-offscreen t))
+
+;; Focused presentation mode built on top of outline.
+(use-package logos
   :ensure t
-  :demand t
 
   :commands
-  (spell-fu-global-mode)
+  (logos-narrow-dwim
+   logos-forward-page-dwim
+   logos-backward-page-dwim
+   logos-focus-mode)
 
   :custom
-  (ispell-program-name "@aspell@")
+  (logos-outlines-are-pages t)
 
-  :init
-  (spell-fu-global-mode))
+  :bind
+  (([remap narrow-to-region] . #'logos-narrow-dwim)
+   ([remap forward-page] . #'logos-forward-page-dwim)
+   ([remap backward-page] . #'logos-backward-page-dwim)
+   ("<f9>" . #'logos-focus-mode)))
+
+;; Spell checxing and correction.
+(if (executable-find "enchant-2")
+
+    ;; HACK: enchant and jinx are difficult a difficult combination to
+    ;;       install with nix, so we instead check to see if they are
+    ;;       available on the system elsehow.
+    (use-package jinx
+      :ensure t
+
+      :custom
+      (ispell-program-name "enchant-2")
+
+      :commands
+      (jinx-correct
+       jinx-languages)
+
+      :bind
+      (("M-$" . #'jinx-correct)
+       ("C-M-$" . #'jinx-languages))
+
+      :hook
+      (emacs-startup . global-jinx-mode))
+
+  ;; HACK: If enchant is not available on the system, then fall back
+  ;;       to aspell and spell-fu. This combination is easier to
+  ;;       install with nix.
+  (use-package spell-fu
+    :ensure t
+
+    :commands
+    (spell-fu-global-mode)
+
+    :custom
+    (ispell-program-name "@aspell@")
+
+    :init
+    (spell-fu-global-mode)))
 
 ;; Avoid need for modifier keys.
 (use-package devil
   :ensure t
-  :demand t
 
   :commands
   (global-devil-mode)
@@ -425,20 +482,18 @@
 ;; More convenient options for cursor movement.
 (use-package mwim
   :ensure t
-  :demand t
 
   :commands
   (mwim-beginning
    mwim-end)
 
   :bind
-  (("C-a" . #'mwim-beginning)
-   ("C-e" . #'mwim-end)))
+  (([remap move-beginning-of-line] . #'mwim-beginning)
+   ([remap move-end-of-line] . #'mwim-end)))
 
 ;; In-buffer completion with `completion-in-region'.
 (use-package corfu
   :ensure t
-  :demand t
 
   :defines
   (corfu-continue-commands
@@ -481,7 +536,6 @@
 (unless (display-graphic-p)
   (use-package corfu-terminal
     :ensure t
-    :demand t
 
     :commands
     (corfu-terminal-mode)
@@ -492,7 +546,6 @@
 ;; Extra `completion-at-point-functions'.
 (use-package cape
   :ensure t
-  :demand t
 
   :commands
   (cape-dabbrev
@@ -512,6 +565,8 @@
   (cape-wrap-buster)
 
   :init
+  (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster)
+
   ;; Add `completion-at-point-functions', used by `completion-at-point'.
   ;; NOTE: The order matters!
   (add-to-list 'completion-at-point-functions #'cape-dabbrev)
@@ -530,7 +585,6 @@
 ;; Make templates available via `completion-at-point-functions'.
 (use-package tempel
   :ensure t
-  :demand t
 
   :commands
   (tempel-expand)
@@ -594,7 +648,7 @@
                        embark-highlight-indicator
                        embark-isearch-highlight-indicator))
 
-  :config
+  :init
   (advice-add #'embark-completing-read-prompter
               :around #'embark-hide-which-key-indicator)
 
@@ -606,10 +660,9 @@
 ;; Integration between Embark and Consult.
 (use-package embark-consult
   :ensure t
-  :demand t
 
   :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
+  ((embark-collect-mode completion-list-mode) . consult-preview-at-point-mode))
 
 (use-package grep
   :defines
@@ -629,7 +682,6 @@
 ;; Creates a minor mode for when the point is in a selection.
 (use-package selected
   :ensure t
-  :demand t
   :diminish selected-minor-mode
 
   :commands
@@ -638,7 +690,7 @@
   :defines
   (selected-keymap)
 
-  :config
+  :init
   (selected-global-mode +1))
 
 ;; Edit text with multiple cursors.
@@ -677,7 +729,7 @@
   (defun disable-line-numbers ()
     (display-line-numbers-mode -1))
 
-  :config
+  :init
   (add-hook 'eshell-mode-hook #'disable-line-numbers))
 
 ;; Terminal emulator.
@@ -688,8 +740,23 @@
   (vterm
    vterm-other-window)
 
-  :config
-  (add-hook 'vterm-mode-hook #'disable-line-numbers))
+  :preface
+  (defun project-vterm ()
+    (interactive)
+    (defvar vterm-buffer-name)
+    (let* ((default-directory (project-root (project-current t)))
+           (vterm-buffer-name (project-prefixed-buffer-name "vterm"))
+           (vterm-buffer (get-buffer vterm-buffer-name)))
+      (if (and vterm-buffer (not current-prefix-arg))
+          (pop-to-buffer vterm-buffer)
+        (vterm t))))
+
+  :init
+  (add-hook 'vterm-mode-hook #'disable-line-numbers)
+
+  (with-eval-after-load 'project
+    (define-key project-prefix-map "t" #'project-vterm)
+    (add-to-list 'project-switch-commands '(project-vterm "Vterm") t)))
 
 ;; Error checking.
 (use-package flymake
@@ -719,12 +786,15 @@
         ("C-c C-l r" . #'eglot-rename)
         ("C-c C-l i" . #'eglot-find-implementation)
         ("C-c C-l d" . #'eldoc)
-        ("C-c C-l e" . #'eglot-code-actions))
+        ("C-c C-l e" . #'eglot-code-actions)))
 
-  :config
-  (advice-add 'eglot-completion-at-point :around #'cape-wrap-buster))
+;; Integration between eglot and consult.
+(use-package consult-eglot
+  :ensure t)
 
 ;; Interface for talking to ChatGPT.
+;;
+;; NOTE: You need to store your OpenAI credentials under auth-source.
 (use-package chatgpt-shell
   :ensure t
 
@@ -745,13 +815,12 @@
                                             :host "openai.com"
                                             :user user))))
 
-  :config
+  :init
   (add-hook 'chatgpt-shell-mode-hook #'get-openai-key))
 
 ;; Displays available keybindings in a pop-up.
 (use-package which-key
   :ensure t
-  :demand t
   :diminish which-key-mode
 
   :functions
@@ -769,7 +838,6 @@
 ;; Rich annotations in the minibuffer completion.
 (use-package marginalia
   :ensure t
-  :demand t
 
   :commands
   (marginalia-mode)
@@ -832,9 +900,8 @@
   ;; Set up eglot for go-ts-mode.
   (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
 
-  :config
   ;; CamelCase aware editing operations.
-  (subword-mode +1))
+  (add-hook 'go-ts-mode-hook #'subword-mode))
 
 ;; Extra Golang support.
 ;;
@@ -1065,10 +1132,14 @@
 (use-package ob-restclient
   :ensure t
 
-  :config
-  (org-babel-do-load-languages
-   'org-babel-load-languages
-   '((restclient . t))))
+  :preface
+  (defun set-up-ob-restclient ()
+    (org-babel-do-load-languages
+     'org-babel-load-languages
+     '((restclient . t))))
+
+  :init
+  (add-hook 'org-mode-hook #'set-up-ob-restclient))
 
 ;; Markdown support.
 (use-package markdown-mode
@@ -1126,7 +1197,6 @@
 ;; Indicate the git diff in the margin.
 (use-package diff-hl
   :ensure t
-  :demand t
 
   :commands
   (diff-hl-margin-mode
@@ -1144,14 +1214,13 @@
   (modus-themes-italic-constructs t)
   (modus-themes-bold-constructs t)
 
-  :config
+  :init
   (load-theme 'modus-vivendi-tinted :no-confirm))
 
 ;; Use system dark mode settings for theme.
 (when (memq system-type '(darwin))
   (use-package auto-dark
     :ensure t
-    :demand t
     :diminish auto-dark-mode
 
     :commands
@@ -1209,7 +1278,7 @@
      (interactive)
      (notmuch-search "tag:unread and tag:inbox")))
 
-  :config
+  :init
   (add-hook 'message-setup-hook #'mml-secure-message-sign)
 
   :bind
@@ -1243,6 +1312,33 @@
   (add-to-list
    'proced-format-alist
    '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
+
+;; GitHub interface.
+;;
+;; NOTE: set the following variables with customize:
+;; - consult-gh-default-orgs-list
+(use-package consult-gh
+  :ensure t
+
+  :commands
+  (consult-gh-orgs
+   consult-gh-repo-clone
+   consult-gh-search-repos
+   consult-gh-search-issues)
+
+  :custom
+  (consult-gh-show-preview t)
+  (consult-gh-issue-action #'consult-gh--issue-view-action)
+  (consult-gh-repo-action #'consult-gh--repo-browse-files-action)
+  (consult-gh-file-action #'consult-gh--files-view-action)
+
+  :init
+  (add-to-list 'exec-path "@gh@"))
+
+;; Embark integration for consult-gh.
+(use-package consult-gh-embark
+  :after
+  (consult-gh embark))
 
 (provide 'default)
 

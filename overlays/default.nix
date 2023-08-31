@@ -4,12 +4,20 @@ final: prev:
   wgn-emacs = let
 
     aspell = let
-      pkg = final.aspellWithDicts (d: with d; [ en en-computers en-science ]);
+      pkg = final.aspellWithDicts(d: with d; [
+        en
+        en-computers
+        en-science
+      ]);
     in "${pkg}/bin/aspell";
 
     cssls = let
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-css-language-server";
+
+    gh = let
+      pkg = final.gh;
+    in "${pkg}/bin";
 
     go = let
       pkg = final.go;
@@ -49,7 +57,7 @@ final: prev:
 
     pylsp = let
 
-      pkg = final.python3.withPackages(p:
+      pkg = final.python3.withPackages (p:
 
         with p; [
           jedi
@@ -86,6 +94,28 @@ final: prev:
         src = final.fetchFromGitHub {
           owner = "mickeynp";
           repo = "combobulate";
+
+          inherit
+            rev
+            sha256;
+        };
+      };
+
+      consult-gh = let
+        rev = "1fe876d9552b6ec6af257a4299a34eca99b40539";
+        sha256 = "sha256-bi+qlNvNMXbS4cXbXt01txwD2NAyAqJGNKeOtdtj7tg=";
+      in eFinal.trivialBuild {
+        pname = "consult-gh";
+        version = rev;
+
+        packageRequires = with eFinal; [
+          consult
+          embark
+        ];
+
+        src = final.fetchFromGitHub {
+          owner = "armindarvish";
+          repo = "consult-gh";
 
           inherit
             rev
@@ -166,6 +196,7 @@ final: prev:
       inherit
         aspell
         cssls
+        gh
         go
         godef
         godoc
@@ -202,7 +233,7 @@ final: prev:
 
     wgn-emacs-macport = final.emacsWithPackagesFromUsePackage {
       config = emacs-config;
-      package = final.emacs-macport;
+      package = final.emacs29-macport;
       defaultInitFile = emacs-config;
 
       inherit
