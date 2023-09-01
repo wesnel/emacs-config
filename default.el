@@ -390,7 +390,7 @@
 
   :preface
   (defun add-clone-to-project-list ()
-    (project-remember-project default-directory))
+    (project-remember-project (project-current)))
 
   :commands
   (magit
