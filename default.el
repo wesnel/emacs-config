@@ -381,21 +381,33 @@
 (use-package project
   :commands
   (project-switch-commands
-   project-prefixed-buffer-name))
+   project-prefixed-buffer-name
+   project-remember-project))
 
 ;; Git interface.
 (use-package magit
   :ensure t
 
+  :preface
+  (defun add-clone-to-project-list ()
+    (project-remember-project default-directory))
+
   :commands
   (magit
    magit-project-status)
+
+  :defines
+  (magit-post-clone-hook)
 
   :bind
   (("C-x g" . #'magit))
 
   :init
   (with-eval-after-load 'project
+    ;; Add newly-cloned repositories to the project list.
+    (add-hook 'magit-post-clone-hook #'add-clone-to-project-list)
+
+    ;; Add the ability to open magit in a project.
     (define-key project-prefix-map "m" #'magit-project-status)
     (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
