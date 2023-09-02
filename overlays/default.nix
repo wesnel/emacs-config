@@ -79,6 +79,10 @@ final: prev:
 
     in "${pkg}/bin/pylsp";
 
+    texlab = let
+      pkg = final.texlab;
+    in "${pkg}/bin/texlab";
+
     tsxls = let
       pkg = final.nodePackages.typescript-language-server;
     in "${pkg}/bin/typescript-language-server";
@@ -92,6 +96,31 @@ final: prev:
     ];
 
     override = eFinal: ePrev: {
+      auctex = ePrev.auctex.overrideAttrs (old:
+
+        {
+          outputs = (old.outputs or [ ]) ++ [
+            "out"
+            "tex"
+          ];
+
+          buildInputs = (old.buildInputs or [ ]) ++ (with final; [
+            ghostscript
+            texlive.combined.scheme-full
+          ]);
+
+          preConfigure = ''
+            ${old.preConfigure or ""}
+
+            mkdir -p "$tex"
+          '';
+
+          configureFlags = (old.configureFlags or [ ]) ++ [
+            "--with-lispdir=\${out}/share/emacs/site-lisp"
+            "--with-texmf-dir=\${tex}"
+          ];
+        });
+
       combobulate = let
         rev = "e3370c97bcd1eb9b5dcba03014b246948c6e7126";
         sha256 = "sha256-4KNlyftCuniP4DDXDBsDQmB1KReYz3xzRzkr/awx9eA=";
@@ -217,6 +246,7 @@ final: prev:
         nil
         parinfer
         pylsp
+        texlab
         tsxls
         yamlls;
     };

@@ -785,8 +785,10 @@
 (use-package eglot
   :preface
   (defun apply-eglot-format ()
-    (unless (and (fboundp 'magit-rebase-in-progress-p)
-                 (magit-rebase-in-progress-p))
+    (unless (or (and (fboundp 'magit-rebase-in-progress-p)
+                     (magit-rebase-in-progress-p))
+                (and (fboundp 'magit-merge-in-progress-p)
+                     (magit-merge-in-progress-p)))
       (eglot-format-buffer)))
 
   :commands
@@ -1158,6 +1160,37 @@
 
   :init
   (add-hook 'org-mode-hook #'set-up-ob-restclient))
+
+;; TeX support.
+(use-package auctex
+  :ensure t
+
+  :mode
+  (("\\.tex\\'" . LaTeX-mode))
+
+  :preface
+  (defun latex-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '((LaTeX-mode tex-mode context-mode texinfo-mode bibtex-mode) . ("@texlab@")))
+      (add-hook 'before-save-hook #'apply-eglot-format t t))
+    (eglot-ensure))
+
+  :custom
+  (TeX-auto-save t)
+  (TeX-parse-self t)
+  (TeX-source-correlate-mode t)
+  (TeX-source-correlate-method 'synctex)
+  ;; Don't start the Emacs server when correlating sources.
+  (TeX-source-correlate-start-server nil)
+  ;; Automatically insert braces after sub/superscript in `LaTeX-math-mode'.
+  (TeX-electric-sub-and-superscript t)
+  ;; Just save, don't ask before each compilation.
+  (TeX-save-query nil)
+
+  :init
+  ;; Set up eglot for TeX-mode.
+  (add-hook 'LaTeX-mode-hook #'latex-mode-eglot-setup))
 
 ;; Markdown support.
 (use-package markdown-mode
