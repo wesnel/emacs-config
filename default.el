@@ -503,6 +503,12 @@
   (([remap move-beginning-of-line] . #'mwim-beginning)
    ([remap move-end-of-line] . #'mwim-end)))
 
+(when (display-graphic-p)
+  (use-package doc-view
+    :init
+    (add-to-list 'exec-path "@gs@")
+    (add-to-list 'exec-path "@mupdf@")))
+
 ;; In-buffer completion with `completion-in-region'.
 (use-package corfu
   :ensure t

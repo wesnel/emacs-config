@@ -39,6 +39,10 @@ final: prev:
       pkg = final.gopls;
     in "${pkg}/bin/gopls";
 
+    gs = let
+      pkg = final.ghostscript;
+    in "${pkg}/bin";
+
     htmlls = let
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-html-language-server";
@@ -46,6 +50,10 @@ final: prev:
     multimarkdown = let
       pkg = final.multimarkdown;
     in "${pkg}/bin/multimarkdown";
+
+    mupdf = let
+      pkg = final.mupdf;
+    in "${pkg}/bin";
 
     nil = let
       pkg = final.nil;
@@ -202,8 +210,10 @@ final: prev:
         godoc
         gofumpt
         gopls
+        gs
         htmlls
         multimarkdown
+        mupdf
         nil
         parinfer
         pylsp
