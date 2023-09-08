@@ -1293,11 +1293,11 @@
 ;; Email client.
 ;;
 ;; NOTE: set the following variables with customize:
-;; - user-mail-address
-;; - user-full-name
-;; - mml-secure-openpgp-signers
-;; - sendmail-program
-;; - message-sendmail-extra-arguments
+;; - `user-mail-address'
+;; - `user-full-name'
+;; - `mml-secure-openpgp-signers'
+;; - `sendmail-program'
+;; - `message-sendmail-extra-arguments'
 (use-package notmuch
   :ensure t
 
@@ -1367,7 +1367,7 @@
 ;; GitHub interface.
 ;;
 ;; NOTE: set the following variables with customize:
-;; - consult-gh-default-orgs-list
+;; - `consult-gh-default-orgs-list'
 (use-package consult-gh
   :ensure t
 
@@ -1390,6 +1390,74 @@
 (use-package consult-gh-embark
   :after
   (consult-gh embark))
+
+;; Functions for interacting with pass.
+(use-package password-store
+  :ensure t
+
+  :custom
+  (password-store-executable "@pass@")
+
+  :commands
+  (password-store-edit
+   password-store-get
+   password-store-get-field
+   password-store-clear
+   password-store-copy
+   password-store-copy-field
+   password-store-init
+   password-store-insert
+   password-store-generate
+   password-store-generate-no-symbols
+   password-store-remove
+   password-store-rename
+   password-store-version
+   password-store-url))
+
+;; Interface for interacting with pass.
+(use-package pass
+  :ensure t
+
+  :commands
+  (pass)
+
+  :bind
+  (("C-c p p" . #'pass)))
+
+;; Support for hledger for accounting.
+;;
+;; NOTE: set the following variables with customize:
+;; - `hledger-jfile'
+(use-package hledger-mode
+  :ensure t
+
+  :mode
+  (("\\.journal\\'" . hledger-mode))
+
+  :commands
+  (hledger-run-command
+   hledger-jentry
+   hledger-backward-entry
+   hledger-next-or-new-entry)
+
+  :defines
+  (hledger-mode-map)
+
+  :bind
+  (("C-c j" . #'hledger-run-command)
+   :map hledger-mode-map
+   ("C-c e" . #'hledger-jentry)
+   ("M-p" . #'hledger-backward-entry)
+   ("M-n" . #'hledger-next-or-new-entry))
+
+  :init
+  (add-to-list 'exec-path "@hledger@"))
+
+(use-package flymake-ledger
+  :ensure t
+
+  :hook
+  ((hledger-mode . flymake-hledger-enable)))
 
 (provide 'default)
 

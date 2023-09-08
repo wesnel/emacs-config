@@ -43,6 +43,10 @@ final: prev:
       pkg = final.ghostscript;
     in "${pkg}/bin";
 
+    hledger = let
+      pkg = final.hledger;
+    in "${pkg}/bin";
+
     htmlls = let
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-html-language-server";
@@ -62,6 +66,10 @@ final: prev:
     parinfer = let
       pkg = final.parinfer-rust;
     in "${pkg}/lib/libparinfer_rust.so";
+
+    pass = let
+      pkg = final.pass;
+    in "${pkg}/bin/pass";
 
     pylsp = let
 
@@ -240,11 +248,13 @@ final: prev:
         gofumpt
         gopls
         gs
+        hledger
         htmlls
         multimarkdown
         mupdf
         nil
         parinfer
+        pass
         pylsp
         texlab
         tsxls
