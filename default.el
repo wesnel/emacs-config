@@ -1453,7 +1453,7 @@
   :init
   (add-to-list 'exec-path "@hledger@"))
 
-(use-package flymake-ledger
+(use-package flymake-hledger
   :ensure t
 
   :hook

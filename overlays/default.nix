@@ -132,13 +132,13 @@ final: prev:
       combobulate = let
         rev = "e3370c97bcd1eb9b5dcba03014b246948c6e7126";
         sha256 = "sha256-4KNlyftCuniP4DDXDBsDQmB1KReYz3xzRzkr/awx9eA=";
-      in eFinal.trivialBuild {
+      in eFinal.trivialBuild rec {
         pname = "combobulate";
         version = rev;
 
         src = final.fetchFromGitHub {
           owner = "mickeynp";
-          repo = "combobulate";
+          repo = pname;
 
           inherit
             rev
@@ -149,7 +149,7 @@ final: prev:
       consult-gh = let
         rev = "1fe876d9552b6ec6af257a4299a34eca99b40539";
         sha256 = "sha256-bi+qlNvNMXbS4cXbXt01txwD2NAyAqJGNKeOtdtj7tg=";
-      in eFinal.trivialBuild {
+      in eFinal.trivialBuild rec {
         pname = "consult-gh";
         version = rev;
 
@@ -160,7 +160,7 @@ final: prev:
 
         src = final.fetchFromGitHub {
           owner = "armindarvish";
-          repo = "consult-gh";
+          repo = pname;
 
           inherit
             rev
@@ -171,13 +171,30 @@ final: prev:
       elsewhere = let
         rev = "85300095abd8f227413f80b3185c96874fd05002";
         sha256 = "sha256-GdarA9ac2UvJPphkictyM/k1SXlxE0qhCPJzh96nv3A=";
-      in eFinal.trivialBuild {
+      in eFinal.trivialBuild rec {
         pname = "elsewhere";
         version = rev;
 
         src = final.fetchFromGitHub {
           owner = "wesnel";
-          repo = "elsewhere";
+          repo = pname;
+
+          inherit
+            rev
+            sha256;
+        };
+      };
+
+      flymake-hledger = let
+        rev = "80cffbc70aa72dc9de311e5cf172664f76b4b7e0";
+        sha256 = "sha256-ZcSKhdPe643uzwRA5IjdLcDSU1Gd0hEL8CXSVB5/gys=";
+      in eFinal.trivialBuild rec {
+        pname = "flymake-hledger";
+        version = rev;
+
+        src = final.fetchFromGitHub {
+          owner = "DamienCassou";
+          repo = pname;
 
           inherit
             rev
