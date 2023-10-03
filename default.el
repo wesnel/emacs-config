@@ -791,6 +791,10 @@
                      (magit-merge-in-progress-p)))
       (eglot-format-buffer)))
 
+  :defines
+  (eglot-server-programs
+   eglot-workspace-configuration)
+
   :commands
   (eglot
    eglot-ensure
@@ -979,6 +983,11 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
+      (plist-put 'eglot-workspace-configuration :pylsp
+                 '(:plugins (:pydocstyle
+                             (:enabled :json-true)
+                             :black
+                             (:enabled :json-true))))
       (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 

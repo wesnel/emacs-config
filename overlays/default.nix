@@ -76,13 +76,15 @@ final: prev:
       pkg = final.python3.withPackages (p:
 
         with p; [
+          black
           jedi
           mccabe
           pycodestyle
+          pydocstyle
           pyflakes
+          python-lsp-black
           python-lsp-server
           rope
-          yapf
         ]);
 
     in "${pkg}/bin/pylsp";
