@@ -11,6 +11,10 @@ final: prev:
       ]);
     in "${pkg}/bin/aspell";
 
+    black = let
+      pkg = final.black;
+    in "${pkg}/bin/black";
+
     cssls = let
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-css-language-server";
@@ -51,6 +55,10 @@ final: prev:
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-html-language-server";
 
+    macchiato = let
+      pkg = final.black-macchiato;
+    in "${pkg}/bin/black-macchiato";
+
     multimarkdown = let
       pkg = final.multimarkdown;
     in "${pkg}/bin/multimarkdown";
@@ -76,13 +84,11 @@ final: prev:
       pkg = final.python3.withPackages (p:
 
         with p; [
-          black
           jedi
           mccabe
           pycodestyle
           pydocstyle
           pyflakes
-          python-lsp-black
           python-lsp-server
           rope
         ]);
@@ -259,6 +265,7 @@ final: prev:
 
       inherit
         aspell
+        black
         cssls
         gh
         go
@@ -269,6 +276,7 @@ final: prev:
         gs
         hledger
         htmlls
+        macchiato
         multimarkdown
         mupdf
         nil

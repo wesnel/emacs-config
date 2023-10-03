@@ -976,6 +976,25 @@
    go-test-current-benchmark
    go-run))
 
+;; Support for the Python Black code formatter.
+(use-package python-black
+  :ensure t
+
+  :commands
+  (python-black-on-save-mode-enable-dwim
+   python-black-buffer
+   python-black-region
+   python-black-statement
+   python-black-partial-dwim
+   python-black-org-mode-block)
+
+  :hook
+  (python-base-mode . python-black-on-save-mode-enable-dwim)
+
+  :custom
+  (python-black-command "@black@")
+  (python-black-macchiato-command "@macchiato@"))
+
 ;; Python support.
 (use-package python
   :defer t
@@ -983,12 +1002,10 @@
   :preface
   (defun python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (setq-default eglot-workspace-configuration
-                    (plist-put eglot-workspace-configuration :pylsp
-                               '(:plugins (:pydocstyle
-                                           (:enabled t)
-                                           :black
-                                           (:enabled t)))))
+      (setq-local eglot-workspace-configuration
+                  (plist-put eglot-workspace-configuration :pylsp
+                             '(:plugins (:pydocstyle
+                                         (:enabled t)))))
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
       (add-hook 'before-save-hook #'apply-eglot-format t t))
