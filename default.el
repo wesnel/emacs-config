@@ -1001,12 +1001,12 @@
 ;;       variable. For example, to enable `:pydocstyle', type:
 ;;
 ;;       M-x add-dir-local-variable RET
-;;       python-base-mode RET
+;;       python-ts-mode RET
 ;;       eglot-workspace-configuration RET
 ;;       (:pylsp (:plugins (:pydocstyle (:enabled t)))) RET
 ;;
-;;       Then, save the file which is generated inside your project
-;;       folder.
+;;       Then, save the file which is generated inside the root of
+;;       your project folder.
 (use-package python
   :defer t
 
