@@ -996,6 +996,17 @@
   (python-black-macchiato-command "@macchiato@"))
 
 ;; Python support.
+;;
+;; NOTE: `:pylsp' needs to be configured using a directory-local
+;;       variable. For example, to enable `:pydocstyle', type:
+;;
+;;       M-x add-dir-local-variable RET
+;;       python-base-mode RET
+;;       eglot-workspace-configuration RET
+;;       (:pylsp (:plugins (:pydocstyle (:enabled t)))) RET
+;;
+;;       Then, save the file which is generated inside your project
+;;       folder.
 (use-package python
   :defer t
 
@@ -1005,10 +1016,6 @@
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
       (add-hook 'before-save-hook #'apply-eglot-format t t))
-    (setq-local eglot-workspace-configuration
-                (plist-put eglot-workspace-configuration :pylsp
-                           '(:plugins (:pydocstyle
-                                       (:enabled t)))))
     (eglot-ensure))
 
   :init
