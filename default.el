@@ -985,7 +985,7 @@
                                             (:enabled :json-true)
                                             :black
                                             (:enabled :json-true)))))
-        (if (bound-and-true-p 'eglot-workspace-configuration)
+        (if (bound-and-true-p eglot-workspace-configuration)
             (plist-put 'eglot-workspace-configuration :pylsp python-lsp-config)
           (setq-default eglot-workspace-configuration '(:pylsp python-lsp-config))))
       (add-to-list 'eglot-server-programs
