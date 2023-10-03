@@ -982,9 +982,9 @@
   (defun python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (let* ((python-lsp-config '(:plugins (:pydocstyle
-                                            (:enabled :json-true)
+                                            (:enabled t)
                                             :black
-                                            (:enabled :json-true)))))
+                                            (:enabled t)))))
         (if (bound-and-true-p eglot-workspace-configuration)
             (plist-put 'eglot-workspace-configuration :pylsp python-lsp-config)
           (setq-default eglot-workspace-configuration `(:pylsp ,python-lsp-config))))
