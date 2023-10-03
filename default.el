@@ -939,8 +939,10 @@
 
   :preface
   (defun apply-gofmt ()
-    (unless (and (fboundp 'magit-rebase-in-progress-p)
-                 (magit-rebase-in-progress-p))
+    (unless (or (and (fboundp 'magit-rebase-in-progress-p)
+                     (magit-rebase-in-progress-p))
+                (and (fboundp 'magit-merge-in-progress-p)
+                     (magit-merge-in-progress-p)))
       (gofmt)))
 
   :mode
