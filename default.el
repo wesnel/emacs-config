@@ -987,7 +987,7 @@
                                             (:enabled :json-true)))))
         (if (bound-and-true-p eglot-workspace-configuration)
             (plist-put 'eglot-workspace-configuration :pylsp python-lsp-config)
-          (setq-default eglot-workspace-configuration '(:pylsp python-lsp-config))))
+          (setq-default eglot-workspace-configuration `(:pylsp ,python-lsp-config))))
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
       (add-hook 'before-save-hook #'apply-eglot-format t t))
