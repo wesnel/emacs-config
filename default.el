@@ -981,13 +981,15 @@
   :preface
   (defun python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      (let* ((python-lsp-config '(:plugins (:pydocstyle
+                                            (:enabled :json-true)
+                                            :black
+                                            (:enabled :json-true)))))
+        (if (bound-and-true-p 'eglot-workspace-configuration)
+            (plist-put 'eglot-workspace-configuration :pylsp python-lsp-config)
+          (setq-default eglot-workspace-configuration '(:pylsp python-lsp-config))))
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
-      (plist-put 'eglot-workspace-configuration :pylsp
-                 '(:plugins (:pydocstyle
-                             (:enabled :json-true)
-                             :black
-                             (:enabled :json-true))))
       (add-hook 'before-save-hook #'apply-eglot-format t t))
     (eglot-ensure))
 
