@@ -137,12 +137,12 @@
   :diminish whitespace-mode
 
   :preface
-  (defun set-up-whitespace ()
+  (defun wgn/set-up-whitespace ()
     (add-hook 'before-save-hook #'whitespace-cleanup nil t)
     (whitespace-toggle-options '(lines newline-mark)))
 
   :hook
-  ((text-mode prog-mode) . set-up-whitespace))
+  ((text-mode prog-mode) . wgn/set-up-whitespace))
 
 ;; Support for CamelCase.
 (use-package subword
@@ -317,11 +317,11 @@
   (ls-lisp-use-insert-directory-program nil)
 
   :preface
-  (defun fix-dired-ls ()
+  (defun wgn/fix-dired-ls ()
     (require 'ls-lisp))
 
   :init
-  (add-hook 'dired-mode-hook #'fix-dired-ls))
+  (add-hook 'dired-mode-hook #'wgn/fix-dired-ls))
 
 ;; Easily mark and kill regions.
 (use-package easy-kill
@@ -389,7 +389,7 @@
   :ensure t
 
   :preface
-  (defun add-clone-to-project-list ()
+  (defun wgn/add-clone-to-project-list ()
     (project-remember-project (project-current)))
 
   :commands
@@ -405,7 +405,7 @@
   :init
   (with-eval-after-load 'project
     ;; Add newly-cloned repositories to the project list.
-    (add-hook 'magit-post-clone-hook #'add-clone-to-project-list)
+    (add-hook 'magit-post-clone-hook #'wgn/add-clone-to-project-list)
 
     ;; Add the ability to open magit in a project.
     (define-key project-prefix-map "m" #'magit-project-status)
@@ -608,12 +608,12 @@
   (tempel-expand)
 
   :preface
-  (defun add-tempel-to-completion-at-point ()
+  (defun wgn/add-tempel-to-completion-at-point ()
     (setq-local completion-at-point-functions
                 (cons #'tempel-expand completion-at-point-functions)))
 
   :hook
-  ((prog-mode text-mode) . add-tempel-to-completion-at-point))
+  ((prog-mode text-mode) . wgn/add-tempel-to-completion-at-point))
 
 ;; Pre-made templates for tempel.
 (use-package tempel-collection
@@ -624,7 +624,7 @@
   :ensure t
 
   :preface
-  (defun embark-which-key-indicator ()
+  (defun wgn/embark-which-key-indicator ()
     (lambda (&optional keymap targets prefix)
       (if (null keymap)
           (which-key--hide-popup-ignore-command)
@@ -643,10 +643,10 @@
          nil nil t (lambda (binding)
                      (not (string-suffix-p "-argument" (cdr binding))))))))
 
-  (defun embark-hide-which-key-indicator (fn &rest args)
+  (defun wgn/embark-hide-which-key-indicator (fn &rest args)
     (which-key--hide-popup-ignore-command)
     (let ((embark-indicators
-           (remq #'embark-which-key-indicator embark-indicators)))
+           (remq #'wgn/embark-which-key-indicator embark-indicators)))
       (apply fn args)))
 
   :functions
@@ -662,13 +662,13 @@
   (embark-indicators)
 
   :custom
-  (embark-indicators '(embark-which-key-indicator
+  (embark-indicators '(wgn/embark-which-key-indicator
                        embark-highlight-indicator
                        embark-isearch-highlight-indicator))
 
   :init
   (advice-add #'embark-completing-read-prompter
-              :around #'embark-hide-which-key-indicator)
+              :around #'wgn/embark-hide-which-key-indicator)
 
   :bind
   (("C-." . #'embark-act)
@@ -744,11 +744,11 @@
 ;; Shell written in Emacs Lisp.
 (use-package eshell
   :preface
-  (defun disable-line-numbers ()
+  (defun wgn/disable-line-numbers ()
     (display-line-numbers-mode -1))
 
   :init
-  (add-hook 'eshell-mode-hook #'disable-line-numbers))
+  (add-hook 'eshell-mode-hook #'wgn/disable-line-numbers))
 
 ;; Terminal emulator.
 (use-package vterm
@@ -759,7 +759,7 @@
    vterm-other-window)
 
   :preface
-  (defun project-vterm ()
+  (defun wgn/project-vterm ()
     (interactive)
     (defvar vterm-buffer-name)
     (let* ((default-directory (project-root (project-current t)))
@@ -770,11 +770,11 @@
         (vterm t))))
 
   :init
-  (add-hook 'vterm-mode-hook #'disable-line-numbers)
+  (add-hook 'vterm-mode-hook #'wgn/disable-line-numbers)
 
   (with-eval-after-load 'project
-    (define-key project-prefix-map "t" #'project-vterm)
-    (add-to-list 'project-switch-commands '(project-vterm "Vterm") t)))
+    (define-key project-prefix-map "t" #'wgn/project-vterm)
+    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t)))
 
 ;; Error checking.
 (use-package flymake
@@ -784,7 +784,7 @@
 ;; Language server integration.
 (use-package eglot
   :preface
-  (defun apply-eglot-format ()
+  (defun wgn/apply-eglot-format ()
     (unless (or (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
                 (and (fboundp 'magit-merge-in-progress-p)
@@ -826,7 +826,7 @@
   (chatgpt-shell)
 
   :preface
-  (defun get-openai-key ()
+  (defun wgn/get-openai-key ()
     (let* ((default (notmuch-user-primary-email))
            (user (completing-read (format "Choose user (default %s):" default)
                                   (notmuch-user-emails)
@@ -840,7 +840,7 @@
                                             :user user))))
 
   :init
-  (add-hook 'chatgpt-shell-mode-hook #'get-openai-key))
+  (add-hook 'chatgpt-shell-mode-hook #'wgn/get-openai-key))
 
 ;; Displays available keybindings in a pop-up.
 (use-package which-key
@@ -909,11 +909,11 @@
   ("go\\.mod\\'" . go-mod-ts-mode)
 
   :preface
-  (defun go-ts-mode-eglot-setup ()
+  (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -922,7 +922,7 @@
                '(go-mode . go-ts-mode))
 
   ;; Set up eglot for go-ts-mode.
-  (add-hook 'go-ts-mode-hook #'go-ts-mode-eglot-setup)
+  (add-hook 'go-ts-mode-hook #'wgn/go-ts-mode-eglot-setup)
 
   ;; CamelCase aware editing operations.
   (add-hook 'go-ts-mode-hook #'subword-mode))
@@ -938,7 +938,7 @@
   (gofmt)
 
   :preface
-  (defun apply-gofmt ()
+  (defun wgn/apply-gofmt ()
     (unless (or (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
                 (and (fboundp 'magit-merge-in-progress-p)
@@ -956,7 +956,7 @@
   :hook
   (go-ts-mode . (lambda ()
                   (require 'go-mode)
-                  (add-hook 'before-save-hook #'apply-gofmt t t)))
+                  (add-hook 'before-save-hook #'wgn/apply-gofmt t t)))
 
   :custom
   (go-command "@go@")
@@ -1011,11 +1011,11 @@
   :defer t
 
   :preface
-  (defun python-ts-mode-eglot-setup ()
+  (defun wgn/python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((python-mode python-ts-mode) . ("@pylsp@")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1024,7 +1024,7 @@
                '(python-mode . python-ts-mode))
 
   ;; Set up eglot for python-ts-mode.
-  (add-hook 'python-ts-mode-hook #'python-ts-mode-eglot-setup))
+  (add-hook 'python-ts-mode-hook #'wgn/python-ts-mode-eglot-setup))
 
 ;; Nix support.
 (use-package nix-mode
@@ -1032,16 +1032,16 @@
   :mode "\\.nix\\'"
 
   :preface
-  (defun nix-mode-eglot-setup ()
+  (defun wgn/nix-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(nix-mode . ("@nil@")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
   ;; Set up eglot for nix-mode.
-  (add-hook 'nix-mode-hook #'nix-mode-eglot-setup))
+  (add-hook 'nix-mode-hook #'wgn/nix-mode-eglot-setup))
 
 ;; YAML support.
 (use-package yaml-ts-mode
@@ -1050,32 +1050,32 @@
    ("\\.yml\\'" . yaml-ts-mode))
 
   :preface
-  (defun yaml-ts-mode-eglot-setup ()
+  (defun wgn/yaml-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(yaml-ts-mode . ("@yamlls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
   ;; Set up eglot for yaml-mode.
-  (add-hook 'yaml-ts-mode-hook #'yaml-ts-mode-eglot-setup))
+  (add-hook 'yaml-ts-mode-hook #'wgn/yaml-ts-mode-eglot-setup))
 
 ;; Support for HTML with embedded JS and CSS.
 (use-package mhtml-mode
   :defer t
 
   :preface
-  (defun mhtml-mode-eglot-setup ()
+  (defun wgn/mhtml-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(mhtml-mode . ("@htmlls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
   ;; Set up eglot for mhtml-mode.
-  (add-hook 'mhtml-mode-hook #'mhtml-mode-eglot-setup))
+  (add-hook 'mhtml-mode-hook #'wgn/mhtml-mode-eglot-setup))
 
 ;; JSX and TSX support.
 (use-package tsx-ts-mode
@@ -1084,11 +1084,11 @@
    ("\\.jsx\\'" . tsx-ts-mode))
 
   :preface
-  (defun tsx-ts-mode-eglot-setup ()
+  (defun wgn/tsx-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(tsx-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1097,21 +1097,21 @@
                '(js-jsx-mode . tsx-ts-mode))
 
   ;; Set up eglot for tsx-ts-mode.
-  (add-hook 'tsx-ts-mode-hook #'tsx-ts-mode-eglot-setup))
+  (add-hook 'tsx-ts-mode-hook #'wgn/tsx-ts-mode-eglot-setup))
 
 ;; Javascript support.
 (use-package js-ts-mode
   :mode "\\.js\\'"
 
   :preface
-  (defun js-ts-mode-eglot-setup ()
+  (defun wgn/js-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(js-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
-  (defun js-ts-mode-fix-auto-mode-alist ()
+  (defun wgn/js-ts-mode-fix-auto-mode-alist ()
     (setq auto-mode-alist
           (assoc-delete-all "\\.jsx\\'" auto-mode-alist))
     (add-to-list 'auto-mode-alist
@@ -1119,7 +1119,7 @@
 
   :init
   ;; Set up eglot for js-ts-mode.
-  (add-hook 'js-ts-mode-hook #'js-ts-mode-eglot-setup)
+  (add-hook 'js-ts-mode-hook #'wgn/js-ts-mode-eglot-setup)
 
   ;; HACK: `js-ts-mode' modifies `auto-mode-alist' when it is
   ;;       loaded. In particular, it configures JSX files to be opened
@@ -1135,34 +1135,34 @@
   ;;
   ;;       Hence, we need to re-affirm our JSX configuration after
   ;;       `js-ts-mode' has loaded.
-  (add-hook 'js-ts-mode-hook #'js-ts-mode-fix-auto-mode-alist))
+  (add-hook 'js-ts-mode-hook #'wgn/js-ts-mode-fix-auto-mode-alist))
 
 ;; Typescript support.
 (use-package typescript-ts-mode
   :mode "\\.ts\\'"
 
   :preface
-  (defun typescript-ts-mode-eglot-setup ()
+  (defun wgn/typescript-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(typescript-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
   ;; Set up eglot for typescript-ts-mode.
-  (add-hook 'typescript-ts-mode-hook #'typescript-ts-mode-eglot-setup))
+  (add-hook 'typescript-ts-mode-hook #'wgn/typescript-ts-mode-eglot-setup))
 
 ;; CSS support.
 (use-package css-ts-mode
   :defer t
 
   :preface
-  (defun css-ts-mode-eglot-setup ()
+  (defun wgn/css-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(css-ts-mode . ("@cssls@" "--stdio")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1171,7 +1171,7 @@
                '(css-mode . css-ts-mode))
 
   ;; Set up eglot for css-ts-mode.
-  (add-hook 'css-ts-mode-hook #'css-ts-mode-eglot-setup))
+  (add-hook 'css-ts-mode-hook #'wgn/css-ts-mode-eglot-setup))
 
 ;; Note taking, time tracking, etc.
 (use-package org
@@ -1189,13 +1189,13 @@
   :ensure t
 
   :preface
-  (defun set-up-ob-restclient ()
+  (defun wgn/set-up-ob-restclient ()
     (org-babel-do-load-languages
      'org-babel-load-languages
      '((restclient . t))))
 
   :init
-  (add-hook 'org-mode-hook #'set-up-ob-restclient))
+  (add-hook 'org-mode-hook #'wgn/set-up-ob-restclient))
 
 ;; TeX support.
 (use-package auctex
@@ -1205,11 +1205,11 @@
   (("\\.tex\\'" . LaTeX-mode))
 
   :preface
-  (defun latex-mode-eglot-setup ()
+  (defun wgn/latex-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '((LaTeX-mode tex-mode context-mode texinfo-mode bibtex-mode) . ("@texlab@")))
-      (add-hook 'before-save-hook #'apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :custom
@@ -1226,7 +1226,7 @@
 
   :init
   ;; Set up eglot for TeX-mode.
-  (add-hook 'LaTeX-mode-hook #'latex-mode-eglot-setup))
+  (add-hook 'LaTeX-mode-hook #'wgn/latex-mode-eglot-setup))
 
 ;; Markdown support.
 (use-package markdown-mode
