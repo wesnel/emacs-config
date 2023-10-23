@@ -524,6 +524,7 @@
   ;; Add `completion-at-point-functions', used by `completion-at-point'.
   ;; NOTE: The order matters!
   (add-to-list 'completion-at-point-functions #'cape-dabbrev)
+  (add-to-list 'completion-at-point-functions #'cape-file)
   (add-to-list 'completion-at-point-functions #'cape-elisp-block)
   (add-to-list 'completion-at-point-functions #'cape-history)
   (add-to-list 'completion-at-point-functions #'cape-keyword)
