@@ -695,7 +695,7 @@
 
   :bind
   (:map grep-mode-map
-        ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
+   ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
 
 ;; Creates a minor mode for when the point is in a selection.
 (use-package selected
@@ -720,7 +720,7 @@
 
   :bind
   (:map selected-keymap
-        ("C-x c" . #'mc/mark-all-like-this)))
+   ("C-x c" . #'mc/mark-all-like-this)))
 
 ;; Structured editing and navigation based on tree-sitter.
 (use-package combobulate
@@ -805,12 +805,12 @@
 
   :bind
   (:map eglot-mode-map
-        ("C-c C-l ." . #'xref-find-definitions)
-        ("C-c C-l ?" . #'xref-find-references)
-        ("C-c C-l r" . #'eglot-rename)
-        ("C-c C-l i" . #'eglot-find-implementation)
-        ("C-c C-l d" . #'eldoc)
-        ("C-c C-l e" . #'eglot-code-actions)))
+   ("C-c C-l ." . #'xref-find-definitions)
+   ("C-c C-l ?" . #'xref-find-references)
+   ("C-c C-l r" . #'eglot-rename)
+   ("C-c C-l i" . #'eglot-find-implementation)
+   ("C-c C-l d" . #'eldoc)
+   ("C-c C-l e" . #'eglot-code-actions)))
 
 ;; Integration between eglot and consult.
 (use-package consult-eglot
@@ -1244,7 +1244,7 @@
 
   :bind
   (:map markdown-mode-map
-        ("C-c C-e" . #'markdown-do))
+   ("C-c C-e" . #'markdown-do))
 
   :custom
   (markdown-command "@multimarkdown@"))
