@@ -48,6 +48,8 @@
   (require-final-newline t)
   ;; Don't use tabs to indent.
   (indent-tabs-mode nil)
+  ;; TAB key indents and then completes.
+  (tab-always-indent 'complete)
   ;; Maintain correct appearance of tabs.
   (tab-width 8)
   ;; Hide commands in M-x which do not work in the current mode.
@@ -173,26 +175,12 @@
   :init
   (global-hl-todo-mode +1))
 
-;; Completion engine based on `completing-read'.
-(use-package vertico
-  :ensure t
-
-  :commands
-  (vertico-mode)
-
-  :init
-  (vertico-mode +1))
-
 ;; Completion style that allows for multiple regular expressions.
 (use-package orderless
   :ensure t
 
   :custom
-  ;; Allow minibuffer commands while in the minibuffer.
-  (enable-recursive-minibuffers t)
-  (resize-mini-windows t)
   (completion-styles '(basic substring initials flex orderless))
-  (completion-category-defaults nil)
   (completion-category-overrides '((file (styles . (basic partial-completion orderless)))
                                    (bookmark (styles . (basic substring)))
                                    (library (styles . (basic substring)))
@@ -509,58 +497,6 @@
     (add-to-list 'exec-path "@gs@")
     (add-to-list 'exec-path "@mupdf@")))
 
-;; In-buffer completion with `completion-in-region'.
-(use-package corfu
-  :ensure t
-
-  :defines
-  (corfu-continue-commands
-   corfu-map)
-
-  :commands
-  (corfu-mode
-   global-corfu-mode
-   corfu-insert-separator
-   corfu-popupinfo-mode)
-
-  :preface
-  (defun corfu-enable-in-minibuffer ()
-    (when (where-is-internal #'completion-at-point (list (current-local-map)))
-      (setq-local corfu-echo-delay nil
-                  corfu-popupinfo-delay nil)
-      (corfu-mode +1)))
-
-  :bind
-  (:map corfu-map
-        ("SPC" . #'corfu-insert-separator))
-
-  :custom
-  (tab-always-indent 'complete)         ; Show completions with tab key.
-  (completion-cycle-threshold nil)      ; Always show candidates in menu.
-  (corfu-auto nil)                      ; Don't auto-complete.
-  (corfu-preview-current 'insert)       ; Preview current candidate.
-  (corfu-preselect-first t)             ; Pre-select first candidate.
-
-  :init
-  (add-hook 'minibuffer-setup-hook #'corfu-enable-in-minibuffer)
-
-  ;; Show docs in popup.
-  ;; NOTE: Does not currently work with terminal Emacs.
-  ;;       https://github.com/minad/corfu/issues/248
-  (corfu-popupinfo-mode +1)
-  (global-corfu-mode +1))
-
-;; Allows corfu completion popup to work in terminal Emacs.
-(unless (display-graphic-p)
-  (use-package corfu-terminal
-    :ensure t
-
-    :commands
-    (corfu-terminal-mode)
-
-    :init
-    (corfu-terminal-mode +1)))
-
 ;; Extra `completion-at-point-functions'.
 (use-package cape
   :ensure t
@@ -857,6 +793,54 @@
   :init
   (which-key-mode +1)
   (which-key-enable-devil-support))
+
+;; Completion using the built-in *Completions* buffer.
+(use-package minibuffer
+  :preface
+  (defun wgn/sort-by-alpha-length (elems)
+    (sort elems (lambda (c1 c2)
+                  (or (string-version-lessp c1 c2)
+                      (< (length c1) (length c2))))))
+
+  (defun wgn/sort-by-history (elems)
+    (if-let ((hist (and (not (eq minibuffer-history-variable t))
+                        (symbol-value minibuffer-history-variable))))
+        (minibuffer--sort-by-position hist elems)
+      (wgn/sort-by-alpha-length elems)))
+
+  (defun wgn/completion-category ()
+    (when-let ((window (active-minibuffer-window)))
+      (with-current-buffer (window-buffer window)
+        (completion-metadata-get
+         (completion-metadata (buffer-substring-no-properties
+                               (minibuffer-prompt-end)
+                               (max (minibuffer-prompt-end) (point)))
+                              minibuffer-completion-table
+                              minibuffer-completion-predicate)
+         'category))))
+
+  (defun wgn/sort-multi-category (elems)
+    (pcase (wgn/completion-category)
+      ('nil elems) ; no sorting
+      ('kill-ring elems)
+      ('project-file (wgn/sort-by-alpha-length elems))
+      (_ (wgn/sort-by-history elems))))
+
+  :custom
+  (completions-format 'one-column)
+  (completions-header-format nil)
+  (completions-max-height 20)
+  (completion-auto-help 'always)
+  (completion-auto-select 'second-tab)
+  (completions-sort #'wgn/sort-multi-category)
+
+  :bind
+  (:map minibuffer-local-map
+   ("C-p" . #'minibuffer-previous-completion)
+   ("C-n" . #'minibuffer-next-completion)
+   :map completion-in-region-mode-map
+   ("C-p" . #'minibuffer-previous-completion)
+   ("C-n" . #'minibuffer-next-completion)))
 
 ;; Rich annotations in the minibuffer completion.
 (use-package marginalia
