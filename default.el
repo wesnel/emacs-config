@@ -669,6 +669,16 @@
    (typescript-ts-mode . combobulate-mode)
    (tsx-ts-mode . combobulate-mode)))
 
+;; Create scratch buffers of any major mode.
+(use-package scratch
+  :ensure t
+
+  :commands
+  (scratch)
+
+  :bind
+  (("C-c s" . #'scratch)))
+
 ;; Visual `query-replace' with regular expressions.
 (use-package visual-regexp
   :ensure t
