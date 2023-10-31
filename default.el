@@ -467,7 +467,12 @@
 ;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
   :ensure t
-  :hook lisp-data-mode
+
+  :hook
+  (lisp-data-mode
+   janet-mode
+   clojure-mode
+   clojurescript-mode)
 
   :custom
   (parinfer-rust-library "@parinfer@"))
