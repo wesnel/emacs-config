@@ -37,7 +37,7 @@
 (eval-when-compile
   (require 'use-package))
 
-;; Miscellaneous Emacs configuration.
+;;;; Miscellaneous Emacs configuration.
 (use-package emacs
   :custom
   ;; Disable package archives.
@@ -79,7 +79,7 @@
   (size-indication-mode +1)
   (display-time))
 
-;; Use user shell $PATH.
+;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
   (use-package exec-path-from-shell
     :ensure t
@@ -107,7 +107,7 @@
 
         (exec-path-from-shell-initialize))))
 
-;; Store secrets in Emacs.
+;;;; Store secrets in Emacs.
 (use-package auth-source
   :custom
   (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
@@ -115,7 +115,7 @@
   :init
   (auth-source-pass-enable))
 
-;; Avoid putting files in weird places.
+;;;; Avoid putting files in weird places.
 (use-package no-littering
   :ensure t
   :demand t
@@ -126,15 +126,15 @@
   :config
   (no-littering-theme-backups))
 
-;; Required for :bind in use-package.
+;;;; Required for :bind in use-package.
 (use-package bind-key
   :ensure t)
 
-;; Required for :diminish in use-package.
+;;;; Required for :diminish in use-package.
 (use-package diminish
   :ensure t)
 
-;; Whitespace preferences.
+;;;; Whitespace preferences.
 (use-package whitespace
   :diminish whitespace-mode
 
@@ -146,18 +146,18 @@
   :hook
   ((text-mode prog-mode) . wgn/set-up-whitespace))
 
-;; Support for CamelCase.
+;;;; Support for CamelCase.
 (use-package subword
   :diminish subword-mode)
 
-;; Navigate code based on an outline.
+;;;; Navigate code based on an outline.
 (use-package outline
   :diminish outline-minor-mode
 
   :hook
   ((text-mode prog-mode) . outline-minor-mode))
 
-;; Syntax highlighting.
+;;;; Syntax highlighting.
 (use-package treesit
   :commands
   (treesit-font-lock-recompute-features)
@@ -165,7 +165,7 @@
   :custom
   (treesit-font-lock-level 4))
 
-;; Highlight TODO comments.
+;;;; Highlight TODO comments.
 (use-package hl-todo
   :ensure t
 
@@ -175,7 +175,7 @@
   :init
   (global-hl-todo-mode +1))
 
-;; Completion style that allows for multiple regular expressions.
+;;;; Completion style that allows for multiple regular expressions.
 (use-package orderless
   :ensure t
 
@@ -190,7 +190,7 @@
                                    (kill-ring (styles . (emacs22 orderless)))
                                    (eglot (styles . (emacs22 substring orderless))))))
 
-;; Provides search and navigation based on `completing-read'.
+;;;; Provides search and navigation based on `completing-read'.
 (use-package consult
   :ensure t
 
@@ -294,12 +294,12 @@
   :init
   (advice-add #'register-preview :override #'consult-register-window))
 
-;; Move between windows.
+;;;; Move between windows.
 (use-package window
   :bind
   (("M-o" . #'other-window)))
 
-;; Open directory as buffer.
+;;;; Open directory as buffer.
 (use-package dired
   :custom
   (ls-lisp-use-insert-directory-program nil)
@@ -311,7 +311,7 @@
   :init
   (add-hook 'dired-mode-hook #'wgn/fix-dired-ls))
 
-;; Easily mark and kill regions.
+;;;; Easily mark and kill regions.
 (use-package easy-kill
   :ensure t
 
@@ -323,7 +323,7 @@
   (([remap kill-ring-save] . #'easy-kill)
    ([remap mark-sexp] . #'easy-mark)))
 
-;; Persist history over Emacs restarts.
+;;;; Persist history over Emacs restarts.
 (use-package savehist
   :custom
   (savehist-additional-variables '(search-ring regexp-search-ring))
@@ -332,12 +332,12 @@
   :init
   (savehist-mode +1))
 
-;; Remember your location in a file.
+;;;; Remember your location in a file.
 (use-package saveplace
   :init
   (save-place-mode +1))
 
-;; Save recent files.
+;;;; Save recent files.
 (use-package recentf
   :custom
   (recentf-max-saved-items 500)
@@ -347,7 +347,7 @@
   :init
   (recentf-mode +1))
 
-;; Undo history as a tree.
+;;;; Undo history as a tree.
 (use-package undo-tree
   :ensure t
   :diminish undo-tree-mode
@@ -365,14 +365,14 @@
   :init
   (global-undo-tree-mode +1))
 
-;; Project management.
+;;;; Project management.
 (use-package project
   :commands
   (project-switch-commands
    project-prefixed-buffer-name
    project-remember-project))
 
-;; Git interface.
+;;;; Git interface.
 (use-package magit
   :ensure t
 
@@ -399,7 +399,7 @@
     (define-key project-prefix-map "m" #'magit-project-status)
     (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
-;; Automatically manage parentheses in lisps.
+;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
   :ensure t
   :hook lisp-data-mode
@@ -407,12 +407,12 @@
   :custom
   (parinfer-rust-library "@parinfer@"))
 
-;; Show matching parentheses.
+;;;; Show matching parentheses.
 (use-package paren
   :custom
   (show-paren-context-when-offscreen t))
 
-;; Focused presentation mode built on top of outline.
+;;;; Focused presentation mode built on top of outline.
 (use-package logos
   :ensure t
 
@@ -431,7 +431,7 @@
    ([remap backward-page] . #'logos-backward-page-dwim)
    ("<f9>" . #'logos-focus-mode)))
 
-;; Spell checxing and correction.
+;;;; Spell checxing and correction.
 (if (executable-find "enchant-2")
 
     ;; HACK: enchant and jinx are difficult a difficult combination to
@@ -469,7 +469,7 @@
     :init
     (spell-fu-global-mode)))
 
-;; Avoid need for modifier keys.
+;;;; Avoid need for modifier keys.
 (use-package devil
   :ensure t
 
@@ -479,7 +479,7 @@
   :init
   (global-devil-mode +1))
 
-;; More convenient options for cursor movement.
+;;;; More convenient options for cursor movement.
 (use-package mwim
   :ensure t
 
@@ -497,7 +497,7 @@
     (add-to-list 'exec-path "@gs@")
     (add-to-list 'exec-path "@mupdf@")))
 
-;; Extra `completion-at-point-functions'.
+;;;; Extra `completion-at-point-functions'.
 (use-package cape
   :ensure t
 
@@ -535,7 +535,7 @@
   (add-to-list 'completion-at-point-functions #'cape-dict)
   (add-to-list 'completion-at-point-functions #'cape-symbol))
 
-;; Make templates available via `completion-at-point-functions'.
+;;;; Make templates available via `completion-at-point-functions'.
 (use-package tempel
   :ensure t
 
@@ -550,11 +550,11 @@
   :hook
   ((prog-mode text-mode) . wgn/add-tempel-to-completion-at-point))
 
-;; Pre-made templates for tempel.
+;;;; Pre-made templates for tempel.
 (use-package tempel-collection
   :ensure t)
 
-;; Contextual actions based on what is near point.
+;;;; Contextual actions based on what is near point.
 (use-package embark
   :ensure t
 
@@ -610,7 +610,7 @@
    ("M-." . #'embark-dwim)         ; orig. `xref-find-definitions'.
    ("C-h B" . #'embark-bindings))) ; orig. `describe-bindings'.
 
-;; Integration between Embark and Consult.
+;;;; Integration between Embark and Consult.
 (use-package embark-consult
   :ensure t
 
@@ -621,7 +621,7 @@
   :defines
   (grep-mode-map))
 
-;; Editable grep buffers.
+;;;; Editable grep buffers.
 (use-package wgrep
   :ensure t
 
@@ -632,7 +632,7 @@
   (:map grep-mode-map
    ("C-c C-p" . #'wgrep-change-to-wgrep-mode)))
 
-;; Creates a minor mode for when the point is in a selection.
+;;;; Creates a minor mode for when the point is in a selection.
 (use-package selected
   :ensure t
   :diminish selected-minor-mode
@@ -646,7 +646,7 @@
   :init
   (selected-global-mode +1))
 
-;; Edit text with multiple cursors.
+;;;; Edit text with multiple cursors.
 (use-package multiple-cursors
   :ensure t
 
@@ -657,7 +657,7 @@
   (:map selected-keymap
    ("C-x c" . #'mc/mark-all-like-this)))
 
-;; Structured editing and navigation based on tree-sitter.
+;;;; Structured editing and navigation based on tree-sitter.
 (use-package combobulate
   :ensure t
 
@@ -669,7 +669,7 @@
    (typescript-ts-mode . combobulate-mode)
    (tsx-ts-mode . combobulate-mode)))
 
-;; Create scratch buffers of any major mode.
+;;;; Create scratch buffers of any major mode.
 (use-package scratch
   :ensure t
 
@@ -679,14 +679,14 @@
   :bind
   (("C-c s" . #'scratch)))
 
-;; Visual `query-replace' with regular expressions.
+;;;; Visual `query-replace' with regular expressions.
 (use-package visual-regexp
   :ensure t
 
   :bind
   (("C-M-%" . vr/query-replace)))
 
-;; Shell written in Emacs Lisp.
+;;;; Shell written in Emacs Lisp.
 (use-package eshell
   :preface
   (defun wgn/disable-line-numbers ()
@@ -695,7 +695,7 @@
   :init
   (add-hook 'eshell-mode-hook #'wgn/disable-line-numbers))
 
-;; Terminal emulator.
+;;;; Terminal emulator.
 (use-package vterm
   :ensure t
 
@@ -721,12 +721,12 @@
     (define-key project-prefix-map "t" #'wgn/project-vterm)
     (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t)))
 
-;; Error checking.
+;;;; Error checking.
 (use-package flymake
   :hook
   (prog-mode . flymake-mode))
 
-;; Language server integration.
+;;;; Language server integration.
 (use-package eglot
   :preface
   (defun wgn/apply-eglot-format ()
@@ -757,11 +757,11 @@
    ("C-c C-l d" . #'eldoc)
    ("C-c C-l e" . #'eglot-code-actions)))
 
-;; Integration between eglot and consult.
+;;;; Integration between eglot and consult.
 (use-package consult-eglot
   :ensure t)
 
-;; Interface for talking to ChatGPT.
+;;;; Interface for talking to ChatGPT.
 ;;
 ;; NOTE: You need to store your OpenAI credentials under auth-source.
 (use-package chatgpt-shell
@@ -787,7 +787,7 @@
   :init
   (add-hook 'chatgpt-shell-mode-hook #'wgn/get-openai-key))
 
-;; Displays available keybindings in a pop-up.
+;;;; Displays available keybindings in a pop-up.
 (use-package which-key
   :ensure t
   :diminish which-key-mode
@@ -804,7 +804,7 @@
   (which-key-mode +1)
   (which-key-enable-devil-support))
 
-;; Completion using the built-in *Completions* buffer.
+;;;; Completion using the built-in *Completions* buffer.
 (use-package minibuffer
   :preface
   (defun wgn/sort-by-alpha-length (elems)
@@ -852,7 +852,7 @@
    ("C-p" . #'minibuffer-previous-completion)
    ("C-n" . #'minibuffer-next-completion)))
 
-;; Rich annotations in the minibuffer completion.
+;;;; Rich annotations in the minibuffer completion.
 (use-package marginalia
   :ensure t
 
@@ -862,7 +862,7 @@
   :init
   (marginalia-mode +1))
 
-;; More helpful documentation for Emacs Lisp.
+;;;; More helpful documentation for Emacs Lisp.
 (use-package helpful
   :ensure t
 
@@ -880,7 +880,7 @@
    ("C-h x" . #'helpful-command)
    ("C-c C-d" . #'helpful-at-point)))
 
-;; Open code from Emacs in the web browser.
+;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
   :ensure t
 
@@ -888,12 +888,12 @@
   (elsewhere-open
    elsewhere-build-url))
 
-;; Send HTTP requests from Emacs.
+;;;; Send HTTP requests from Emacs.
 (use-package restclient
   :ensure t
   :mode "\\.http\\'")
 
-;; Basic Golang support.
+;;;; Basic Golang support.
 ;;
 ;; HACK: This is built-in to Emacs, but there is also a third-party
 ;;       go-mode which we will install next.
@@ -920,7 +920,7 @@
   ;; CamelCase aware editing operations.
   (add-hook 'go-ts-mode-hook #'subword-mode))
 
-;; Extra Golang support.
+;;;; Extra Golang support.
 ;;
 ;; HACK: We won't actually use this go-mode other than for importing
 ;;       some extra functions to augment the built-in go-ts-mode.
@@ -958,7 +958,7 @@
   (godef-command "@godef@")
   (godoc-and-godef-command "@godoc@"))
 
-;; Run Golang tests.
+;;;; Run Golang tests.
 (use-package gotest
   :ensure t
 
@@ -969,7 +969,7 @@
    go-test-current-benchmark
    go-run))
 
-;; Support for the Python Black code formatter.
+;;;; Support for the Python Black code formatter.
 (use-package python-black
   :ensure t
 
@@ -988,7 +988,7 @@
   (python-black-command "@black@")
   (python-black-macchiato-command "@macchiato@"))
 
-;; Python support.
+;;;; Python support.
 ;;
 ;; NOTE: `:pylsp' needs to be configured using a directory-local
 ;;       variable. For example, to enable `:pydocstyle', type:
@@ -1019,7 +1019,7 @@
   ;; Set up eglot for python-ts-mode.
   (add-hook 'python-ts-mode-hook #'wgn/python-ts-mode-eglot-setup))
 
-;; Nix support.
+;;;; Nix support.
 (use-package nix-mode
   :ensure t
   :mode "\\.nix\\'"
@@ -1036,7 +1036,7 @@
   ;; Set up eglot for nix-mode.
   (add-hook 'nix-mode-hook #'wgn/nix-mode-eglot-setup))
 
-;; YAML support.
+;;;; YAML support.
 (use-package yaml-ts-mode
   :mode
   (("\\.yaml\\'" . yaml-ts-mode)
@@ -1054,7 +1054,7 @@
   ;; Set up eglot for yaml-mode.
   (add-hook 'yaml-ts-mode-hook #'wgn/yaml-ts-mode-eglot-setup))
 
-;; Support for HTML with embedded JS and CSS.
+;;;; Support for HTML with embedded JS and CSS.
 (use-package mhtml-mode
   :defer t
 
@@ -1070,7 +1070,7 @@
   ;; Set up eglot for mhtml-mode.
   (add-hook 'mhtml-mode-hook #'wgn/mhtml-mode-eglot-setup))
 
-;; JSX and TSX support.
+;;;; JSX and TSX support.
 (use-package tsx-ts-mode
   :mode
   (("\\.tsx\\'" . tsx-ts-mode)
@@ -1092,7 +1092,7 @@
   ;; Set up eglot for tsx-ts-mode.
   (add-hook 'tsx-ts-mode-hook #'wgn/tsx-ts-mode-eglot-setup))
 
-;; Javascript support.
+;;;; Javascript support.
 (use-package js-ts-mode
   :mode "\\.js\\'"
 
@@ -1130,7 +1130,7 @@
   ;;       `js-ts-mode' has loaded.
   (add-hook 'js-ts-mode-hook #'wgn/js-ts-mode-fix-auto-mode-alist))
 
-;; Typescript support.
+;;;; Typescript support.
 (use-package typescript-ts-mode
   :mode "\\.ts\\'"
 
@@ -1146,7 +1146,7 @@
   ;; Set up eglot for typescript-ts-mode.
   (add-hook 'typescript-ts-mode-hook #'wgn/typescript-ts-mode-eglot-setup))
 
-;; CSS support.
+;;;; CSS support.
 (use-package css-ts-mode
   :defer t
 
@@ -1166,7 +1166,7 @@
   ;; Set up eglot for css-ts-mode.
   (add-hook 'css-ts-mode-hook #'wgn/css-ts-mode-eglot-setup))
 
-;; Note taking, time tracking, etc.
+;;;; Note taking, time tracking, etc.
 (use-package org
   :ensure t
 
@@ -1177,7 +1177,7 @@
   (org-hide-emphasis-markers t)
   (org-pretty-entities t))
 
-;; Send HTTP requests from org-mode.
+;;;; Send HTTP requests from org-mode.
 (use-package ob-restclient
   :ensure t
 
@@ -1190,7 +1190,7 @@
   :init
   (add-hook 'org-mode-hook #'wgn/set-up-ob-restclient))
 
-;; TeX support.
+;;;; TeX support.
 (use-package auctex
   :ensure t
 
@@ -1221,7 +1221,7 @@
   ;; Set up eglot for TeX-mode.
   (add-hook 'LaTeX-mode-hook #'wgn/latex-mode-eglot-setup))
 
-;; Markdown support.
+;;;; Markdown support.
 (use-package markdown-mode
   :ensure t
 
@@ -1242,21 +1242,21 @@
   :custom
   (markdown-command "@multimarkdown@"))
 
-;; Generate table of contents in markdown files.
+;;;; Generate table of contents in markdown files.
 (use-package markdown-toc
   :ensure t
 
   :hook
   ((markdown-mode gfm-mode) . markdown-toc-mode))
 
-;; Reading EPUB files.
+;;;; Reading EPUB files.
 (use-package nov
   :ensure t
 
   :mode
   ("\\.epub\\'" . nov-mode))
 
-;; Convert buffers to HTML (including org-mode).
+;;;; Convert buffers to HTML (including org-mode).
 (use-package htmlize
   :ensure t
 
@@ -1266,7 +1266,7 @@
    htmlize-many-files
    htmlize-many-files-dired))
 
-;; Pretty styling in org-mode buffers.
+;;;; Pretty styling in org-mode buffers.
 (use-package org-modern
   :ensure t
 
@@ -1274,7 +1274,7 @@
   ((org-mode . org-modern-mode)
    (org-agenda-finalize . org-modern-agenda)))
 
-;; Indicate the git diff in the margin.
+;;;; Indicate the git diff in the margin.
 (use-package diff-hl
   :ensure t
 
@@ -1286,7 +1286,7 @@
   (diff-hl-margin-mode)
   (global-diff-hl-mode))
 
-;; Color scheme.
+;;;; Color scheme.
 (use-package modus-themes
   :ensure t
 
@@ -1297,7 +1297,7 @@
   :init
   (load-theme 'modus-vivendi-tinted :no-confirm))
 
-;; Use system dark mode settings for theme.
+;;;; Use system dark mode settings for theme.
 (when (memq system-type '(darwin))
   (use-package auto-dark
     :ensure t
@@ -1314,12 +1314,12 @@
     :init
     (auto-dark-mode +1)))
 
-;; Highlight the current line.
+;;;; Highlight the current line.
 (use-package hl-line
   :hook
   ((text-mode prog-mode) . hl-line-mode))
 
-;; Email client.
+;;;; Email client.
 ;;
 ;; NOTE: set the following variables with customize:
 ;; - `user-mail-address'
@@ -1364,19 +1364,19 @@
   :bind
   (("C-c m" . #'notmuch-hello)))
 
-;; Transient interface for notmuch commands.
+;;;; Transient interface for notmuch commands.
 (use-package notmuch-transient
   :ensure t)
 
-;; Link between org-mode and notmuch buffers.
+;;;; Link between org-mode and notmuch buffers.
 (use-package ol-notmuch
   :ensure t)
 
-;; Adds various transient interfaces.
+;;;; Adds various transient interfaces.
 (use-package tray
   :ensure t)
 
-;; Monitor and act upon system processes.
+;;;; Monitor and act upon system processes.
 (use-package proced
   :commands
   (proced)
@@ -1393,7 +1393,7 @@
    'proced-format-alist
    '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
 
-;; GitHub interface.
+;;;; GitHub interface.
 ;;
 ;; NOTE: set the following variables with customize:
 ;; - `consult-gh-default-orgs-list'
@@ -1415,12 +1415,12 @@
   :init
   (add-to-list 'exec-path "@gh@"))
 
-;; Embark integration for consult-gh.
+;;;; Embark integration for consult-gh.
 (use-package consult-gh-embark
   :after
   (consult-gh embark))
 
-;; Functions for interacting with pass.
+;;;; Functions for interacting with pass.
 (use-package password-store
   :ensure t
 
@@ -1443,7 +1443,7 @@
    password-store-version
    password-store-url))
 
-;; Interface for interacting with pass.
+;;;; Interface for interacting with pass.
 (use-package pass
   :ensure t
 
@@ -1453,7 +1453,7 @@
   :bind
   (("C-c p p" . #'pass)))
 
-;; Support for hledger for accounting.
+;;;; Support for hledger for accounting.
 ;;
 ;; NOTE: set the following variables with customize:
 ;; - `hledger-jfile'
