@@ -399,6 +399,34 @@
     (define-key project-prefix-map "m" #'magit-project-status)
     (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
+;;;; Janet support.
+(use-package janet-mode
+  :ensure t
+  :mode "\\.janet\\'"
+
+  :defines
+  (janet-mode-map))
+
+;;;; Interactive Janet development.
+(use-package ijanet-mode
+  :ensure t
+
+  :commands
+  (ijanet
+   ijanet-eval-buffer
+   ijanet-eval-line
+   ijanet-eval-region)
+
+  :bind
+  (:map janet-mode-map
+   ("C-c C-p" . #'ijanet)
+   ("C-c C-b" . #'ijanet-eval-buffer)
+   ("C-c C-l" . #'ijanet-eval-line)
+   ("C-c C-r" . #'ijanet-eval-region))
+
+  :custom
+  (ijanet-program "@janet@"))
+
 ;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
   :ensure t

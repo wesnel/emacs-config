@@ -55,6 +55,10 @@ final: prev:
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-html-language-server";
 
+    janet = let
+      pkg = final.janet;
+    in "${pkg}/bin/janet";
+
     macchiato = let
       pkg = final.black-macchiato;
     in "${pkg}/bin/black-macchiato";
@@ -226,6 +230,23 @@ final: prev:
           };
         });
 
+      ijanet-mode = let
+        rev = "2821db192fd0733d402cbd1c58f6060aa02ef100";
+        sha256 = "sha256-Ljuj6Oc28xgi5N1XCp4TjHUtR83FFcVBN6dhTi/7qwk=";
+      in eFinal.trivialBuild rec {
+        pname = "ijanet-mode";
+        version = rev;
+
+        src = final.fetchFromGitHub {
+          owner = "SerialDev";
+          repo = pname;
+
+          inherit
+            rev
+            sha256;
+        };
+      };
+
       no-littering = let
         rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
         sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";
@@ -276,6 +297,7 @@ final: prev:
         gs
         hledger
         htmlls
+        janet
         macchiato
         multimarkdown
         mupdf
