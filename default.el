@@ -410,7 +410,10 @@
 ;;;; Show matching parentheses.
 (use-package paren
   :custom
-  (show-paren-context-when-offscreen t))
+  (show-paren-context-when-offscreen t)
+
+  :init
+  (show-paren-mode +1))
 
 ;;;; Focused presentation mode built on top of outline.
 (use-package logos
