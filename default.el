@@ -427,6 +427,32 @@
   :custom
   (ijanet-program "@janet@"))
 
+;;;; Clojure support.
+(use-package clojure-mode
+  :ensure t
+
+  :commands
+  (clojure-mode
+   clojurescript-mode
+   clojurec-mode)
+
+  :mode
+  (("\\.clj\\'" . clojure-mode)
+   ("\\.cljs\\'" . clojurescript-mode)
+   ("\\.cljc\\'" . clojurec-mode)))
+
+;;;; Interactive Clojure development.
+(use-package cider
+  :ensure t
+
+  :commands
+  (cider-jack-in)
+
+  :custom
+  (cider-lein-command "@lein@")
+  (cider-clojure-cli-command "@clojure@")
+  (cider-boot-command "@boot@"))
+
 ;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
   :ensure t

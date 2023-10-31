@@ -15,6 +15,14 @@ final: prev:
       pkg = final.black;
     in "${pkg}/bin/black";
 
+    boot = let
+      pkg = final.boot;
+    in "${pkg}/bin/boot";
+
+    clojure = let
+      pkg = final.clojure;
+    in "${pkg}/bin/clojure";
+
     cssls = let
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-css-language-server";
@@ -58,6 +66,10 @@ final: prev:
     janet = let
       pkg = final.janet;
     in "${pkg}/bin/janet";
+
+    lein = let
+      pkg = final.leiningen;
+    in "${pkg}/bin/lein";
 
     macchiato = let
       pkg = final.black-macchiato;
@@ -287,6 +299,8 @@ final: prev:
       inherit
         aspell
         black
+        boot
+        clojure
         cssls
         gh
         go
@@ -298,6 +312,7 @@ final: prev:
         hledger
         htmlls
         janet
+        lein
         macchiato
         multimarkdown
         mupdf
