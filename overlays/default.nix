@@ -111,6 +111,10 @@ final: prev:
 
     in "${pkg}/bin/pylsp";
 
+    sbcl = let
+      pkg = final.sbcl;
+    in "${pkg}/bin/sbcl";
+
     texlab = let
       pkg = final.texlab;
     in "${pkg}/bin/texlab";
@@ -320,6 +324,7 @@ final: prev:
         parinfer
         pass
         pylsp
+        sbcl
         texlab
         tsxls
         yamlls;

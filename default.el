@@ -453,6 +453,17 @@
   (cider-clojure-cli-command "@clojure@")
   (cider-boot-command "@boot@"))
 
+;;;; Interactive Lisp development.
+(use-package slime
+  :ensure t
+
+  :commands
+  (slime
+   slime-eval-buffer)
+
+  :custom
+  (inferior-lisp-program "@sbcl@"))
+
 ;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
   :ensure t
