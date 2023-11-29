@@ -1157,6 +1157,26 @@
   ;; Set up eglot for yaml-mode.
   (add-hook 'yaml-ts-mode-hook #'wgn/yaml-ts-mode-eglot-setup))
 
+;;;; Terraform support.
+(use-package terraform-mode
+  :ensure t
+  :mode "\\.tf\\(vars\\)?\\'"
+
+  :preface
+  (defun wgn/terraform-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(terraform-mode . ("@terraformls@" "serve")))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    (eglot-ensure))
+
+  :custom
+  (terraform-indent-level 4)
+
+  :init
+  ;; Set up eglot for terraform-mode.
+  (add-hook 'terraform-mode-hook #'wgn/terraform-mode-eglot-setup))
+
 ;;;; Support for HTML with embedded JS and CSS.
 (use-package mhtml-mode
   :defer t

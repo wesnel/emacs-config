@@ -115,6 +115,10 @@ final: prev:
       pkg = final.sbcl;
     in "${pkg}/bin/sbcl";
 
+    terraformls = let
+      pkg = final.terraform-ls;
+    in "${pkg}/bin/terraform-ls";
+
     texlab = let
       pkg = final.texlab;
     in "${pkg}/bin/texlab";
@@ -325,6 +329,7 @@ final: prev:
         pass
         pylsp
         sbcl
+        terraformls
         texlab
         tsxls
         yamlls;
