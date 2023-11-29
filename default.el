@@ -468,11 +468,20 @@
 (use-package parinfer-rust-mode
   :ensure t
 
+  :commands
+  (parinfer-rust-mode)
+
+  :preface
+  (defun wgn/enable-parinfer ()
+    (electric-pair-local-mode -1)
+    (parinfer-rust-mode +1))
+
   :hook
-  (lisp-data-mode
-   janet-mode
-   clojure-mode
-   clojurescript-mode)
+  ((lisp-data-mode
+    janet-mode
+    clojure-mode
+    clojurescript-mode)
+   . wgn/enable-parinfer)
 
   :custom
   (parinfer-rust-library "@parinfer@"))
@@ -484,6 +493,14 @@
 
   :init
   (show-paren-mode +1))
+
+;;;; Insert matching parentheses (and brackets, braces, etc).
+(use-package elec-pair
+  :hook
+  (prog-mode . electric-pair-local-mode)
+
+  :custom
+  (electric-pair-open-newline-between-pairs t))
 
 ;;;; Focused presentation mode built on top of outline.
 (use-package logos
