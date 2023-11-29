@@ -771,12 +771,15 @@
   :bind
   (("C-c s" . #'scratch)))
 
-;;;; Visual `query-replace' with regular expressions.
+;;;; Visual `query-replace-regexp'.
 (use-package visual-regexp
   :ensure t
 
+  :commands
+  (vr/query-replace)
+
   :bind
-  (("C-M-%" . vr/query-replace)))
+  (("C-M-%" . #'vr/query-replace)))
 
 ;;;; Shell written in Emacs Lisp.
 (use-package eshell
