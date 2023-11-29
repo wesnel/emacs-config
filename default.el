@@ -1376,6 +1376,9 @@
 (use-package nov
   :ensure t
 
+  :init
+  (add-hook 'nov-mode-hook #'wgn/disable-line-numbers)
+
   :mode
   ("\\.epub\\'" . nov-mode))
 
