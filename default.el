@@ -852,6 +852,14 @@
    ("C-c C-l d" . #'eldoc)
    ("C-c C-l e" . #'eglot-code-actions)))
 
+;;;; Show documentation in a childframe.
+(use-package eldoc-box
+  :ensure t
+
+  :hook
+  ((eldoc-mode . eldoc-box-hover-at-point-mode)
+   (eglot-managed-mode-hook . eldoc-box-hover-at-point-mode)))
+
 ;;;; Integration between eglot and consult.
 (use-package consult-eglot
   :ensure t)
