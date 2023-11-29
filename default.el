@@ -741,10 +741,12 @@
   :ensure t
 
   :commands
-  (mc/mark-all-like-this)
+  (mc/mark-all-like-this
+   mc/add-cursor-on-click)
 
   :bind
-  (:map selected-keymap
+  (("C-S-<mouse-1>" . #'mc/add-cursor-on-click)
+   :map selected-keymap
    ("C-x c" . #'mc/mark-all-like-this)))
 
 ;;;; Structured editing and navigation based on tree-sitter.
