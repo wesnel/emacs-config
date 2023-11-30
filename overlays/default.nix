@@ -27,6 +27,10 @@ final: prev:
       pkg = final.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-css-language-server";
 
+    delta = let
+      pkg = final.magit-delta;
+    in "${pkg}/bin/delta";
+
     gh = let
       pkg = final.gh;
     in "${pkg}/bin";
@@ -310,6 +314,7 @@ final: prev:
         boot
         clojure
         cssls
+        delta
         gh
         go
         godef

@@ -399,6 +399,16 @@
     (define-key project-prefix-map "m" #'magit-project-status)
     (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
+;;;; Support for git-delta in magit.
+(use-package magit-delta
+  :ensure t
+
+  :hook
+  (magit-mode . magit-delta-mode)
+
+  :custom
+  (magit-delta-delta-executable "@delta@"))
+
 ;;;; Janet support.
 (use-package janet-mode
   :ensure t
