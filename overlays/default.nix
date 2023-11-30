@@ -378,12 +378,5 @@ final: prev:
       wgn-emacs-unstable-nox;
 
     defaultPackage = wgn-emacs-unstable-nox;
-
-    shell = final.mkShell {
-      buildInputs = [
-        defaultPackage
-        emacs-config
-      ];
-    };
   };
 }
