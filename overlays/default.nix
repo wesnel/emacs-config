@@ -3,14 +3,6 @@ final: prev:
 {
   wgn-emacs = let
 
-    aspell = let
-      pkg = final.aspellWithDicts(d: with d; [
-        en
-        en-computers
-        en-science
-      ]);
-    in "${pkg}/bin/aspell";
-
     black = let
       pkg = final.black;
     in "${pkg}/bin/black";
@@ -309,7 +301,6 @@ final: prev:
       src = ../default.el;
 
       inherit
-        aspell
         black
         boot
         clojure
@@ -377,6 +368,6 @@ final: prev:
       wgn-emacs-unstable
       wgn-emacs-unstable-nox;
 
-    defaultPackage = wgn-emacs-unstable-nox;
+    default = wgn-emacs-unstable-nox;
   };
 }

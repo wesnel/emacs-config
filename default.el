@@ -532,42 +532,22 @@
    ("<f9>" . #'logos-focus-mode)))
 
 ;;;; Spell checxing and correction.
-(if (executable-find "enchant-2")
+(use-package jinx
+  :ensure t
 
-    ;; HACK: enchant and jinx are difficult a difficult combination to
-    ;;       install with nix, so we instead check to see if they are
-    ;;       available on the system elsehow.
-    (use-package jinx
-      :ensure t
+  :custom
+  (ispell-program-name "enchant-2")
 
-      :custom
-      (ispell-program-name "enchant-2")
+  :commands
+  (jinx-correct
+   jinx-languages)
 
-      :commands
-      (jinx-correct
-       jinx-languages)
+  :bind
+  (("M-$" . #'jinx-correct)
+   ("C-M-$" . #'jinx-languages))
 
-      :bind
-      (("M-$" . #'jinx-correct)
-       ("C-M-$" . #'jinx-languages))
-
-      :hook
-      (emacs-startup . global-jinx-mode))
-
-  ;; HACK: If enchant is not available on the system, then fall back
-  ;;       to aspell and spell-fu. This combination is easier to
-  ;;       install with nix.
-  (use-package spell-fu
-    :ensure t
-
-    :commands
-    (spell-fu-global-mode)
-
-    :custom
-    (ispell-program-name "@aspell@")
-
-    :init
-    (spell-fu-global-mode)))
+  :hook
+  (emacs-startup . global-jinx-mode))
 
 ;;;; Avoid need for modifier keys.
 (use-package devil
