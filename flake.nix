@@ -64,41 +64,64 @@
       in {
         packages = pkgs.wgn-emacs;
 
-        nixosModules.default =
-          { config
-          , lib
-          , ... }:
+        nixosModules = {
+          home =
+            { config
+            , lib
+            , ... }:
 
-          let
-            cfg = config.programs.wgn.emacs;
-          in {
-            options.programs.wgn.emacs = {
-              enable = lib.mkEnableOption "Enable Wesley's Emacs Configuration";
+            let
+              cfg = config.home.programs.wgn.emacs;
+            in {
+              options = {
+                home.programs.wgn.emacs = {
+                  enable = lib.mkEnableOption "Enable the Home Manager portion of Wesley's Emacs Configuration";
+                };
+              };
 
-              package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" {
-                default = self.packages.${system}.wgn-emacs-unstable-nox;
+              config = lib.mkIf cfg.enable {
+                home = {
+                  file.".emacs.d/early-init.el".source = ./early-init.el;
+                };
               };
             };
 
-            config = lib.mkIf cfg.enable {
-              home.file.".emacs.d/early-init.el".source = ./early-init.el;
+          nixos =
+            { config
+            , lib
+            , ... }:
 
-              environment = {
-                pathsToLink = [
-                  "/share/hunspell"
-                ];
+            let
+              cfg = config.programs.wgn.emacs;
+            in {
+              options = {
+                programs.wgn.emacs = {
+                  enable = lib.mkEnableOption "Enable the NixOS portion of Wesley's Emacs Configuration";
 
-                systemPackages = let
-                  pkg = cfg.package;
-                in (with pkgs; [
-                  pkg
-                  enchant2
-                  nuspell
-                ]) ++ (with pkgs.hunspellDicts; [
-                  en-us-large
-                ]);
+                  package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" {
+                    default = self.packages.${system}.wgn-emacs-unstable-nox;
+                  };
+                };
+              };
+
+              config = lib.mkIf cfg.enable {
+                environment = {
+                  pathsToLink = [
+                    "/share/hunspell"
+                  ];
+
+                  systemPackages = let
+                    pkg = cfg.package;
+                  in (with pkgs; [
+                    pkg
+                    enchant2
+                    nuspell
+                  ]) ++ (with pkgs.hunspellDicts; [
+                    en-us-large
+                  ]);
+                };
               };
             };
-          };
+        };
       });
 }
