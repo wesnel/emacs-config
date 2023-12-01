@@ -20,7 +20,7 @@ final: prev:
     in "${pkg}/bin/vscode-css-language-server";
 
     delta = let
-      pkg = final.magit-delta;
+      pkg = final.delta;
     in "${pkg}/bin/delta";
 
     gh = let
