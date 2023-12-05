@@ -856,29 +856,22 @@
 
 ;;;; Interface for talking to ChatGPT.
 ;;
-;; NOTE: You need to store your OpenAI credentials under auth-source.
-(use-package chatgpt-shell
+;; NOTE: If you want to actually use ChatGPT, you need to store your
+;;       OpenAI credentials under auth-source.
+;;
+;; TODO: Integrate this with a local model.
+(use-package org-ai
   :ensure t
 
   :commands
-  (chatgpt-shell)
+  (org-ai-mode
+   org-ai-global-mode)
 
-  :preface
-  (defun wgn/get-openai-key ()
-    (let* ((default (notmuch-user-primary-email))
-           (user (completing-read (format "Choose user (default %s):" default)
-                                  (notmuch-user-emails)
-                                  nil
-                                  nil
-                                  nil
-                                  nil
-                                  default)))
-      (setq-local chatgpt-shell-openai-key (auth-source-pick-first-password
-                                            :host "openai.com"
-                                            :user user))))
+  :hook
+  (org-mode . org-ai-mode)
 
   :init
-  (add-hook 'chatgpt-shell-mode-hook #'wgn/get-openai-key))
+  (org-ai-global-mode))
 
 ;;;; Displays available keybindings in a pop-up.
 (use-package which-key
