@@ -949,6 +949,8 @@
   (completion-auto-help 'always)
   (completion-auto-select 'second-tab)
   (completions-sort #'wgn/sort-multi-category)
+  (completion-ignore-case t)
+  (read-buffer-completion-ignore-case t)
 
   :bind
   (:map minibuffer-local-map
