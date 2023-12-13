@@ -825,7 +825,10 @@
 ;;;; Error checking.
 (use-package flymake
   :hook
-  (prog-mode . flymake-mode))
+  (prog-mode . flymake-mode)
+
+  :custom
+  (checkdoc-package-keywords-flag t))
 
 ;;;; Language server integration.
 (use-package eglot
