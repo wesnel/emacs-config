@@ -709,6 +709,7 @@
 ;;;; Integration between Embark and Consult.
 (use-package embark-consult
   :ensure t
+  :demand t
 
   :hook
   ((embark-collect-mode completion-list-mode) . consult-preview-at-point-mode))
