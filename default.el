@@ -805,6 +805,9 @@
   (vterm
    vterm-other-window)
 
+  :custom
+  (vterm-max-scrollback 100000)
+
   :preface
   (defun wgn/project-vterm ()
     (interactive)
