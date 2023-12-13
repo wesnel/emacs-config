@@ -107,6 +107,10 @@ final: prev:
 
     in "${pkg}/bin/pylsp";
 
+    rg = let
+      pkg = final.ripgrep;
+    in "${pkg}/bin/rg";
+
     sbcl = let
       pkg = final.sbcl;
     in "${pkg}/bin/sbcl";
@@ -324,6 +328,7 @@ final: prev:
         parinfer
         pass
         pylsp
+        rg
         sbcl
         terraformls
         texlab

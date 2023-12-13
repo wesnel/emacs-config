@@ -365,12 +365,28 @@
   :init
   (global-undo-tree-mode +1))
 
+;;;; Find identifier by reference in many major modes.
+(use-package xref
+  :defines
+  (xref-search-program-alist
+   xref-search-program))
+
 ;;;; Project management.
 (use-package project
   :commands
   (project-switch-commands
    project-prefixed-buffer-name
-   project-remember-project))
+   project-remember-project)
+
+  :preface
+  (defun wgn/patch-ripgrep-in-xref-search ()
+    (setq xref-search-program-alist
+          (add-to-list 'xref-search-program-alist
+                       '(ripgrep . "xargs -0 @rg@ <C> --null -nH --no-heading --no-messages -g '!*/' -e <R>"))
+          xref-search-program 'ripgrep))
+
+  :init
+  (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search))
 
 ;;;; Git interface.
 (use-package magit
