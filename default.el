@@ -182,7 +182,7 @@
   :ensure t
 
   :custom
-  (completion-styles '(basic substring initials flex orderless))
+  (completion-styles '(orderless basic))
   (completion-category-overrides '((file (styles . (basic partial-completion orderless)))
                                    (bookmark (styles . (basic substring)))
                                    (library (styles . (basic substring)))
