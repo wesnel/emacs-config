@@ -58,6 +58,8 @@
   (display-time-day-and-date t)
   (display-time-24hr-format t)
   (display-time-use-mail-icon t)
+  ;; Allow minibuffer command while in a minibuffer command.
+  (enable-recursive-minibuffers t)
 
   :init
   ;; Remove some UI elements.
