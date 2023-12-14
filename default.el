@@ -188,113 +188,8 @@
                                    (library (styles . (basic substring)))
                                    (embark-keybinding (styles . (basic substring)))
                                    (imenu (styles . (basic substring orderless)))
-                                   (consult-location (styles . (basic substring orderless)))
                                    (kill-ring (styles . (emacs22 orderless)))
                                    (eglot (styles . (emacs22 substring orderless))))))
-
-;;;; Provides search and navigation based on `completing-read'.
-(use-package consult
-  :ensure t
-
-  :defines
-  (consult-preview-key)
-
-  :commands
-  (consult-find
-   consult-locate
-   consult-grep
-   consult-git-grep
-   consult-ripgrep
-   consult-line
-   consult-line-multi
-   consult-keep-lines
-   consult-focus-lines
-   consult-isearch-history
-   consult-outline
-   consult-mark
-   consult-global-mark
-   consult-imenu
-   consult-imenu-multi
-   consult-complex-command
-   consult-buffer
-   consult-buffer-other-window
-   consult-buffer-other-frame
-   consult-bookmark
-   consult-project-buffer
-   consult-register-load
-   consult-register-store
-   consult-register
-   consult-register-window
-   consult-yank-pop
-   consult-compile-error
-   consult-flymake
-   consult-goto-line
-   consult-mode-command
-   consult-history
-   consult-kmacro
-   consult-man)
-
-  :bind
-  (;; C-c bindings in `mode-specific-map'
-   ("C-c M-x" . #'consult-mode-command)
-   ("C-c h" . #'consult-history)
-   ("C-c k" . #'consult-kmacro)
-   ("C-c m" . #'consult-man)
-   ("C-c i" . #'consult-info)
-   ([remap Info-search] . consult-info)
-   ;; C-x bindings in `ctl-x-map'
-   ("C-x M-:" . #'consult-complex-command)     ;; orig. repeat-complex-command
-   ("C-x b" . #'consult-buffer)                ;; orig. switch-to-buffer
-   ("C-x 4 b" . #'consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
-   ("C-x 5 b" . #'consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
-   ("C-x r b" . #'consult-bookmark)            ;; orig. bookmark-jump
-   ("C-x p b" . #'consult-project-buffer)      ;; orig. project-switch-to-buffer
-   ;; Custom M-# bindings for fast register access
-   ("M-#" . #'consult-register-load)
-   ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
-   ("C-M-#" . #'consult-register)
-   ;; Other custom bindings
-   ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
-   ;; M-g bindings in `goto-map'
-   ("M-g e" . #'consult-compile-error)
-   ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
-   ("M-g g" . #'consult-goto-line)             ;; orig. goto-line
-   ("M-g M-g" . #'consult-goto-line)           ;; orig. goto-line
-   ("M-g o" . #'consult-outline)               ;; Alternative: consult-org-heading
-   ("M-g m" . #'consult-mark)
-   ("M-g k" . #'consult-global-mark)
-   ("M-g i" . #'consult-imenu)
-   ("M-g I" . #'consult-imenu-multi)
-   ;; M-s bindings in `search-map'
-   ("M-s d" . #'consult-find)
-   ("M-s D" . #'consult-locate)
-   ("M-s g" . #'consult-grep)
-   ("M-s G" . #'consult-git-grep)
-   ("M-s r" . #'consult-ripgrep)
-   ("M-s l" . #'consult-line)
-   ("M-s L" . #'consult-line-multi)
-   ("M-s k" . #'consult-keep-lines)
-   ("M-s u" . #'consult-focus-lines)
-   ;; Isearch integration
-   ("M-s e" . #'consult-isearch-history)
-   :map isearch-mode-map
-   ("M-e" . #'consult-isearch-history)         ;; orig. isearch-edit-string
-   ("M-s e" . #'consult-isearch-history)       ;; orig. isearch-edit-string
-   ("M-s l" . #'consult-line)                  ;; needed by consult-line to detect isearch
-   ("M-s L" . #'consult-line-multi)            ;; needed by consult-line to detect isearch
-   ;; Minibuffer history
-   :map minibuffer-local-map
-   ("M-s" . #'consult-history)                 ;; orig. next-matching-history-element
-   ("M-r" . #'consult-history))                ;; orig. previous-matching-history-element
-
-  :custom
-  (register-preview-function #'consult-register-format)
-  (xref-show-xrefs-function #'consult-xref)
-  (xref-show-definitions-function #'consult-xref)
-  (consult-narrow-key "<")
-
-  :init
-  (advice-add #'register-preview :override #'consult-register-window))
 
 ;;;; Move between windows.
 (use-package window
@@ -708,14 +603,6 @@
    ("M-." . #'embark-dwim)         ; orig. `xref-find-definitions'.
    ("C-h B" . #'embark-bindings))) ; orig. `describe-bindings'.
 
-;;;; Integration between Embark and Consult.
-(use-package embark-consult
-  :ensure t
-  :demand t
-
-  :hook
-  ((embark-collect-mode completion-list-mode) . consult-preview-at-point-mode))
-
 (use-package grep
   :defines
   (grep-mode-map))
@@ -874,10 +761,6 @@
   :hook
   ((eldoc-mode . eldoc-box-hover-at-point-mode)
    (eglot-managed-mode-hook . eldoc-box-hover-at-point-mode)))
-
-;;;; Integration between eglot and consult.
-(use-package consult-eglot
-  :ensure t)
 
 ;;;; Interface for talking to ChatGPT.
 ;;
@@ -1528,33 +1411,6 @@
   (add-to-list
    'proced-format-alist
    '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
-
-;;;; GitHub interface.
-;;
-;; NOTE: set the following variables with customize:
-;; - `consult-gh-default-orgs-list'
-(use-package consult-gh
-  :ensure t
-
-  :commands
-  (consult-gh-orgs
-   consult-gh-repo-clone
-   consult-gh-search-repos
-   consult-gh-search-issues)
-
-  :custom
-  (consult-gh-show-preview t)
-  (consult-gh-issue-action #'consult-gh--issue-view-action)
-  (consult-gh-repo-action #'consult-gh--repo-browse-files-action)
-  (consult-gh-file-action #'consult-gh--files-view-action)
-
-  :init
-  (add-to-list 'exec-path "@gh@"))
-
-;;;; Embark integration for consult-gh.
-(use-package consult-gh-embark
-  :after
-  (consult-gh embark))
 
 ;;;; Functions for interacting with pass.
 (use-package password-store
