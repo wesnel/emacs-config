@@ -283,6 +283,20 @@ final: prev:
           };
         });
 
+      scratch = let
+        rev = "afd2590a56a8d33bd07ffbe30feda5ece9c5d5cb";
+        sha256 = "1myd3zsxdkflrvpzmnd27n5ga9f4i0v1dq8p365fq3picq6694zw";
+      in ePrev.scratch.overrideAttrs (old:
+
+        {
+          src = final.fetchzip {
+            url = "https://codeberg.org/wgn/scratch/archive/${rev}.tar.gz";
+
+            inherit
+              sha256;
+          };
+        });
+
       which-key = let
         rev = "6abe544835d67f92a633fbf2622b9a8b6eb10a3c";
         sha256 = "sha256-FzTdq3WXDzXJKXgSG9ctJLSCnsR9nnlV+wY3eNaEWYU=";

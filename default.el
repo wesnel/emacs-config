@@ -616,6 +616,9 @@
   :commands
   (scratch)
 
+  :custom
+  (scratch-use-singleton-buffer nil)
+
   :bind
   (("C-c s" . #'scratch)))
 
