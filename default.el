@@ -893,6 +893,9 @@
 (use-package python
   :defer t
 
+  :custom
+  (python-indent-def-block-scale 1)
+
   :preface
   (defun wgn/python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
