@@ -494,67 +494,6 @@
     (add-to-list 'exec-path "@gs@")
     (add-to-list 'exec-path "@mupdf@")))
 
-;;;; Extra `completion-at-point-functions'.
-(use-package cape
-  :ensure t
-
-  :commands
-  (cape-abbrev
-   cape-dabbrev
-   cape-file
-   cape-elisp-block
-   cape-history
-   cape-keyword
-   cape-tex
-   cape-sgml
-   cape-rfc1345
-   cape-abbrev
-   cape-dict
-   cape-elisp-symbol
-   cape-line
-   cape-emoji)
-
-  :functions
-  (cape-capf-buster)
-
-  :init
-  (advice-add 'eglot-completion-at-point :around #'cape-capf-buster)
-
-  ;; Add `completion-at-point-functions', used by `completion-at-point'.
-  ;; NOTE: The order matters!
-  (add-to-list 'completion-at-point-functions #'cape-abbrev)
-  (add-to-list 'completion-at-point-functions #'cape-dabbrev)
-  (add-to-list 'completion-at-point-functions #'cape-file)
-  (add-to-list 'completion-at-point-functions #'cape-elisp-block)
-  (add-to-list 'completion-at-point-functions #'cape-history)
-  (add-to-list 'completion-at-point-functions #'cape-keyword)
-  (add-to-list 'completion-at-point-functions #'cape-tex)
-  (add-to-list 'completion-at-point-functions #'cape-sgml)
-  (add-to-list 'completion-at-point-functions #'cape-rfc1345)
-  (add-to-list 'completion-at-point-functions #'cape-abbrev)
-  (add-to-list 'completion-at-point-functions #'cape-dict)
-  (add-to-list 'completion-at-point-functions #'cape-elisp-symbol)
-  (add-to-list 'completion-at-point-functions #'cape-emoji))
-
-;;;; Make templates available via `completion-at-point-functions'.
-(use-package tempel
-  :ensure t
-
-  :commands
-  (tempel-expand)
-
-  :preface
-  (defun wgn/add-tempel-to-completion-at-point ()
-    (setq-local completion-at-point-functions
-                (cons #'tempel-expand completion-at-point-functions)))
-
-  :hook
-  ((prog-mode text-mode) . wgn/add-tempel-to-completion-at-point))
-
-;;;; Pre-made templates for tempel.
-(use-package tempel-collection
-  :ensure t)
-
 (use-package grep
   :defines
   (grep-mode-map))
