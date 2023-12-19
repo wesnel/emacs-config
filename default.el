@@ -34,14 +34,14 @@
 
 ;;; Code:
 
+(require 'package)
+
 (eval-when-compile
   (require 'use-package))
 
 ;;;; Miscellaneous Emacs configuration.
 (use-package emacs
   :custom
-  ;; Disable package archives.
-  (package-archives nil)
   (use-short-answers t)
   (initial-buffer-choice t)
   ;; Place newline at end of file.
@@ -80,6 +80,11 @@
   (column-number-mode +1)
   (size-indication-mode +1)
   (display-time))
+
+(use-package package
+  :init
+  (add-to-list 'package-archives
+               '("melpa" . "https://melpa.org/packages/")))
 
 ;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
