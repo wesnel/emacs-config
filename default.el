@@ -65,6 +65,9 @@
   ;; Remove some UI elements.
   (menu-bar-no-scroll-bar)
   (menu-bar-no-window-divider)
+  (menu-bar-mode -1)
+  (scroll-bar-mode -1)
+  (tool-bar-mode -1)
 
   ;; Show line numbers at the beginning of each line.
   (global-display-line-numbers-mode +1)
