@@ -350,6 +350,26 @@ final: prev:
         yamlls;
     };
 
+    wgn-emacs = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
+      package = final.emacs;
+      defaultInitFile = emacs-config;
+
+      inherit
+        extraEmacsPackages
+        override;
+    };
+
+    wgn-emacs-nox = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
+      package = final.emacs-nox;
+      defaultInitFile = emacs-config;
+
+      inherit
+        extraEmacsPackages
+        override;
+    };
+
     wgn-emacs-unstable = final.emacsWithPackagesFromUsePackage {
       config = emacs-config;
       package = final.emacs-unstable;
@@ -370,6 +390,26 @@ final: prev:
         override;
     };
 
+    wgn-emacs-git = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
+      package = final.emacs-git;
+      defaultInitFile = emacs-config;
+
+      inherit
+        extraEmacsPackages
+        override;
+    };
+
+    wgn-emacs-git-nox = final.emacsWithPackagesFromUsePackage {
+      config = emacs-config;
+      package = final.emacs-git-nox;
+      defaultInitFile = emacs-config;
+
+      inherit
+        extraEmacsPackages
+        override;
+    };
+
     wgn-emacs-macport = final.emacsWithPackagesFromUsePackage {
       config = emacs-config;
       package = final.emacs29-macport;
@@ -383,10 +423,14 @@ final: prev:
   in rec {
     inherit
       emacs-config
+      wgn-emacs
+      wgn-emacs-nox
       wgn-emacs-macport
       wgn-emacs-unstable
-      wgn-emacs-unstable-nox;
+      wgn-emacs-unstable-nox
+      wgn-emacs-git
+      wgn-emacs-git-nox;
 
-    default = wgn-emacs-unstable-nox;
+    default = wgn-emacs-nox;
   };
 }
