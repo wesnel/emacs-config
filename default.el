@@ -651,6 +651,26 @@
    ("C-c C-l d" . #'eldoc)
    ("C-c C-l e" . #'eglot-code-actions)))
 
+(use-package dape
+  :ensure t
+
+  :commands
+  (dape
+   dape-breakpoint-global-mode
+   dape-breakpoint-load
+   dape-breakpoint-save)
+
+  :hook
+  ((kill-emacs . dape-breakpoint-save)
+   (after-init . dape-breakpoint-load))
+
+  :config
+  (dape-breakpoint-global-mode)
+
+  (add-hook 'dape-on-start-hooks
+            (lambda ()
+              (save-some-buffers t t))))
+
 ;;;; Show documentation in a childframe.
 (use-package eldoc-box
   :ensure t
