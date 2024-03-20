@@ -735,15 +735,7 @@
   (completion-auto-select 'second-tab)
   (completions-sort #'wgn/sort-multi-category)
   (completion-ignore-case t)
-  (read-buffer-completion-ignore-case t)
-
-  :bind
-  (:map minibuffer-local-map
-   ("C-p" . #'minibuffer-previous-completion)
-   ("C-n" . #'minibuffer-next-completion)
-   :map completion-in-region-mode-map
-   ("C-p" . #'minibuffer-previous-completion)
-   ("C-n" . #'minibuffer-next-completion)))
+  (read-buffer-completion-ignore-case t))
 
 ;;;; Rich annotations in the minibuffer completion.
 (use-package marginalia
