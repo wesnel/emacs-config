@@ -200,6 +200,22 @@ final: prev:
         };
       };
 
+      eglot = let
+        rev = "1.17.0.20240314.151638";
+        sha256 = "sha256-eJGnNaQx1YxugpNbkD2KgC3NAJxbQn+JmDIMXLpvwvw=";
+      in ePrev.eglot.overrideAttrs (old:
+
+        {
+          version = rev;
+
+          src = final.fetchurl {
+            url = "https://elpa.gnu.org/devel/eglot-${rev}.tar";
+
+            inherit
+              sha256;
+          };
+        });
+
       elsewhere = let
         rev = "85300095abd8f227413f80b3185c96874fd05002";
         sha256 = "sha256-GdarA9ac2UvJPphkictyM/k1SXlxE0qhCPJzh96nv3A=";

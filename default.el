@@ -622,6 +622,8 @@
 
 ;;;; Language server integration.
 (use-package eglot
+  :ensure t
+
   :preface
   (defun wgn/apply-eglot-format ()
     (unless (or (and (fboundp 'magit-rebase-in-progress-p)
