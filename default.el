@@ -732,7 +732,6 @@
     (pcase (wgn/completion-category)
       ('nil elems) ; no sorting
       ('kill-ring elems)
-      ('project-file (wgn/sort-by-alpha-length elems))
       (_ (wgn/sort-by-history elems))))
 
   :custom
