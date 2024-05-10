@@ -638,6 +638,7 @@
    ("C-c C-l d" . #'eldoc)
    ("C-c C-l e" . #'eglot-code-actions)))
 
+;;;; Debug adapter integration.
 (use-package dape
   :ensure t
 
