@@ -48,6 +48,9 @@
   (indent-tabs-mode nil)
   ;; TAB key indents and then completes.
   (tab-always-indent 'complete)
+  ;; Slight override to the above: the first press of TAB key
+  ;; completes unless the next character is part of a word.
+  (tab-first-completion 'word)
   ;; Maintain correct appearance of tabs.
   (tab-width 8)
   ;; Hide commands in M-x which do not work in the current mode.
@@ -61,11 +64,7 @@
 
   :init
   ;; Remove some UI elements.
-  (menu-bar-no-scroll-bar)
-  (menu-bar-no-window-divider)
   (menu-bar-mode -1)
-  (scroll-bar-mode -1)
-  (tool-bar-mode -1)
 
   ;; Show line numbers at the beginning of each line.
   (global-display-line-numbers-mode +1)
