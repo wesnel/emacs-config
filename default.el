@@ -898,12 +898,15 @@
 
   :custom
   (python-indent-def-block-scale 1)
+  (python-flymake-command '("@ruff@" "--quiet" "--stdin-filename=stdin" "-"))
 
   :preface
   (defun wgn/python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
-                   '((python-mode python-ts-mode) . ("@pylsp@"))))
+                   '((python-mode python-ts-mode) . ("@pylsp@")))
+      (add-hook 'flymake-diagnostic-functions
+                'python-flymake))
     (eglot-ensure))
 
   :init
