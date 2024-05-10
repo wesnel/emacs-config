@@ -476,18 +476,6 @@
   :init
   (global-devil-mode +1))
 
-;;;; More convenient options for cursor movement.
-(use-package mwim
-  :ensure t
-
-  :commands
-  (mwim-beginning
-   mwim-end)
-
-  :bind
-  (([remap move-beginning-of-line] . #'mwim-beginning)
-   ([remap move-end-of-line] . #'mwim-end)))
-
 (when (display-graphic-p)
   (use-package doc-view
     :init
