@@ -81,10 +81,10 @@
   (size-indication-mode +1)
   (display-time))
 
+;;;; Disable package archives.
 (use-package package
-  :init
-  (add-to-list 'package-archives
-               '("melpa" . "https://melpa.org/packages/")))
+  :custom
+  (package-archives nil))
 
 ;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
