@@ -3,10 +3,50 @@ final: prev:
 {
   wgn-emacs = let
 
-    build-emacs-config = pkgs:
+    # For building an Emacs configuration for non-Nix systems which
+    # are presumed to just have these commands pre-installed.
+    build-deps-dynamic = pkgs:
 
-      let
+      {
+        black = "black";
+        boot = "boot";
+        clojure = "clojure";
+        cssls = "vscode-css-language-server";
+        delta = "delta";
+        gh = "gh";
+        go = "go";
+        godef = "godef";
+        godoc = "go doc";
+        gofumpt = "gofumpt";
+        gopls = "gopls";
+        gs = "gs";
+        hledger = "hledger";
+        htmlls = "vscode-html-language-server";
+        janet = "janet";
+        lein = "lein";
+        macchiato = "black-macchiato";
+        multimarkdown = "multimarkdown";
+        mupdf = "mupdf";
+        nil = "nil";
+        parinfer = "parinfer-rust";
+        pass = "pass";
+        pylsp = "pylsp";
+        rg = "rg";
+        ruff = "ruff";
+        sbcl = "sbcl";
+        terraformls = "terraform-ls";
+        texlab = "texlab";
+        tsxls = "typescript-language-server";
+        yamlls = "yaml-language-server";
+      };
 
+    # For building an Emacs configuration for Nix systems.  These
+    # commands will be automatically installed alongside the Emacs
+    # configuration, and their Nix store paths will be statically
+    # linked in the built Emacs configuration.
+    build-deps-static = pkgs:
+
+      {
         black = let
           pkg = pkgs.black;
         in "${pkg}/bin/black";
@@ -132,12 +172,17 @@ final: prev:
         yamlls = let
           pkg = pkgs.yaml-language-server;
         in "${pkg}/bin/yaml-language-server";
+      };
 
+    build-emacs-config = pkgs: build-deps:
+
+      let
+        deps = build-deps pkgs;
       in pkgs.substituteAll {
         name = "default.el";
         src = ../default.el;
 
-        inherit
+        inherit (deps)
           black
           boot
           clojure
@@ -170,13 +215,13 @@ final: prev:
           yamlls;
       };
 
-    build-emacs = pkgs: emacs:
+    build-emacs = pkgs: build-deps: build-package:
 
       let
-        config = build-emacs-config pkgs;
+        config = build-emacs-config pkgs build-deps;
       in pkgs.emacsWithPackagesFromUsePackage {
         config = config;
-        package = emacs;
+        package = build-package pkgs;
         defaultInitFile = config;
 
         extraEmacsPackages = ePkgs: with ePkgs; [
@@ -363,26 +408,57 @@ final: prev:
         };
       };
 
-    emacs-config = build-emacs-config final;
+    emacs-config = build-emacs-config final build-deps-static;
+    emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
 
-    wgn-emacs = build-emacs final final.emacs;
-    wgn-emacs-nox = build-emacs final final.emacs-nox;
-    wgn-emacs-unstable = build-emacs final final.emacs-unstable;
-    wgn-emacs-unstable-nox = build-emacs final final.emacs-unstable-nox;
-    wgn-emacs-git = build-emacs final final.emacs-git;
-    wgn-emacs-git-nox = build-emacs final final.emacs-git-nox;
-    wgn-emacs-macport = build-emacs final final.emacs29-macport;
+    wgn-emacs = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs);
+
+    wgn-emacs-nox = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs-nox);
+
+    wgn-emacs-unstable = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs-unstable);
+
+    wgn-emacs-unstable-nox = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs-unstable-nox);
+
+    wgn-emacs-git = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs-git);
+
+    wgn-emacs-git-nox = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs-git-nox);
+
+    wgn-emacs-macport = build-emacs
+      final
+      build-deps-static
+      (pkgs: pkgs.emacs29-macport);
 
     # FIXME: My goal is to build a MacOS executable from Linux.
     #        Unfortunately this currently fails with the error:
     #
     # error: don't yet have a `targetPackages.darwin.LibsystemCross for x86_64-apple-darwin`
-    wgn-emacs-macport-cross = build-emacs final.pkgsCross.x86_64-darwin
-      final.pkgsCross.x86_64-darwin.emacs29-macport;
+    wgn-emacs-macport-cross = build-emacs
+      final.pkgsCross.x86_64-darwin
+      build-deps-static
+      (pkgs: pkgs.emacs29-macport);
 
   in rec {
     inherit
       emacs-config
+      emacs-config-dynamic
       wgn-emacs
       wgn-emacs-nox
       wgn-emacs-macport

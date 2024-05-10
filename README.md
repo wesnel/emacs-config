@@ -42,6 +42,8 @@ open ./result/Applications/Emacs.app
 
 ## Just the Configuration File
 
+### Targeting Nix Systems
+
 ``` shell
 nix build github:wesnel/emacs-config#emacs-config
 ```
@@ -51,6 +53,22 @@ Then,
 ``` shell
 cat ./result
 ```
+
+With this method, all external commands referenced in the Emacs configuration will be installed automatically.  The full path to these commands will be statically linked in the Emacs configuration, so as to not pollute your `$PATH`.
+
+### Targeting non-Nix Systems
+
+``` shell
+nix build github:wesnel/emacs-config#emacs-config-dynamic
+```
+
+Then,
+
+``` shell
+cat ./result
+```
+
+With this method, any external commands referenced in the Emacs configuration will fail unless they are manually installed somehow.
 
 # Nix Configuration Module Usage
 
