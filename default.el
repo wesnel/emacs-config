@@ -742,7 +742,8 @@
   (completion-auto-select 'second-tab)
   (completions-sort #'wgn/sort-multi-category)
   (completion-ignore-case t)
-  (read-buffer-completion-ignore-case t))
+  (read-buffer-completion-ignore-case t)
+  (read-file-name-completion-ignore-case t))
 
 ;;;; Rich annotations in the minibuffer completion.
 (use-package marginalia
