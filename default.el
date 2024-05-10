@@ -42,7 +42,6 @@
 ;;;; Miscellaneous Emacs configuration.
 (use-package emacs
   :custom
-  (use-short-answers t)
   (initial-buffer-choice t)
   ;; Place newline at end of file.
   (require-final-newline t)
