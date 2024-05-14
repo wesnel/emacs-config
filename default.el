@@ -91,6 +91,9 @@
 (use-package pinentry
   :ensure t
 
+  :commands
+  (pinentry-start)
+
   :init
   (pinentry-start))
 
