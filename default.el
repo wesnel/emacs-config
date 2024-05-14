@@ -1249,6 +1249,10 @@
   :hook
   ((text-mode prog-mode) . hl-line-mode))
 
+(use-package mml-sec
+  :commands
+  (mml-secure-message-sign))
+
 ;;;; Email client.
 ;;
 ;; NOTE: set the following variables with customize:
