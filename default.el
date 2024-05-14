@@ -112,6 +112,7 @@
     :config
     (dolist (var '("SSH_AUTH_SOCK"
                    "SSH_AGENT_PID"
+                   "GITHUB_TOKEN"
                    "GPG_AGENT_INFO"
                    "GPG_TTY"
                    "LANG"
