@@ -422,7 +422,7 @@
    . wgn/enable-parinfer)
 
   :custom
-  (parinfer-rust-library "@parinfer@"))
+  (parinfer-rust-library @parinfer@))
 
 ;;;; Show matching parentheses.
 (use-package paren

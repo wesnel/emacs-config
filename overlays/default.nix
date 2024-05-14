@@ -28,7 +28,7 @@ final: prev:
         multimarkdown = "multimarkdown";
         mupdf = "mupdf";
         nil = "nil";
-        parinfer = "parinfer-rust";
+        parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
         pass = "pass";
         pylsp = "pylsp";
         rg = "rg";
@@ -129,7 +129,9 @@ final: prev:
 
         parinfer = let
           pkg = pkgs.parinfer-rust;
-        in "${pkg}/lib/libparinfer_rust.so";
+        in ''
+          "${pkg}/lib/libparinfer_rust.so"
+        '';
 
         pass = let
           pkg = pkgs.pass;
