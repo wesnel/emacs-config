@@ -1207,16 +1207,14 @@
    (org-agenda-finalize . org-modern-agenda)))
 
 ;;;; Indicate the git diff in the margin.
-(use-package diff-hl
+(use-package git-gutter
   :ensure t
 
   :commands
-  (diff-hl-margin-mode
-   global-diff-hl-mode)
+  (global-git-gutter-mode)
 
   :init
-  (diff-hl-margin-mode)
-  (global-diff-hl-mode))
+  (global-git-gutter-mode +1))
 
 ;;;; Color scheme.
 (use-package modus-themes
