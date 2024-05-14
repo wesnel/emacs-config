@@ -81,10 +81,11 @@
   (size-indication-mode +1)
   (display-time))
 
-;;;; Disable package archives.
+;;;; Add MELPA to package archives.
 (use-package package
-  :custom
-  (package-archives nil))
+  :init
+  (add-to-list 'package-archives
+               '("melpa" . "https://melpa.org/packages/")))
 
 ;;;; Allow pinentry from within Emacs.
 (use-package pinentry
