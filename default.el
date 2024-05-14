@@ -1043,9 +1043,11 @@
   :preface
   (defun wgn/tsx-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      ;; FIXME: Need to figure out how to change indent size.
+      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
       (add-to-list 'eglot-server-programs
-                   '(tsx-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+                   '(tsx-ts-mode . ("@tsxls@" "--stdio"))))
+
     (eglot-ensure))
 
   :init
@@ -1067,9 +1069,11 @@
   :preface
   (defun wgn/js-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      ;; FIXME: Need to figure out how to change indent size.
+      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
       (add-to-list 'eglot-server-programs
-                   '(js-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+                   '(js-ts-mode . ("@tsxls@" "--stdio"))))
+
     (eglot-ensure))
 
   (defun wgn/js-ts-mode-fix-auto-mode-alist ()
@@ -1109,9 +1113,11 @@
   :preface
   (defun wgn/typescript-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      ;; FIXME: Need to figure out how to change indent size.
+      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
       (add-to-list 'eglot-server-programs
-                   '(typescript-ts-mode . ("@tsxls@" "--stdio")))
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+                   '(typescript-ts-mode . ("@tsxls@" "--stdio"))))
+
     (eglot-ensure))
 
   :init
