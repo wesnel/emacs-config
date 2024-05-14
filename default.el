@@ -350,6 +350,10 @@
 (use-package ijanet-mode
   :ensure t
 
+  ;; TODO: If using a non-Nix configuration, you'll need to point this
+  ;;       towards your local git clone of ijanet-mode.
+  ; :load-path ("~/git/github.com/serialdev/ijanet-mode")
+
   :commands
   (ijanet
    ijanet-eval-buffer
@@ -539,6 +543,10 @@
 ;;;; Structured editing and navigation based on tree-sitter.
 (use-package combobulate
   :ensure t
+
+  ;; TODO: If using a non-Nix configuration, you'll need to point this
+  ;;       towards your local git clone of combobulate.
+  ; :load-path ("~/git/github.com/mickeynp/combobulate")
 
   :hook
   ((python-ts-mode . combobulate-mode)
@@ -788,6 +796,10 @@
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
   :ensure t
+
+  ;; TODO: If using a non-Nix configuration, you'll need to point this
+  ;;       towards your local git clone of elsewhere.
+  ; :load-path ("~/git/github.com/wesnel/elsewhere")
 
   :commands
   (elsewhere-open
