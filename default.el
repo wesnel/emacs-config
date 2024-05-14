@@ -548,6 +548,9 @@
   ;;       towards your local git clone of combobulate.
   ; :load-path ("~/git/github.com/mickeynp/combobulate")
 
+  :custom
+  (combobulate-key-prefix "C-c o")
+
   :hook
   ((python-ts-mode . combobulate-mode)
    (js-ts-mode . combobulate-mode)
