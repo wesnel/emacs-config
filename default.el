@@ -178,6 +178,9 @@
 
 ;;;; Syntax highlighting.
 (use-package treesit
+  :defines
+  (treesit-language-source-alist)
+
   :commands
   (treesit-font-lock-recompute-features)
 
@@ -830,6 +833,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(go "https://github.com/tree-sitter/tree-sitter-go.git" "v0.19.1")))
+
   ;; Open go files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
                '(go-mode . go-ts-mode))
@@ -937,6 +944,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(python "https://github.com/tree-sitter/tree-sitter-python.git")))
+
   ;; Open python files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
                '(python-mode . python-ts-mode))
@@ -976,6 +987,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(yaml . ("https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0"))))
+
   ;; Set up eglot for yaml-mode.
   (add-hook 'yaml-ts-mode-hook #'wgn/yaml-ts-mode-eglot-setup))
 
@@ -1012,6 +1027,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(html . ("https://github.com/tree-sitter/tree-sitter-html" "v0.20.1"))))
+
   ;; Set up eglot for mhtml-mode.
   (add-hook 'mhtml-mode-hook #'wgn/mhtml-mode-eglot-setup))
 
@@ -1030,6 +1049,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(tsx . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "tsx/src"))))
+
   ;; Open JSX files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
                '(js-jsx-mode . tsx-ts-mode))
@@ -1056,6 +1079,10 @@
                  '("\\.jsx\\'" . tsx-ts-mode)))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(javascript ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.20.1" "src"))))
+
   ;; Set up eglot for js-ts-mode.
   (add-hook 'js-ts-mode-hook #'wgn/js-ts-mode-eglot-setup)
 
@@ -1088,6 +1115,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(typescript . ("https://github.com/tree-sitter/tree-sitter-typescript" "v0.20.3" "typescript/src"))))
+
   ;; Set up eglot for typescript-ts-mode.
   (add-hook 'typescript-ts-mode-hook #'wgn/typescript-ts-mode-eglot-setup))
 
@@ -1104,6 +1135,10 @@
     (eglot-ensure))
 
   :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(css . ("https://github.com/tree-sitter/tree-sitter-css" "v0.20.0"))))
+
   ;; Open CSS files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
                '(css-mode . css-ts-mode))
