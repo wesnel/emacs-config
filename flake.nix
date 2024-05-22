@@ -28,14 +28,12 @@
           prev:
 
           {
-            parinfer-rust = prev.parinfer-rust.overrideAttrs (old:
+            parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old:
 
               {
                 # HACK: On Mac, the file has the extension ".dylib",
                 #       but it needs to be ".so":
                 postInstall = ''
-                  ${old.postInstall}
-
                   if [ -e $out/lib/libparinfer_rust.dylib ]
                     then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
                   fi

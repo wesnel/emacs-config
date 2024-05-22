@@ -128,7 +128,7 @@ final: prev:
         in "${pkg}/bin/nil";
 
         parinfer = let
-          pkg = pkgs.parinfer-rust;
+          pkg = pkgs.parinfer-rust-emacs;
         in ''
           "${pkg}/lib/libparinfer_rust.so"
         '';
