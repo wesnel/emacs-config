@@ -87,16 +87,6 @@
   (add-to-list 'package-archives
                '("melpa" . "https://melpa.org/packages/")))
 
-;;;; Allow pinentry from within Emacs.
-(use-package pinentry
-  :ensure t
-
-  :commands
-  (pinentry-start)
-
-  :init
-  (pinentry-start))
-
 ;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
   (use-package exec-path-from-shell
