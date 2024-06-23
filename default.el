@@ -153,12 +153,14 @@
   :diminish whitespace-mode
 
   :preface
-  (defun wgn/set-up-whitespace ()
-    (add-hook 'before-save-hook #'whitespace-cleanup nil t)
+  (defun wgn/clean-up-whitespace ()
+    (add-hook 'before-save-hook #'whitespace-cleanup nil t))
+  (defun wgn/view-whitespace ()
     (whitespace-toggle-options '(lines newline-mark)))
 
   :hook
-  ((text-mode prog-mode) . wgn/set-up-whitespace))
+  ((prog-mode . wgn/clean-up-whitespace)
+   ((prog-mode text-mode) . wgn/view-whitespace)))
 
 ;;;; Support for CamelCase.
 (use-package subword
