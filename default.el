@@ -1428,6 +1428,52 @@ targets."
   ;; Set up eglot for TeX-mode.
   (add-hook 'LaTeX-mode-hook #'wgn/latex-mode-eglot-setup))
 
+;;;; Support for multiple major modes
+(use-package mmm-mode
+  :ensure t
+
+  :commands
+  (mmm-add-classes
+   mmm-add-mode-ext-class)
+
+  :defines
+  (mmm-global-mode
+   mmm-parse-when-idle)
+
+  :preface
+  ; https://jblevins.org/log/mmm
+  (defun wgn/mmm-markdown-auto-class (lang &optional submode)
+   "Define a mmm-mode class for LANG in `markdown-mode' using SUBMODE.
+If SUBMODE is not provided, use `LANG-mode' by default."
+   (let ((class (intern (concat "markdown-" lang)))
+         (submode (or submode (intern (concat lang "-mode"))))
+         (front (concat "^```" lang "[\n\r]+"))
+         (back "^```"))
+     (mmm-add-classes (list (list class :submode submode :front front :back back)))
+     (mmm-add-mode-ext-class 'markdown-mode nil class)))
+
+  :init
+  (setq mmm-global-mode     'maybe
+        mmm-parse-when-idle 't)
+  (mapc #'wgn/mmm-markdown-auto-class
+        '("awk"
+          "bibtex"
+          "c"
+          "cpp"
+          "css"
+          "go"
+          "html"
+          "latex"
+          "lisp"
+          "makefile"
+          "markdown"
+          "python"
+          "r"
+          "ruby"
+          "sql"
+          "stata"
+          "xml")))
+
 ;;;; Markdown support.
 (use-package markdown-mode
   :ensure t
