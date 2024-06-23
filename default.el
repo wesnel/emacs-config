@@ -349,7 +349,8 @@
   :ensure t
 
   ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of ijanet-mode.
+  ;;       towards your local git clone of ijanet-mode.  In this case,
+  ;;       you will also need to remove the `:ensure' line from above.
   ; :load-path ("~/git/github.com/serialdev/ijanet-mode")
 
   :commands
@@ -543,7 +544,8 @@
   :ensure t
 
   ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of combobulate.
+  ;;       towards your local git clone of combobulate.  In this case,
+  ;;       you will also need to remove the `:ensure' line from above.
   ; :load-path ("~/git/github.com/mickeynp/combobulate")
 
   :custom
@@ -799,7 +801,8 @@
   :ensure t
 
   ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of elsewhere.
+  ;;       towards your local git clone of elsewhere.  In this case,
+  ;;       you will also need to remove the `:ensure' line from above.
   ; :load-path ("~/git/github.com/wesnel/elsewhere")
 
   :commands
