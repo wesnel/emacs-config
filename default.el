@@ -97,7 +97,11 @@
     (exec-path-from-shell-initialize)
 
     :defines
-    (exec-path-from-shell-variables)
+    (exec-path-from-shell-arguments
+     exec-path-from-shell-variables)
+
+    :custom
+    (exec-path-from-shell-arguments nil)
 
     :config
     (dolist (var '("SSH_AUTH_SOCK"
