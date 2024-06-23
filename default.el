@@ -693,6 +693,26 @@
   ((eldoc-mode . eldoc-box-hover-at-point-mode)
    (eglot-managed-mode-hook . eldoc-box-hover-at-point-mode)))
 
+;;;; Coding copilot with local model.
+(use-package emacs-copilot
+  :ensure t
+
+  ;; TODO: If using a non-Nix configuration, you'll need to point this
+  ;;       towards your local git clone of emacs-copilot.  In this
+  ;;       case, you will also need to remove the `:ensure' line from
+  ;;       above.
+  ; :load-path ("~/git/github.com/jart/emacs-copilot")
+
+  :bind
+  (:map prog-mode-map
+   ("C-c C-k" . #'copilot-complete))
+
+  :commands
+  (copilot-complete)
+
+  :defines
+  (copilot-bin))
+
 ;;;; Interface for talking to ChatGPT.
 ;;
 ;; NOTE: If you want to actually use ChatGPT, you need to store your

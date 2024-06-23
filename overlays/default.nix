@@ -13,6 +13,7 @@ final: prev:
         clojure = "clojure";
         cssls = "vscode-css-language-server";
         delta = "delta";
+        dlv = "dlv";
         gh = "gh";
         go = "go";
         godef = "godef";
@@ -66,6 +67,10 @@ final: prev:
         delta = let
           pkg = pkgs.delta;
         in "${pkg}/bin/delta";
+
+        dlv = let
+          pkg = pkgs.delve;
+        in "${pkg}/bin/dlv";
 
         gh = let
           pkg = pkgs.gh;
@@ -190,6 +195,7 @@ final: prev:
           clojure
           cssls
           delta
+          dlv
           gh
           go
           godef
@@ -304,6 +310,23 @@ final: prev:
 
             src = pkgs.fetchFromGitHub {
               owner = "wesnel";
+              repo = pname;
+
+              inherit
+                rev
+                sha256;
+            };
+          };
+
+          emacs-copilot = let
+            rev = "c629d3951df88b48bdc47620b33d2588508d73be";
+            sha256 = "0m6by3m1k1jlbjzgh9fkdsnkcydpxvv6jbg644822dkynvirgihm";
+          in ePkgs.trivialBuild rec {
+            pname = "emacs-copilot";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "jart";
               repo = pname;
 
               inherit
