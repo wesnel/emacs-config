@@ -685,14 +685,6 @@
             (lambda ()
               (save-some-buffers t t))))
 
-;;;; Show documentation in a childframe.
-(use-package eldoc-box
-  :ensure t
-
-  :hook
-  ((eldoc-mode . eldoc-box-hover-at-point-mode)
-   (eglot-managed-mode-hook . eldoc-box-hover-at-point-mode)))
-
 ;;;; Coding copilot with local model.
 (use-package emacs-copilot
   :ensure t
