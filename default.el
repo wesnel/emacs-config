@@ -1443,6 +1443,7 @@ targets."
 ;;;; Support for multiple major modes
 (use-package mmm-mode
   :ensure t
+  :demand t
 
   :commands
   (mmm-add-classes
