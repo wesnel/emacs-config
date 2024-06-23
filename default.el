@@ -836,7 +836,9 @@
   :init
   (with-eval-after-load 'treesit
     (add-to-list 'treesit-language-source-alist
-                 '(go "https://github.com/tree-sitter/tree-sitter-go.git" "v0.19.1")))
+                 '(go "https://github.com/tree-sitter/tree-sitter-go.git" "v0.20.0"))
+    (add-to-list 'treesit-language-source-alist
+                 '(gomod "https://github.com/camdencheek/tree-sitter-go-mod.git" "v1.0.2")))
 
   ;; Open go files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
