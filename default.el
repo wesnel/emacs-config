@@ -166,6 +166,13 @@
 (use-package subword
   :diminish subword-mode)
 
+;;;; Simplify repeated calling of related commands.
+(use-package repeat
+  :diminish repeat-mode
+
+  :init
+  (repeat-mode +1))
+
 ;;;; Navigate code based on an outline.
 (use-package outline
   :diminish outline-minor-mode
