@@ -1533,16 +1533,8 @@ If SUBMODE is not provided, use `LANG-mode' by default."
   :bind
   (("C-c m" . #'notmuch-hello)))
 
-;;;; Transient interface for notmuch commands.
-(use-package notmuch-transient
-  :ensure t)
-
 ;;;; Link between org-mode and notmuch buffers.
 (use-package ol-notmuch
-  :ensure t)
-
-;;;; Adds various transient interfaces.
-(use-package tray
   :ensure t)
 
 ;;;; Monitor and act upon system processes.
