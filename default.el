@@ -345,6 +345,15 @@
   :custom
   (magit-delta-delta-executable "@delta@"))
 
+;;;; Dockerfile support.
+(use-package dockerfile-ts-mode
+  :mode "\\Dockerfile\\'"
+
+  :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(dockerfile "https://github.com/camdencheek/tree-sitter-dockerfile.git" "v0.2.0"))))
+
 ;;;; Janet support.
 (use-package janet-mode
   :ensure t
