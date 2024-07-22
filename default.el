@@ -114,6 +114,7 @@
                    "NIX_SSL_CERT_FILE"
                    "NIX_PATH"
                    "NVM_DIR"
+                   "NVM_BIN"
                    "PASSWORD_STORE_DIR"
                    "PASSWORD_STORE_KEY"
                    "PASSWORD_STORE_SIGNING_KEY"))
