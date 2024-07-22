@@ -24,6 +24,7 @@ final: prev:
         hledger = "hledger";
         htmlls = "vscode-html-language-server";
         janet = "janet";
+        jsonls = "vscode-json-language-server";
         lein = "lein";
         macchiato = "black-macchiato";
         multimarkdown = "multimarkdown";
@@ -111,6 +112,10 @@ final: prev:
         janet = let
           pkg = pkgs.janet;
         in "${pkg}/bin/janet";
+
+        jsonls = let
+          pkg = pkgs.vscode-langservers-extracted;
+        in "${pkg}/bin/vscode-json-language-server";
 
         lein = let
           pkg = pkgs.leiningen;
@@ -206,6 +211,7 @@ final: prev:
           hledger
           htmlls
           janet
+          jsonls
           lein
           macchiato
           multimarkdown

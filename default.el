@@ -1268,6 +1268,30 @@ targets."
   ;; Set up eglot for typescript-ts-mode.
   (add-hook 'typescript-ts-mode-hook #'wgn/typescript-ts-mode-eglot-setup))
 
+;;;; JSON support.
+(use-package json-ts-mode
+  :mode "\\.json\\'"
+
+  :preface
+  (defun wgn/json-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(json-ts-mode . ("@jsonls@" "--stdio"))))
+
+    (eglot-ensure))
+
+  :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(json . ("https://github.com/tree-sitter/tree-sitter-json" "v0.21.0"))))
+
+  ;; Open JSON files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(js-json-mode . json-ts-mode))
+
+  ;; Set up eglot for json-ts-mode.
+  (add-hook 'json-ts-mode-hook #'wgn/json-ts-mode-eglot-setup))
+
 ;;;; CSS support.
 (use-package css-ts-mode
   :defer t
