@@ -1388,14 +1388,16 @@ targets."
   :preface
   ; https://jblevins.org/log/mmm
   (defun wgn/mmm-markdown-auto-class (lang &optional submode)
-   "Define a mmm-mode class for LANG in `markdown-mode' using SUBMODE.
+   "Define a mmm-mode class for LANG in markdown modes using SUBMODE.
 If SUBMODE is not provided, use `LANG-mode' by default."
    (let ((class (intern (concat "markdown-" lang)))
          (submode (or submode (intern (concat lang "-mode"))))
          (front (concat "^```" lang "[\n\r]+"))
          (back "^```"))
      (mmm-add-classes (list (list class :submode submode :front front :back back)))
-     (mmm-add-mode-ext-class 'markdown-mode nil class)))
+     (mapc (lambda (mode) (mmm-add-mode-ext-class mode nil class))
+           '(markdown-mode
+             gfm-mode))))
 
   :init
   (setq mmm-global-mode     'maybe
