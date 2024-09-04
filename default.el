@@ -1360,55 +1360,6 @@ targets."
   ;; Set up eglot for TeX-mode.
   (add-hook 'LaTeX-mode-hook #'wgn/latex-mode-eglot-setup))
 
-;;;; Support for multiple major modes
-(use-package mmm-mode
-  :ensure t
-  :demand t
-
-  :commands
-  (mmm-add-classes
-   mmm-add-mode-ext-class)
-
-  :defines
-  (mmm-global-mode
-   mmm-parse-when-idle)
-
-  :preface
-  ; https://jblevins.org/log/mmm
-  (defun wgn/mmm-markdown-auto-class (lang &optional submode)
-   "Define a mmm-mode class for LANG in markdown modes using SUBMODE.
-If SUBMODE is not provided, use `LANG-mode' by default."
-   (let ((class (intern (concat "markdown-" lang)))
-         (submode (or submode (intern (concat lang "-mode"))))
-         (front (concat "^```" lang "[\n\r]+"))
-         (back "^```"))
-     (mmm-add-classes (list (list class :submode submode :front front :back back)))
-     (mapc (lambda (mode) (mmm-add-mode-ext-class mode nil class))
-           '(markdown-mode
-             gfm-mode))))
-
-  :init
-  (setq mmm-global-mode     'maybe
-        mmm-parse-when-idle 't)
-  (mapc #'wgn/mmm-markdown-auto-class
-        '("awk"
-          "bibtex"
-          "c"
-          "cpp"
-          "css"
-          "go"
-          "html"
-          "latex"
-          "lisp"
-          "makefile"
-          "markdown"
-          "python"
-          "r"
-          "ruby"
-          "sql"
-          "stata"
-          "xml")))
-
 ;;;; Markdown support.
 (use-package markdown-mode
   :ensure t
@@ -1417,7 +1368,8 @@ If SUBMODE is not provided, use `LANG-mode' by default."
   (markdown-do)
 
   :defines
-  (markdown-mode-map)
+  (markdown-mode-map
+   markdown-fontify-code-blocks-natively)
 
   :mode
   (("README\\.\\(?:md\\|markdown\\|mkd\\|mdown\\|mkdn\\|mdwn\\)\\'" . gfm-mode)
@@ -1428,7 +1380,8 @@ If SUBMODE is not provided, use `LANG-mode' by default."
    ("C-c C-e" . #'markdown-do))
 
   :custom
-  (markdown-command "@multimarkdown@"))
+  (markdown-command "@multimarkdown@")
+  (markdown-fontify-code-blocks-natively t))
 
 ;;;; Generate table of contents in markdown files.
 (use-package markdown-toc
