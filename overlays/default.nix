@@ -8,7 +8,7 @@ final: prev:
     build-deps-dynamic = pkgs:
 
       {
-        black = "black";
+        asdf = "asdf";
         boot = "boot";
         clojure = "clojure";
         cssls = "vscode-css-language-server";
@@ -26,15 +26,14 @@ final: prev:
         janet = "janet";
         jsonls = "vscode-json-language-server";
         lein = "lein";
-        macchiato = "black-macchiato";
         multimarkdown = "multimarkdown";
         mupdf = "mupdf";
         nil = "nil";
         parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
         pass = "pass";
+        poetry = "poetry";
         pylsp = "pylsp";
         rg = "rg";
-        ruff = "ruff";
         sbcl = "sbcl";
         terraformls = "terraform-ls";
         texlab = "texlab";
@@ -49,9 +48,9 @@ final: prev:
     build-deps-static = pkgs:
 
       {
-        black = let
-          pkg = pkgs.black;
-        in "${pkg}/bin/black";
+        asdf = let
+          pkg = pkgs.asdf-vm;
+        in "${pkg}/bin/asdf";
 
         boot = let
           pkg = pkgs.boot;
@@ -121,10 +120,6 @@ final: prev:
           pkg = pkgs.leiningen;
         in "${pkg}/bin/lein";
 
-        macchiato = let
-          pkg = pkgs.black-macchiato;
-        in "${pkg}/bin/black-macchiato";
-
         multimarkdown = let
           pkg = pkgs.multimarkdown;
         in "${pkg}/bin/multimarkdown";
@@ -147,12 +142,17 @@ final: prev:
           pkg = pkgs.pass;
         in "${pkg}/bin/pass";
 
+        poetry = let
+          pkg = pkgs.poetry;
+        in "${pkg}/bin/poetry";
+
         pylsp = let
 
           pkg = pkgs.python3.withPackages (p:
 
             with p; [
               python-lsp-server
+              python-lsp-ruff
             ]);
 
         in "${pkg}/bin/pylsp";
@@ -160,10 +160,6 @@ final: prev:
         rg = let
           pkg = pkgs.ripgrep;
         in "${pkg}/bin/rg";
-
-        ruff = let
-          pkg = pkgs.ruff;
-        in "${pkg}/bin/ruff";
 
         sbcl = let
           pkg = pkgs.sbcl;
@@ -195,7 +191,7 @@ final: prev:
         src = ../default.el;
 
         inherit (deps)
-          black
+          asdf
           boot
           clojure
           cssls
@@ -213,15 +209,14 @@ final: prev:
           janet
           jsonls
           lein
-          macchiato
           multimarkdown
           mupdf
           nil
           parinfer
           pass
+          poetry
           pylsp
           rg
-          ruff
           sbcl
           terraformls
           texlab

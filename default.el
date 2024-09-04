@@ -106,20 +106,24 @@
     (exec-path-from-shell-arguments nil)
 
     :config
-    (dolist (var '("SSH_AUTH_SOCK"
-                   "SSH_AGENT_PID"
+    (dolist (var '("ARTIFACTORY_PYPI_PASSWORD"
+                   "ARTIFACTORY_PYPI_USERNAME"
                    "GITHUB_TOKEN"
                    "GPG_AGENT_INFO"
                    "GPG_TTY"
                    "LANG"
                    "LC_CTYPE"
-                   "NIX_SSL_CERT_FILE"
                    "NIX_PATH"
-                   "NVM_DIR"
+                   "NIX_SSL_CERT_FILE"
                    "NVM_BIN"
+                   "NVM_DIR"
                    "PASSWORD_STORE_DIR"
                    "PASSWORD_STORE_KEY"
-                   "PASSWORD_STORE_SIGNING_KEY"))
+                   "PASSWORD_STORE_SIGNING_KEY"
+                   "POETRY_HTTP_BASIC_SHIPT_RESOLVE_PASSWORD"
+                   "POETRY_HTTP_BASIC_SHIPT_RESOLVE_USERNAME"
+                   "SSH_AGENT_PID"
+                   "SSH_AUTH_SOCK"))
           (add-to-list 'exec-path-from-shell-variables var)
 
         (exec-path-from-shell-initialize))))
@@ -1039,25 +1043,6 @@ targets."
    go-test-current-benchmark
    go-run))
 
-;;;; Support for the Python Black code formatter.
-(use-package python-black
-  :ensure t
-
-  :commands
-  (python-black-on-save-mode-enable-dwim
-   python-black-buffer
-   python-black-region
-   python-black-statement
-   python-black-partial-dwim
-   python-black-org-mode-block)
-
-  :hook
-  (python-base-mode . python-black-on-save-mode-enable-dwim)
-
-  :custom
-  (python-black-command "@black@")
-  (python-black-macchiato-command "@macchiato@"))
-
 ;;;; Python support.
 ;;
 ;; NOTE: `:pylsp' needs to be configured using a directory-local
@@ -1075,15 +1060,15 @@ targets."
 
   :custom
   (python-indent-def-block-scale 1)
-  (python-flymake-command '("@ruff@" "--quiet" "--stdin-filename=stdin" "-"))
 
   :preface
   (defun wgn/python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
-                   '((python-mode python-ts-mode) . ("@pylsp@")))
-      (add-hook 'flymake-diagnostic-functions
-                'python-flymake))
+                   `((python-mode python-ts-mode) .
+                     ,(eglot-alternatives '(("@asdf@" "exec" "poetry" "run" "pylsp")
+                                            ("@poetry@" "run" "pylsp")
+                                            "@pylsp@")))))
     (eglot-ensure))
 
   :init
