@@ -1068,7 +1068,8 @@ targets."
                    `((python-mode python-ts-mode) .
                      ,(eglot-alternatives '(("@asdf@" "exec" "poetry" "run" "pylsp")
                                             ("@poetry@" "run" "pylsp")
-                                            "@pylsp@")))))
+                                            "@pylsp@"))))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
