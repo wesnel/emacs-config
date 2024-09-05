@@ -1214,7 +1214,7 @@ targets."
   :init
   (with-eval-after-load 'treesit
     (add-to-list 'treesit-language-source-alist
-                 '(javascript ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.20.1" "src"))))
+                 '(javascript . ("https://github.com/tree-sitter/tree-sitter-javascript" "v0.20.1" "src"))))
 
   ;; Set up eglot for js-ts-mode.
   (add-hook 'js-ts-mode-hook #'wgn/js-ts-mode-eglot-setup)
