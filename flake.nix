@@ -34,6 +34,8 @@
                 # HACK: On Mac, the file has the extension ".dylib",
                 #       but it needs to be ".so":
                 postInstall = ''
+                  ${old.postInstall or ""}
+
                   if [ -e $out/lib/libparinfer_rust.dylib ]
                     then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
                   fi
