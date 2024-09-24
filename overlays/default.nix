@@ -201,6 +201,7 @@ final: prev:
           clojure
           cssls
           delta
+          direnv
           dlv
           gh
           go
