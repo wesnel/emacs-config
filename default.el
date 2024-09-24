@@ -666,7 +666,8 @@
       (eglot-format-buffer)))
 
   :defines
-  (eglot-server-programs
+  (eglot-alternatives
+   eglot-server-programs
    eglot-workspace-configuration)
 
   :commands
@@ -947,9 +948,6 @@ targets."
   :preface
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'exec-path "@go@")
-      (add-to-list 'eglot-server-programs
-                   '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1031,14 +1029,7 @@ targets."
   :hook
   (go-ts-mode . (lambda ()
                   (require 'go-mode)
-                  (add-hook 'before-save-hook #'wgn/apply-gofmt t t)))
-
-  :custom
-  (go-command "@go@")
-  (godoc-command "@godoc@")
-  (gofmt-command "@gofumpt@")
-  (godef-command "@godef@")
-  (godoc-and-godef-command "@godoc@"))
+                  (add-hook 'before-save-hook #'wgn/apply-gofmt t t))))
 
 ;;;; Run Golang tests.
 (use-package gotest
