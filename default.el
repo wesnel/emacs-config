@@ -940,6 +940,7 @@ targets."
   :preface
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      (add-to-list 'exec-path "@go@")
       (add-to-list 'eglot-server-programs
                    '((go-ts-mode go-mod-ts-mode) . ("@gopls@")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
