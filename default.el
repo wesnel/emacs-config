@@ -917,7 +917,10 @@ targets."
   :ensure t
 
   :hook
-  (after-init . envrc-global-mode))
+  (after-init . envrc-global-mode)
+
+  :custom
+  (envrc-direnv-executable "@direnv@"))
 
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere

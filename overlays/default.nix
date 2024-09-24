@@ -13,6 +13,7 @@ final: prev:
         clojure = "clojure";
         cssls = "vscode-css-language-server";
         delta = "delta";
+        direnv = "direnv";
         dlv = "dlv";
         gh = "gh";
         go = "go";
@@ -67,6 +68,10 @@ final: prev:
         delta = let
           pkg = pkgs.delta;
         in "${pkg}/bin/delta";
+
+        direnv = let
+          pkg = pkgs.direnv;
+        in "${pkg}/bin/direnv";
 
         dlv = let
           pkg = pkgs.delve;
