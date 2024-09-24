@@ -911,6 +911,13 @@ targets."
    ("C-h x" . #'helpful-command)
    ("C-c C-d" . #'helpful-at-point)))
 
+;;;; Use project-local dependencies
+(use-package envrc
+  :ensure t
+
+  :hook
+  (after-init . envrc-global-mode))
+
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
   :ensure t
