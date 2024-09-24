@@ -9,37 +9,15 @@ final: prev:
 
       {
         asdf = "asdf";
-        boot = "boot";
-        clojure = "clojure";
-        cssls = "vscode-css-language-server";
         delta = "delta";
         direnv = "direnv";
-        dlv = "dlv";
-        gh = "gh";
-        go = "go";
-        godef = "godef";
-        godoc = "go doc";
-        gofumpt = "gofumpt";
-        gopls = "gopls";
         gs = "gs";
         hledger = "hledger";
-        htmlls = "vscode-html-language-server";
-        janet = "janet";
-        jsonls = "vscode-json-language-server";
-        lein = "lein";
         multimarkdown = "multimarkdown";
         mupdf = "mupdf";
-        nil = "nil";
         parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
         pass = "pass";
-        poetry = "poetry";
-        pylsp = "pylsp";
         rg = "rg";
-        sbcl = "sbcl";
-        terraformls = "terraform-ls";
-        texlab = "texlab";
-        tsxls = "typescript-language-server";
-        yamlls = "yaml-language-server";
       };
 
     # For building an Emacs configuration for Nix systems.  These
@@ -53,18 +31,6 @@ final: prev:
           pkg = pkgs.asdf-vm;
         in "${pkg}/bin/asdf";
 
-        boot = let
-          pkg = pkgs.boot;
-        in "${pkg}/bin/boot";
-
-        clojure = let
-          pkg = pkgs.clojure;
-        in "${pkg}/bin/clojure";
-
-        cssls = let
-          pkg = pkgs.vscode-langservers-extracted;
-        in "${pkg}/bin/vscode-css-language-server";
-
         delta = let
           pkg = pkgs.delta;
         in "${pkg}/bin/delta";
@@ -72,34 +38,6 @@ final: prev:
         direnv = let
           pkg = pkgs.direnv;
         in "${pkg}/bin/direnv";
-
-        dlv = let
-          pkg = pkgs.delve;
-        in "${pkg}/bin/dlv";
-
-        gh = let
-          pkg = pkgs.gh;
-        in "${pkg}/bin";
-
-        go = let
-          pkg = pkgs.go;
-        in "${pkg}/bin/go";
-
-        godef = let
-          pkg = pkgs.godef;
-        in "${pkg}/bin/godef";
-
-        godoc = let
-          pkg = pkgs.go;
-        in "${pkg}/bin/go doc";
-
-        gofumpt = let
-          pkg = pkgs.gofumpt;
-        in "${pkg}/bin/gofumpt";
-
-        gopls = let
-          pkg = pkgs.gopls;
-        in "${pkg}/bin/gopls";
 
         gs = let
           pkg = pkgs.ghostscript;
@@ -109,22 +47,6 @@ final: prev:
           pkg = pkgs.hledger;
         in "${pkg}/bin";
 
-        htmlls = let
-          pkg = pkgs.vscode-langservers-extracted;
-        in "${pkg}/bin/vscode-html-language-server";
-
-        janet = let
-          pkg = pkgs.janet;
-        in "${pkg}/bin/janet";
-
-        jsonls = let
-          pkg = pkgs.vscode-langservers-extracted;
-        in "${pkg}/bin/vscode-json-language-server";
-
-        lein = let
-          pkg = pkgs.leiningen;
-        in "${pkg}/bin/lein";
-
         multimarkdown = let
           pkg = pkgs.multimarkdown;
         in "${pkg}/bin/multimarkdown";
@@ -132,10 +54,6 @@ final: prev:
         mupdf = let
           pkg = pkgs.mupdf;
         in "${pkg}/bin";
-
-        nil = let
-          pkg = pkgs.nil;
-        in "${pkg}/bin/nil";
 
         parinfer = let
           pkg = pkgs.parinfer-rust-emacs;
@@ -147,44 +65,9 @@ final: prev:
           pkg = pkgs.pass;
         in "${pkg}/bin/pass";
 
-        poetry = let
-          pkg = pkgs.poetry;
-        in "${pkg}/bin/poetry";
-
-        pylsp = let
-
-          pkg = pkgs.python3.withPackages (p:
-
-            with p; [
-              python-lsp-server
-              python-lsp-ruff
-            ]);
-
-        in "${pkg}/bin/pylsp";
-
         rg = let
           pkg = pkgs.ripgrep;
         in "${pkg}/bin/rg";
-
-        sbcl = let
-          pkg = pkgs.sbcl;
-        in "${pkg}/bin/sbcl";
-
-        terraformls = let
-          pkg = pkgs.terraform-ls;
-        in "${pkg}/bin/terraform-ls";
-
-        texlab = let
-          pkg = pkgs.texlab;
-        in "${pkg}/bin/texlab";
-
-        tsxls = let
-          pkg = pkgs.nodePackages.typescript-language-server;
-        in "${pkg}/bin/typescript-language-server";
-
-        yamlls = let
-          pkg = pkgs.yaml-language-server;
-        in "${pkg}/bin/yaml-language-server";
       };
 
     build-emacs-config = pkgs: build-deps:
@@ -197,37 +80,15 @@ final: prev:
 
         inherit (deps)
           asdf
-          boot
-          clojure
-          cssls
           delta
           direnv
-          dlv
-          gh
-          go
-          godef
-          godoc
-          gofumpt
-          gopls
           gs
           hledger
-          htmlls
-          janet
-          jsonls
-          lein
           multimarkdown
           mupdf
-          nil
           parinfer
           pass
-          poetry
-          pylsp
-          rg
-          sbcl
-          terraformls
-          texlab
-          tsxls
-          yamlls;
+          rg;
       };
 
     build-emacs = pkgs: build-deps: build-package:

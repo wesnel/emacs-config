@@ -389,10 +389,7 @@
    ("C-c C-p" . #'ijanet)
    ("C-c C-b" . #'ijanet-eval-buffer)
    ("C-c C-l" . #'ijanet-eval-line)
-   ("C-c C-r" . #'ijanet-eval-region))
-
-  :custom
-  (ijanet-program "@janet@"))
+   ("C-c C-r" . #'ijanet-eval-region)))
 
 ;;;; Clojure support.
 (use-package clojure-mode
@@ -413,12 +410,7 @@
   :ensure t
 
   :commands
-  (cider-jack-in)
-
-  :custom
-  (cider-lein-command "@lein@")
-  (cider-clojure-cli-command "@clojure@")
-  (cider-boot-command "@boot@"))
+  (cider-jack-in))
 
 ;;;; Interactive Lisp development.
 (use-package slime
@@ -426,10 +418,7 @@
 
   :commands
   (slime
-   slime-eval-buffer)
-
-  :custom
-  (inferior-lisp-program "@sbcl@"))
+   slime-eval-buffer))
 
 ;;;; Automatically manage parentheses in Lisps.
 (use-package parinfer-rust-mode
@@ -979,7 +968,7 @@ targets."
      modes (go-mode go-ts-mode)
      ensure dape-ensure-command
      fn dape-config-autoport
-     command "@dlv@"
+     command "dlv"
      command-args ("dap" "--listen" "127.0.0.1::autoport")
      command-cwd dape-cwd-fn
      port :autoport
@@ -1069,8 +1058,8 @@ targets."
       (add-to-list 'eglot-server-programs
                    `((python-mode python-ts-mode) .
                      ,(eglot-alternatives '(("@asdf@" "exec" "poetry" "run" "pylsp")
-                                            ("@poetry@" "run" "pylsp")
-                                            "@pylsp@"))))
+                                            ("poetry" "run" "pylsp")
+                                            "pylsp"))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1094,8 +1083,6 @@ targets."
   :preface
   (defun wgn/nix-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(nix-mode . ("@nil@")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1112,8 +1099,6 @@ targets."
   :preface
   (defun wgn/yaml-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(yaml-ts-mode . ("@yamlls@" "--stdio")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1133,8 +1118,6 @@ targets."
   :preface
   (defun wgn/terraform-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(terraform-mode . ("@terraformls@" "serve")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1152,8 +1135,6 @@ targets."
   :preface
   (defun wgn/mhtml-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(mhtml-mode . ("@htmlls@" "--stdio")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1173,12 +1154,10 @@ targets."
 
   :preface
   (defun wgn/tsx-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   '(tsx-ts-mode . ("@tsxls@" "--stdio"))))
-
+    ;; FIXME: Need to figure out how to change indent size.
+    ;;
+    ;; (with-eval-after-load 'eglot
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1199,12 +1178,10 @@ targets."
 
   :preface
   (defun wgn/js-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   '(js-ts-mode . ("@tsxls@" "--stdio"))))
-
+    ;; FIXME: Need to figure out how to change indent size.
+    ;;
+    ;; (with-eval-after-load 'eglot
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   (defun wgn/js-ts-mode-fix-auto-mode-alist ()
@@ -1243,11 +1220,10 @@ targets."
 
   :preface
   (defun wgn/typescript-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   '(typescript-ts-mode . ("@tsxls@" "--stdio"))))
+    ;; FIXME: Need to figure out how to change indent size.
+    ;;
+    ;; (with-eval-after-load 'eglot
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
 
     (eglot-ensure))
 
@@ -1265,10 +1241,6 @@ targets."
 
   :preface
   (defun wgn/json-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(json-ts-mode . ("@jsonls@" "--stdio"))))
-
     (eglot-ensure))
 
   :init
@@ -1290,8 +1262,6 @@ targets."
   :preface
   (defun wgn/css-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '(css-ts-mode . ("@cssls@" "--stdio")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
@@ -1341,8 +1311,6 @@ targets."
   :preface
   (defun wgn/latex-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   '((LaTeX-mode tex-mode context-mode texinfo-mode bibtex-mode) . ("@texlab@")))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 

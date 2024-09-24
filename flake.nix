@@ -58,6 +58,20 @@
       });
 
     in {
+      devShells = forAllSystems (system:
+
+        let
+
+          pkgs = nixpkgsFor.${system};
+
+        in {
+          default = pkgs.mkShell {
+            buildInputs = with pkgs; [
+              nil
+            ];
+          };
+        });
+
       packages = forAllSystems (system:
 
         let
