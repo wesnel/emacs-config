@@ -655,12 +655,12 @@
       (eglot-format-buffer)))
 
   :defines
-  (eglot-alternatives
-   eglot-server-programs
+  (eglot-server-programs
    eglot-workspace-configuration)
 
   :commands
   (eglot
+   eglot-alternatives
    eglot-ensure
    eglot-rename
    eglot-find-implementation
