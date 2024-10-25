@@ -89,6 +89,17 @@
   (add-to-list 'package-archives
                '("melpa" . "https://melpa.org/packages/")))
 
+;;;; Note taking, time tracking, etc.
+(use-package org
+  :ensure t
+
+  :custom
+  (org-catch-invisible-edits 'show-and-error)
+  (org-special-ctrl-a/e t)
+  (org-insert-heading-respect-content t)
+  (org-hide-emphasis-markers t)
+  (org-pretty-entities t))
+
 ;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
   (use-package exec-path-from-shell
@@ -1276,17 +1287,6 @@ targets."
 
   ;; Set up eglot for css-ts-mode.
   (add-hook 'css-ts-mode-hook #'wgn/css-ts-mode-eglot-setup))
-
-;;;; Note taking, time tracking, etc.
-(use-package org
-  :ensure t
-
-  :custom
-  (org-catch-invisible-edits 'show-and-error)
-  (org-special-ctrl-a/e t)
-  (org-insert-heading-respect-content t)
-  (org-hide-emphasis-markers t)
-  (org-pretty-entities t))
 
 ;;;; Send HTTP requests from org-mode.
 (use-package ob-restclient
