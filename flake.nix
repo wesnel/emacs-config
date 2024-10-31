@@ -22,12 +22,15 @@
     flake-utils,
     ...
   }: let
-    default = import ./overlays;
+    default = import ./overlays {
+      inherit
+        emacs-overlay
+        ;
+    };
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
         overlays = [
-          (import emacs-overlay)
           default
         ];
 

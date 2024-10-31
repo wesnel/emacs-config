@@ -1,4 +1,4 @@
-final: prev: let
+{emacs-overlay}: final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
@@ -365,6 +365,10 @@ final: prev: let
     build-deps-static
     (pkgs: pkgs.emacs29-macport);
 in {
+  imports = [
+    emacs-overlay
+  ];
+
   inherit
     emacs-config
     emacs-config-dynamic
