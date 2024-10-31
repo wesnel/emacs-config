@@ -114,15 +114,12 @@ With this method, any external commands referenced in the Emacs configuration wi
 
             {
               nixpkgs.overlays = [
-                (final: prev:
-
-                  {
-                    emacs = emacs-config.packages.${system}.wgn-emacs-unstable; # (2)
-                  })
+                emacs-config.overlays.default
+                emacs-config.overlays.emacs # (2)
               ];
             })
 
-          emacs-config.nixosModules.nixos # (3)
+          emacs-config.nixosModules.default # (3)
 
           home-manager.nixosModules.home-manager {
             home-manager = {
@@ -131,7 +128,7 @@ With this method, any external commands referenced in the Emacs configuration wi
 
                   {
                     imports = [
-                      emacs-config.nixosModules.home # (4)
+                      emacs-config.homeManagerModules.default # (4)
                     ];
                   };
               };
@@ -191,15 +188,12 @@ This flake is also compatible with MacOS systems using [nix-darwin](https://gith
 
             {
               nixpkgs.overlays = [
-                (final: prev:
-
-                  {
-                    emacs = emacs-config.packages.${system}.wgn-emacs-unstable; # (2)
-                  })
+                emacs-config.overlays.default
+                emacs-config.overlays.emacs # (2)
               ];
             })
 
-          emacs-config.nixosModules.nixos # (3)
+          emacs-config.nixosModules.default # (3)
 
           home-manager.darwinModules.home-manager {
             home-manager = {
@@ -208,7 +202,7 @@ This flake is also compatible with MacOS systems using [nix-darwin](https://gith
 
                   {
                     imports = [
-                      emacs-config.nixosModules.home # (4)
+                      emacs-config.homeManagerModules.default # (4)
                     ];
                   };
               };
