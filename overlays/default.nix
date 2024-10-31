@@ -1,4 +1,4 @@
-{emacs-overlay}: final: prev: let
+final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
@@ -377,4 +377,4 @@ in {
     wgn-emacs-git
     wgn-emacs-git-nox
     ;
-} // (import emacs-overlay final prev)
+}
