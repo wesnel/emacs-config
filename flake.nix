@@ -88,8 +88,8 @@
         };
       };
 
-      nixosModules = {
-        home = {
+      homeManagerModules = {
+        default = {
           config,
           lib,
           ...
@@ -108,8 +108,10 @@
             };
           };
         };
+      };
 
-        nixos = {
+      nixosModules = {
+        default = {
           config,
           lib,
           pkgs,
