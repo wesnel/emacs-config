@@ -67,7 +67,7 @@ final: prev: let
   in
     pkgs.substituteAll {
       name = "default.el";
-      src = ../default.el;
+      src = ../.emacs.el;
 
       inherit
         (deps)

@@ -1,6 +1,6 @@
-;;; default.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
+;;; .emacs.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2023 Wesley Nelson
+;; Copyright (C) 2024 Wesley Nelson
 
 ;; Author: Wesley Nelson <wgn@wesnel.dev>
 ;; Maintainer: Wesley Nelson <wgn@wesnel.dev>
@@ -1569,6 +1569,6 @@ targets."
   :hook
   ((hledger-mode . flymake-hledger-enable)))
 
-(provide 'default)
+(provide '.emacs)
 
-;;; default.el ends here
+;;; .emacs.el ends here
