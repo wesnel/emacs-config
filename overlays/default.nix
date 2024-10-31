@@ -365,10 +365,6 @@
     build-deps-static
     (pkgs: pkgs.emacs29-macport);
 in {
-  imports = [
-    emacs-overlay
-  ];
-
   inherit
     emacs-config
     emacs-config-dynamic
@@ -381,4 +377,4 @@ in {
     wgn-emacs-git
     wgn-emacs-git-nox
     ;
-}
+} // (import emacs-overlay final prev)
