@@ -147,6 +147,14 @@
   :init
   (auth-source-pass-enable))
 
+;;;; Automatically encrypt and decrypt files.
+(use-package epa-file
+  :commands
+  (epa-file-enable)
+
+  :init
+  (epa-file-enable))
+
 ;;;; Avoid putting files in weird places.
 (use-package no-littering
   :ensure t
