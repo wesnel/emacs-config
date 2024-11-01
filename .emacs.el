@@ -240,11 +240,6 @@
                                    (kill-ring (styles . (emacs22 orderless)))
                                    (eglot (styles . (emacs22 substring orderless))))))
 
-;;;; Move between windows.
-(use-package window
-  :bind
-  (("M-o" . #'other-window)))
-
 ;;;; Open directory as buffer.
 (use-package dired
   :custom
