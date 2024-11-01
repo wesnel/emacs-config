@@ -113,9 +113,11 @@
           config = lib.mkIf cfg.enable {
             home = {
               file = {
-                ".emacs.d/etc/gnus/init.el".source = lib.mkIf cfg.gnus.enable pkgs.substituteAll {
-                  name = ".gnus.el";
-                  src = ./.gnus.el;
+                ".emacs.d/etc/gnus/init.el" = lib.mkIf cfg.gnus.enable {
+                  source = pkgs.substituteAll {
+                    name = ".gnus.el";
+                    src = ./.gnus.el;
+                  };
                 };
 
                 ".emacs.d/early-init.el".source = ./early-init.el;
