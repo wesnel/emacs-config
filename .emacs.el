@@ -815,7 +815,9 @@
   :ensure t
 
   :defines
-  (embark-indicators)
+  (embark-indicators
+   embark-highlight-indicator
+   embark-isearch-highlight-indicator)
 
   :commands
   (embark-act
@@ -838,6 +840,10 @@
   ;; Show the Embark target at point via Eldoc:
   (add-hook 'eldoc-documentation-functions #'embark-eldoc-first-target)
   (setq eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)
+
+  ;; Set up indicator strategy:
+  (setq embark-indicators '(embark-highlight-indicator
+                            embark-isearch-highlight-indicator))
 
   :config
   ;; Hide the mode line of the Embark live/completions buffers:
