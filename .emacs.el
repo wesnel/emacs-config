@@ -559,19 +559,6 @@
   :init
   (selected-global-mode +1))
 
-;;;; Edit text with multiple cursors.
-(use-package multiple-cursors
-  :ensure t
-
-  :commands
-  (mc/mark-all-like-this
-   mc/add-cursor-on-click)
-
-  :bind
-  (("C-S-<mouse-1>" . #'mc/add-cursor-on-click)
-   :map selected-keymap
-   ("C-x c" . #'mc/mark-all-like-this)))
-
 ;;;; Structured editing and navigation based on tree-sitter.
 (use-package combobulate
   :ensure t
