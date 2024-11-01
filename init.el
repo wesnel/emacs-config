@@ -1,4 +1,4 @@
-;;; .gnus.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
+;;; init.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Wesley Nelson
 
@@ -76,4 +76,4 @@
 
 (provide 'init)
 
-;;; .gnus.el ends here
+;;; init.el ends here

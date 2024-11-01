@@ -115,8 +115,8 @@
               file = {
                 ".emacs.d/etc/gnus/init.el" = lib.mkIf cfg.gnus.enable {
                   source = pkgs.substituteAll {
-                    name = ".gnus.el";
-                    src = ./.gnus.el;
+                    name = "init.el";
+                    src = ./init.el;
                   };
                 };
 
