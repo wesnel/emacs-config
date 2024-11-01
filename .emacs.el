@@ -2,8 +2,8 @@
 
 ;; Copyright (C) 2024 Wesley Nelson
 
-;; Author: Wesley Nelson <wgn@wesnel.dev>
-;; Maintainer: Wesley Nelson <wgn@wesnel.dev>
+;; Author: Wesley Nelson <wgn@wgn.dev>
+;; Maintainer: Wesley Nelson <wgn@wgn.dev>
 ;; URL: https://git.sr.ht/~wgn/emacs-config
 
 ;; Package-Requires: ((emacs "29.1"))
@@ -1388,59 +1388,6 @@
 (use-package hl-line
   :hook
   ((text-mode prog-mode) . hl-line-mode))
-
-(use-package mml-sec
-  :commands
-  (mml-secure-message-sign))
-
-;;;; Email client.
-;;
-;; NOTE: set the following variables with customize:
-;; - `user-mail-address'
-;; - `user-full-name'
-;; - `mml-secure-openpgp-signers'
-;; - `sendmail-program'
-;; - `message-sendmail-extra-arguments'
-(use-package notmuch
-  :ensure t
-
-  :functions
-  (notmuch-user-emails
-   notmuch-user-primary-email)
-
-  :commands
-  (notmuch-hello
-   notmuch-search)
-
-  :custom
-  (mail-specify-envelope-from t)
-  (message-send-mail-function #'message-send-mail-with-sendmail)
-  (notmuch-crypto-process-mime t)
-  (mml-secure-openpgp-encrypt-to-self t)
-  (mml-secure-smime-sign-with-sender t)
-  (notmuch-search-oldest-first nil)
-  ;; Determines whether or not to show the mail icon in the mode line.
-  (display-time-mail-function
-   (lambda ()
-     (replace-regexp-in-string
-      "\n" " "
-      (shell-command-to-string
-       "notmuch count tag:unread and tag:inbox"))))
-  ;; Determines what happens when you click the mail icon in the mode line.
-  (read-mail-command
-   (lambda ()
-     (interactive)
-     (notmuch-search "tag:unread and tag:inbox")))
-
-  :init
-  (add-hook 'message-setup-hook #'mml-secure-message-sign)
-
-  :bind
-  (("C-c m" . #'notmuch-hello)))
-
-;;;; Link between org-mode and notmuch buffers.
-(use-package ol-notmuch
-  :ensure t)
 
 ;;;; Monitor and act upon system processes.
 (use-package proced

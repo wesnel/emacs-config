@@ -93,6 +93,7 @@
         default = {
           config,
           lib,
+          pkgs,
           ...
         }: let
           cfg = config.home.programs.wgn.emacs;
@@ -100,12 +101,25 @@
           options = {
             home.programs.wgn.emacs = {
               enable = lib.mkEnableOption "Enable the Home Manager portion of Wesley's Emacs Configuration";
+
+              gnus = {
+                enable = lib.mkEnableOption "Enable Wesley's Emacs Gnus Configuration with Home Manager";
+
+                # TODO: Add options to customize IMAP server, etc.
+              };
             };
           };
 
           config = lib.mkIf cfg.enable {
             home = {
-              file.".emacs.d/early-init.el".source = ./early-init.el;
+              file = {
+                ".emacs.d/etc/gnus/init.el".source = lib.mkIf cfg.gnus.enable pkgs.substituteAll {
+                  name = ".gnus.el";
+                  src = ./.gnus.el;
+                };
+
+                ".emacs.d/early-init.el".source = ./early-init.el;
+              };
             };
           };
         };
