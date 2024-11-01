@@ -758,23 +758,6 @@
   :init
   (org-ai-global-mode))
 
-;;;; Displays available keybindings in a pop-up.
-(use-package which-key
-  :ensure t
-  :diminish which-key-mode
-
-  :functions
-  (which-key--show-keymap
-   which-key--hide-popup-ignore-command)
-
-  :commands
-  (which-key-mode
-   which-key-enable-devil-support)
-
-  :init
-  (which-key-mode +1)
-  (which-key-enable-devil-support))
-
 ;;;; Completion using the built-in *Completions* buffer.
 (use-package minibuffer
   :preface
@@ -831,37 +814,6 @@
 (use-package embark
   :ensure t
 
-  :preface
-  (defun embark-which-key-indicator ()
-    "An embark indicator that displays keymaps using which-key.
-The which-key help message will show the type and value of the
-current target followed by an ellipsis if there are further
-targets."
-    (lambda (&optional keymap targets prefix)
-      (if (null keymap)
-          (which-key--hide-popup-ignore-command)
-        (which-key--show-keymap
-         (if (eq (plist-get (car targets) :type) 'embark-become)
-             "Become"
-           (format "Act on %s '%s'%s"
-                   (plist-get (car targets) :type)
-                   (embark--truncate-target (plist-get (car targets) :target))
-                   (if (cdr targets) "…" "")))
-         (if prefix
-             (pcase (lookup-key keymap prefix 'accept-default)
-               ((and (pred keymapp) km) km)
-               (_ (key-binding prefix 'accept-default)))
-           keymap)
-         nil nil t (lambda (binding)
-                     (not (string-suffix-p "-argument" (cdr binding))))))))
-
-  (defun embark-hide-which-key-indicator (fn &rest args)
-    "Hide the which-key indicator immediately when using completing-read."
-    (which-key--hide-popup-ignore-command)
-    (let ((embark-indicators
-           (remq #'embark-which-key-indicator embark-indicators)))
-      (apply fn args)))
-
   :defines
   (embark-indicators)
 
@@ -886,14 +838,6 @@ targets."
   ;; Show the Embark target at point via Eldoc:
   (add-hook 'eldoc-documentation-functions #'embark-eldoc-first-target)
   (setq eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)
-
-  (setq embark-indicators
-        '(embark-which-key-indicator
-          embark-highlight-indicator
-          embark-isearch-highlight-indicator))
-
-  (advice-add #'embark-completing-read-prompter
-              :around #'embark-hide-which-key-indicator)
 
   :config
   ;; Hide the mode line of the Embark live/completions buffers:
