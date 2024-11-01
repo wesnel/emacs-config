@@ -42,8 +42,6 @@
 ;;;; Miscellaneous Emacs configuration.
 (use-package emacs
   :custom
-  ;; Load Gnus configuration from its expected location.
-  (gnus-init-file "~/.gnus")
   ;; Place newline at end of file.
   (require-final-newline t)
   ;; Don't use tabs to indent.
