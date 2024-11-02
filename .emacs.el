@@ -61,6 +61,15 @@
   (display-time-use-mail-icon t)
   ;; Allow minibuffer command while in a minibuffer command.
   (enable-recursive-minibuffers t)
+  ;; Mail configuration.
+  ;; TODO: Make configurable via Nix.
+  (mail-sources `((imap :server "imap.fastmail.com"
+                        :user ,user-mail-address
+                        :port 993)))
+  (smtpmail-default-smtp-server "smtp.fastmail.com")
+  (smtpmail-smtp-service 587)
+  (message-send-mail-function #'message-send-mail-with-sendmail)
+  (send-mail-function #'smtpmail-send-it)
 
   :init
   ;; Remove some UI elements.
@@ -82,6 +91,19 @@
   (column-number-mode +1)
   (size-indication-mode +1)
   (display-time))
+
+(use-package mml-sec
+  :commands
+  (mml-secure-message-sign)
+
+  :custom
+  (mm-verify-option 'always)
+  (mm-decrypt-option 'always)
+  (mml-secure-openpgp-encrypt-to-self t)
+  (mml-secure-smime-sign-with-sender t)
+
+  :init
+  (add-hook 'message-setup-hook #'mml-secure-message-sign))
 
 ;;;; Add MELPA to package archives.
 (use-package package
@@ -1455,6 +1477,29 @@
 
   :hook
   ((hledger-mode . flymake-hledger-enable)))
+
+;;;; Contact database.
+(use-package bbdb
+  :ensure t
+
+  :hook
+  ((gnus-startup-hook . bbdb-instantiate-gnus))
+
+  :commands
+  (bbdb-complete-name
+   bbdb-complete-mail
+   bbdb-initialize)
+
+  :custom
+  (bbdb/mail-auto-create-p t)
+  (bbdb/news-auto-create-p t)
+
+  :config
+  (bbdb-initialize 'message 'gnus 'sendmail)
+
+  :bind
+  (:map message-mode-map
+   ("TAB" . #'bbdb-complete-name)))
 
 (provide '.emacs)
 
