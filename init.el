@@ -53,8 +53,8 @@
                                   (nnimap-address "imap.fastmail.com")
                                   (nnimap-server-port 993)
                                   (nnimap-stream ssl)))
-(add-to-list gnus-secondary-select-methods '((nntp "news.gwene.org")
-                                             (nntp "news.gmane.io")))
+(add-to-list 'gnus-secondary-select-methods '((nntp "news.gwene.org")
+                                              (nntp "news.gmane.io")))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
