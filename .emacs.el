@@ -68,7 +68,7 @@
                         :port 993)))
   (smtpmail-default-smtp-server "smtp.fastmail.com")
   (smtpmail-smtp-service 587)
-  (message-send-mail-function #'message-send-mail-with-sendmail)
+  (message-send-mail-function #'message-use-send-mail-function)
   (send-mail-function #'smtpmail-send-it)
   (mail-user-agent 'gnus-user-agent)
 
