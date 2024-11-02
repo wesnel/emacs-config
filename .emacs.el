@@ -1486,8 +1486,7 @@
   ((gnus-startup-hook . bbdb-instantiate-gnus))
 
   :commands
-  (bbdb-complete-name
-   bbdb-complete-mail
+  (bbdb-complete-mail
    bbdb-initialize)
 
   :custom
@@ -1499,7 +1498,7 @@
 
   :bind
   (:map message-mode-map
-   ("TAB" . #'bbdb-complete-name)))
+   ("TAB" . #'bbdb-complete-mail)))
 
 (provide '.emacs)
 
