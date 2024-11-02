@@ -43,6 +43,8 @@
 ;;; Code:
 
 (require 'gnus)
+(require 'gnus-async)
+(require 'gnus-dired)
 (require 'gnus-msg)
 (require 'mail-source)
 (require 'message)
@@ -50,18 +52,31 @@
 (require 'mml-sec)
 (require 'smtpmail)
 
+;;;; Gnus source configuration:
 (setq gnus-select-method '(nnimap "fastmail"
                                   (nnimap-address "imap.fastmail.com")
                                   (nnimap-server-port 993)
-                                  (nnimap-stream ssl))
-      mail-sources `((imap :server "imap.fastmail.com"
+                                  (nnimap-stream ssl)))
+(add-to-list gnus-secondary-select-methods '((nntp "news.gwene.org")
+                                             (nntp "news.gmane.io")))
+
+;;;; General mail configuration (FIXME: move to .emacs.el):
+(setq mail-sources `((imap :server "imap.fastmail.com"
                            :user ,user-mail-address
                            :port 993))
       smtpmail-default-smtp-server "smtp.fastmail.com"
       smtpmail-smtp-service 587)
+(setq message-send-mail-function #'message-send-mail-with-sendmail
+      send-mail-function #'smtpmail-send-it)
 
-(setq gnus-use-cache t)
+;;;; Gnus general configuration:
+(setq gnus-use-cache t
+      gnus-asynchronous t)
+(add-hook 'dired-mode-hook #'gnus-dired-mode)
+(add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
+(add-hook 'gnus-select-group-hook #'gnus-group-set-timestamp)
 
+;;;; Encryption/signing configuration:
 (setq gnus-message-replysign 't
       gnus-message-replyencrypt 't
       mm-verify-option 'always
@@ -70,9 +85,6 @@
       mml-secure-openpgp-encrypt-to-self t
       mml-secure-smime-sign-with-sender t)
 (add-hook 'message-setup-hook #'mml-secure-message-sign)
-
-(setq message-send-mail-function #'message-send-mail-with-sendmail
-      send-mail-function #'smtpmail-send-it)
 
 (provide 'init)
 
