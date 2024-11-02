@@ -70,7 +70,7 @@
   (smtpmail-smtp-service 587)
   (message-send-mail-function #'message-send-mail-with-sendmail)
   (send-mail-function #'smtpmail-send-it)
-  (mail-user-agent 'sendmail-user-agent)
+  (mail-user-agent 'gnus-user-agent)
 
   :init
   ;; Remove some UI elements.
@@ -104,8 +104,7 @@
   (mml-secure-smime-sign-with-sender t)
 
   :init
-  (add-hook 'message-setup-hook #'mml-secure-message-sign)
-  (add-hook 'mail-setup-hook #'mml-secure-message-sign))
+  (add-hook 'message-setup-hook #'mml-secure-message-sign))
 
 ;;;; Add MELPA to package archives.
 (use-package package
@@ -1496,7 +1495,7 @@
   (bbdb/news-auto-create-p t)
 
   :config
-  (bbdb-initialize 'message 'gnus 'sendmail 'mail 'anniv))
+  (bbdb-initialize 'message 'gnus 'sendmail 'anniv))
 
 (provide '.emacs)
 
