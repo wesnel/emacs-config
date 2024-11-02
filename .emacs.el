@@ -70,6 +70,7 @@
   (smtpmail-smtp-service 587)
   (message-send-mail-function #'message-send-mail-with-sendmail)
   (send-mail-function #'smtpmail-send-it)
+  (mail-user-agent 'sendmail-user-agent)
 
   :init
   ;; Remove some UI elements.
