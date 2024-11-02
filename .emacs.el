@@ -1495,11 +1495,7 @@
   (bbdb/news-auto-create-p t)
 
   :config
-  (bbdb-initialize 'message 'gnus 'sendmail)
-
-  :bind
-  (:map message-mode-map
-   ("TAB" . #'bbdb-complete-mail)))
+  (bbdb-initialize 'message 'gnus 'sendmail 'mail 'anniv))
 
 (provide '.emacs)
 
