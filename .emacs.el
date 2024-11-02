@@ -104,7 +104,8 @@
   (mml-secure-smime-sign-with-sender t)
 
   :init
-  (add-hook 'message-setup-hook #'mml-secure-message-sign))
+  (add-hook 'message-setup-hook #'mml-secure-message-sign)
+  (add-hook 'mail-setup-hook #'mml-secure-message-sign))
 
 ;;;; Add MELPA to package archives.
 (use-package package
