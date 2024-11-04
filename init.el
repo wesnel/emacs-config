@@ -66,14 +66,17 @@
                       (nnmail-expiry-wait 90)))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
-(setq gnus-parameters `(("fastmail"
+(setq gnus-parameters '(("fastmail"
                          (gcc-self . "nnimap+fastmail:Sent"))
                         ("gmail"
-                         (gcc-self . "nnimap+gmail:[Gmail]/Sent Mail"))))
+                         (gcc-self . "nnimap+gmail:[Gmail]/Sent Mail")))
+      gnus-message-archive-group '(("fastmail" "nnimap+fastmail:Sent")
+                                   ("gmail" "nnimap+gmail:[Gmail] Sent Mail")))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
       gnus-asynchronous t
+      gnus-gcc-mark-as-read t
       gnus-use-trees t
       gnus-thread-sort-functions '((not gnus-thread-sort-by-number)
                                    gnus-thread-sort-by-score)
