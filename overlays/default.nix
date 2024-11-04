@@ -128,8 +128,8 @@ final: prev: let
         });
 
         combobulate = let
-          rev = "e3370c97bcd1eb9b5dcba03014b246948c6e7126";
-          sha256 = "sha256-4KNlyftCuniP4DDXDBsDQmB1KReYz3xzRzkr/awx9eA=";
+          rev = "e9c5be84062e8183f556d7133d5a477a57e37e51";
+          sha256 = "sha256-r6jObsYx7RRTJUmrCN5h3+0WcHqJA67emhr4/W3rBrM=";
         in
           ePkgs.trivialBuild rec {
             pname = "combobulate";
@@ -137,30 +137,6 @@ final: prev: let
 
             src = pkgs.fetchFromGitHub {
               owner = "mickeynp";
-              repo = pname;
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          };
-
-        consult-gh = let
-          rev = "1fe876d9552b6ec6af257a4299a34eca99b40539";
-          sha256 = "sha256-bi+qlNvNMXbS4cXbXt01txwD2NAyAqJGNKeOtdtj7tg=";
-        in
-          ePkgs.trivialBuild rec {
-            pname = "consult-gh";
-            version = rev;
-
-            packageRequires = with ePkgs; [
-              consult
-              embark
-            ];
-
-            src = pkgs.fetchFromGitHub {
-              owner = "armindarvish";
               repo = pname;
 
               inherit
@@ -227,22 +203,6 @@ final: prev: let
             };
           };
 
-        go-mode = let
-          rev = "166dfb1e090233c4609a50c2ec9f57f113c1da72";
-          sha256 = "sha256-SEqDeF5F/DQ5/NOi3n6mYhlkYg+VxY/EPAvxtt5wUG0=";
-        in
-          ePrev.go-mode.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = old.src.owner;
-              repo = old.src.repo;
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
-
         ijanet-mode = let
           rev = "2821db192fd0733d402cbd1c58f6060aa02ef100";
           sha256 = "sha256-Ljuj6Oc28xgi5N1XCp4TjHUtR83FFcVBN6dhTi/7qwk=";
@@ -262,22 +222,6 @@ final: prev: let
             };
           };
 
-        no-littering = let
-          rev = "ef02b6fcedd97f3ab039b51411fdaab7336d819b";
-          sha256 = "sha256-a3vCZzBUtSJ2EA/wyRfkLpteByZoSUbagiQ8hyJjrsQ=";
-        in
-          ePrev.no-littering.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = old.src.owner;
-              repo = old.src.repo;
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
-
         scratch = let
           rev = "afd2590a56a8d33bd07ffbe30feda5ece9c5d5cb";
           sha256 = "1myd3zsxdkflrvpzmnd27n5ga9f4i0v1dq8p365fq3picq6694zw";
@@ -287,22 +231,6 @@ final: prev: let
               url = "https://codeberg.org/wgn/scratch/archive/${rev}.tar.gz";
 
               inherit
-                sha256
-                ;
-            };
-          });
-
-        which-key = let
-          rev = "6abe544835d67f92a633fbf2622b9a8b6eb10a3c";
-          sha256 = "sha256-FzTdq3WXDzXJKXgSG9ctJLSCnsR9nnlV+wY3eNaEWYU=";
-        in
-          ePrev.which-key.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = "wesnel";
-              repo = "emacs-which-key";
-
-              inherit
-                rev
                 sha256
                 ;
             };
