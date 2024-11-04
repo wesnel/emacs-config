@@ -82,8 +82,10 @@
                                    gnus-thread-sort-by-score)
       gnus-posting-styles '((".*"
                              (signature-file "~/.signature")
+                             (address "wgn@wgn.dev")
                              ("X-SMTP-Server" "smtp.fastmail.com"))
                             ("gmail"
+                             (address "wesley.nelson@shipt.com")
                              ("X-SMTP-Server" "smtp.gmail.com"))))
 (add-hook 'dired-mode-hook #'gnus-dired-mode)
 (add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
