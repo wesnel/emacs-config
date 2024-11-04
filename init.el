@@ -16,10 +16,9 @@
 ;;       account(s).
 ;;
 ;; NOTE: Please set the following variables with customize:
-;;; `user-mail-address' with your email address.
+;;; `user-mail-address' with your primary email address.
 ;;;; Can alternatively be set via the EMAIL environment variable.
-;;;; This should match the email address of your PGP key and the email
-;;;; address of your IMAP account in ~/.authinfo.gpg.
+;;;; This should match the email address of your PGP key.
 ;;; `user-full-name' with your full name.
 ;;;; Can alternatively be set via the NAME environment variable.
 ;;; `mml-secure-openpgp-signers' with the PGP key ID(s) that you want
@@ -49,18 +48,28 @@
 
 ;;;; Gnus source configuration:
 ;; TODO: Make configurable via Nix.
-(setq gnus-select-method '(nnimap "fastmail"
-                                  (nnimap-address "imap.fastmail.com")
-                                  (nnimap-server-port 993)
-                                  (nnimap-stream ssl)
-                                  (nnimap-inbox "INBOX")
-                                  (nnmail-expiry-target "nnimap+fastmail:Archive")
-                                  (nnmail-expiry-wait 90))
-      gnus-parameters `(("fastmail"
-                         (gcc-self . "nnimap+fastmail:Sent")))
-      gnus-message-archive-group "nnimap+fastmail:Sent")
+(setq gnus-select-method
+      '(nnimap "fastmail"
+               (nnimap-address "imap.fastmail.com")
+               (nnimap-server-port 993)
+               (nnimap-stream ssl)
+               (nnimap-inbox "nnimap+fastmail:INBOX")
+               (nnmail-expiry-target "nnimap+fastmail:Trash")
+               (nnmail-expiry-wait 90)))
+(add-to-list 'gnus-secondary-select-methods
+             '(nnimap "gmail"
+                      (nnimap-address "imap.gmail.com")
+                      (nnimap-server-port 993)
+                      (nnimap-stream ssl)
+                      (nnimap-inbox "nnimap+gmail:INBOX")
+                      (nnmail-expiry-target "nnimap+gmail:[Gmail]/Trash")
+                      (nnmail-expiry-wait 90)))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
+(setq gnus-parameters `(("fastmail"
+                         (gcc-self . "nnimap+fastmail:Sent"))
+                        ("gmail"
+                         (gcc-self . "nnimap+gmail:[Gmail]/Sent Mail"))))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
@@ -68,7 +77,12 @@
       gnus-use-trees t
       gnus-thread-sort-functions '((not gnus-thread-sort-by-number)
                                    gnus-thread-sort-by-score)
-      gnus-posting-styles '((".*" (signature-file "~/.signature"))))
+      gnus-posting-styles '((".*"
+                             (signature-file "~/.signature"))
+                            ("^nnimap\\+fastmail"
+                             ("X-SMTP-Server" "smtp.fastmail.com"))
+                            ("^nnimap\\+gmail"
+                             ("X-SMTP-Server" "smtp.gmail.com"))))
 (add-hook 'dired-mode-hook #'gnus-dired-mode)
 (add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
 (add-hook 'gnus-select-group-hook #'gnus-group-set-timestamp)

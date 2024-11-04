@@ -64,9 +64,11 @@
   ;; Mail configuration.
   ;; TODO: Make configurable via Nix.
   (mail-sources `((imap :server "imap.fastmail.com"
-                        :user ,user-mail-address
+                        :user "wgn@wgn.dev"
+                        :port 993)
+                  (imap :server "imap.gmail.com"
+                        :user "wesley.nelson@shipt.com"
                         :port 993)))
-  (smtpmail-default-smtp-server "smtp.fastmail.com")
   (smtpmail-smtp-service 587)
   (message-send-mail-function #'message-use-send-mail-function)
   (send-mail-function #'smtpmail-send-it)
@@ -92,6 +94,29 @@
   (column-number-mode +1)
   (size-indication-mode +1)
   (display-time))
+
+(use-package message
+  :commands
+  (message-remove-header))
+
+(use-package smtpmail
+  :commands
+  (smtpmail-via-smtp)
+
+  :preface
+  (defun wgn/get-smtp-server-from-header (orig-fun &rest args)
+    "Set `smtpmail-smtp-server' based on the X-SMTP-Server header before
+calling ORIG-FUN with ARGS."
+    (let ((smtpmail-smtp-server (or
+                                 (save-restriction
+                                   (message-narrow-to-headers)
+                                   (mail-fetch-field "X-SMTP-Server"
+                                    smtpmail-smtp-server)))))
+      (message-remove-header "X-SMTP-Server")
+      (apply orig-fun args)))
+
+  :init
+  (advice-add #'smtpmail-via-smtp :around #'wgn/get-smtp-server-from-header))
 
 (use-package mml-sec
   :commands
