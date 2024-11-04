@@ -57,8 +57,7 @@
                                   (nnmail-expiry-target "nnimap+fastmail:Archive")
                                   (nnmail-expiry-wait 90))
       gnus-parameters `(("fastmail"
-                         (posting-style
-                          (gcc "nnimap+fastmail:Sent"))))
+                         (gcc-self . "nnimap+fastmail:Sent")))
       gnus-message-archive-group "nnimap+fastmail:Sent")
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
