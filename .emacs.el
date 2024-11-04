@@ -69,6 +69,7 @@
                   (imap :server "imap.gmail.com"
                         :user "wesley.nelson@shipt.com"
                         :port 993)))
+  (smtpmail-default-smtp-server "smtp.fastmail.com")
   (smtpmail-smtp-service 587)
   (message-send-mail-function #'message-use-send-mail-function)
   (send-mail-function #'smtpmail-send-it)
