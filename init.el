@@ -65,6 +65,7 @@
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
       gnus-asynchronous t
+      gnus-use-trees t
       gnus-thread-sort-functions '((not gnus-thread-sort-by-number)
                                    gnus-thread-sort-by-score)
       gnus-posting-styles '((".*" (signature-file "~/.signature"))))
