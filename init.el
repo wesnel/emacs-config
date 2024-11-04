@@ -65,7 +65,8 @@
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
       gnus-asynchronous t
-      gnus-thread-sort-functions '((not gnus-thread-sort-by-number))
+      gnus-thread-sort-functions '((not gnus-thread-sort-by-number)
+                                   gnus-thread-sort-by-score)
       gnus-posting-styles '((".*" (signature-file "~/.signature"))))
 (add-hook 'dired-mode-hook #'gnus-dired-mode)
 (add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
