@@ -52,13 +52,21 @@
 (setq gnus-select-method '(nnimap "fastmail"
                                   (nnimap-address "imap.fastmail.com")
                                   (nnimap-server-port 993)
-                                  (nnimap-stream ssl)))
+                                  (nnimap-stream ssl)
+                                  (nnmail-expiry-target "nnimap+fastmail:Archive")
+                                  (nnmail-expiry-wait 90))
+      gnus-parameters `((,(rx "nnimap+")
+                         (gcc-self . t)))
+      gnus-message-archive-group `((,(rx "nnimap+")
+                                    "nnimap+fastmail:Sent")))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
-      gnus-asynchronous t)
+      gnus-asynchronous t
+      gnus-thread-sort-functions '((not gnus-thread-sort-by-number))
+      gnus-posting-styles '((".*" (signature-file "~/.signature"))))
 (add-hook 'dired-mode-hook #'gnus-dired-mode)
 (add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
 (add-hook 'gnus-select-group-hook #'gnus-group-set-timestamp)

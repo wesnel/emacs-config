@@ -71,6 +71,7 @@
   (message-send-mail-function #'message-use-send-mail-function)
   (send-mail-function #'smtpmail-send-it)
   (mail-user-agent 'gnus-user-agent)
+  (mail-self-blind t)
 
   :init
   ;; Remove some UI elements.
