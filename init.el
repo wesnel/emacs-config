@@ -71,7 +71,7 @@
                         ("gmail"
                          (gcc-self . "nnimap+gmail:[Gmail]/Sent Mail")))
       gnus-message-archive-group '((".*" "nnimap+fastmail:Sent")
-                                   ("gmail" "nnimap+gmail:[Gmail] Sent Mail")))
+                                   ("gmail" "nnimap+gmail:[Gmail]/Sent Mail")))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
