@@ -53,12 +53,13 @@
                                   (nnimap-address "imap.fastmail.com")
                                   (nnimap-server-port 993)
                                   (nnimap-stream ssl)
+                                  (nnimap-inbox "INBOX")
                                   (nnmail-expiry-target "nnimap+fastmail:Archive")
                                   (nnmail-expiry-wait 90))
-      gnus-parameters `((,(rx "nnimap+")
-                         (gcc-self . t)))
-      gnus-message-archive-group `((,(rx "nnimap+")
-                                    "nnimap+fastmail:Sent")))
+      gnus-parameters `(("fastmail"
+                         (posting-style
+                          (gcc "nnimap+fastmail:Sent"))))
+      gnus-message-archive-group "nnimap+fastmail:Sent")
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
 (add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
 
