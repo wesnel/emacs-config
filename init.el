@@ -48,14 +48,15 @@
 
 ;;;; Gnus source configuration:
 ;; TODO: Make configurable via Nix.
-(setq gnus-select-method
-      '(nnimap "fastmail"
-               (nnimap-address "imap.fastmail.com")
-               (nnimap-server-port 993)
-               (nnimap-stream ssl)
-               (nnimap-inbox "nnimap+fastmail:INBOX")
-               (nnmail-expiry-target "nnimap+fastmail:Trash")
-               (nnmail-expiry-wait 90)))
+(setq gnus-select-method '(nnnil nil))
+(add-to-list 'gnus-secondary-select-methods
+             '(nnimap "fastmail"
+                      (nnimap-address "imap.fastmail.com")
+                      (nnimap-server-port 993)
+                      (nnimap-stream ssl)
+                      (nnimap-inbox "nnimap+fastmail:INBOX")
+                      (nnmail-expiry-target "nnimap+fastmail:Trash")
+                      (nnmail-expiry-wait 90)))
 (add-to-list 'gnus-secondary-select-methods
              '(nnimap "gmail"
                       (nnimap-address "imap.gmail.com")
@@ -64,32 +65,55 @@
                       (nnimap-inbox "nnimap+gmail:INBOX")
                       (nnmail-expiry-target "nnimap+gmail:[Gmail]/Trash")
                       (nnmail-expiry-wait 90)))
-(add-to-list 'gnus-secondary-select-methods '(nntp "news.gwene.org"))
-(add-to-list 'gnus-secondary-select-methods '(nntp "news.gmane.io"))
-(setq gnus-parameters '((".*"
+(add-to-list 'gnus-secondary-select-methods
+             '(nntp "news.gwene.org"))
+(add-to-list 'gnus-secondary-select-methods
+             '(nntp "news.gmane.io"))
+
+(setq gnus-parameters '(("fastmail"
                          (gcc-self . "nnimap+fastmail:Sent"))
                         ("gmail"
                          (gcc-self . "nnimap+gmail:[Gmail]/Sent Mail")))
-      gnus-message-archive-group '((".*" "nnimap+fastmail:Sent")
-                                   ("gmail" "nnimap+gmail:[Gmail]/Sent Mail")))
+      gnus-posting-styles '((".*"
+                             (signature-file "~/.signature"))
+                            ("fastmail"
+                             (address "wgn@wgn.dev")
+                             ("X-Message-SMTP-Method" "smtp smtp.fastmail.com 587"))
+                            ("gmail"
+                             (address "wesley.nelson@shipt.com")
+                             ("X-Message-SMTP-Method" "smtp smtp.gmail.com 587"))))
 
 ;;;; Gnus general configuration:
 (setq gnus-use-cache t
       gnus-asynchronous t
+      gnus-use-header-prefetch t
       gnus-gcc-mark-as-read t
       gnus-use-trees t
       gnus-thread-sort-functions '((not gnus-thread-sort-by-number)
-                                   gnus-thread-sort-by-score)
-      gnus-posting-styles '((".*"
-                             (signature-file "~/.signature")
-                             (address "wgn@wgn.dev")
-                             ("X-SMTP-Server" "smtp.fastmail.com"))
-                            ("gmail"
-                             (address "wesley.nelson@shipt.com")
-                             ("X-SMTP-Server" "smtp.gmail.com"))))
+                                   gnus-thread-sort-by-score))
 (add-hook 'dired-mode-hook #'gnus-dired-mode)
 (add-hook 'gnus-group-mode-hook #'gnus-topic-mode)
 (add-hook 'gnus-select-group-hook #'gnus-group-set-timestamp)
+
+;;;; Appearance:
+(setq gnus-sum-thread-tree-false-root " "
+      gnus-sum-thread-tree-indent "  "
+      gnus-sum-thread-tree-root "r "
+      gnus-sum-thread-tree-single-indent "◎ "
+      gnus-sum-thread-tree-vertical "|"
+      gnus-sum-thread-tree-leaf-with-other "├─► "
+      gnus-sum-thread-tree-single-leaf "╰─► "
+
+      ;; │06-Jan│  Sender Name  │ Email Subject
+      gnus-summary-line-format (concat "%0{%U%R%z%}"
+                                       "%3{│%}" "%1{%d%}" "%3{│%}"
+                                       "  "
+                                       "%4{%-20,20f%}"
+                                       "  "
+                                       "%3{│%}"
+                                       " "
+                                       "%1{%B%}"
+                                       "%s\n"))
 
 ;;;; Encryption/signing configuration:
 (setq gnus-message-replysign 't
