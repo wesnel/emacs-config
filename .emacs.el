@@ -96,6 +96,16 @@
   (size-indication-mode +1)
   (display-time))
 
+(use-package server
+  :commands
+  (server-running-p
+   server-start)
+
+  :init
+  ;; Start server.
+  (unless (server-running-p)
+    (server-start)))
+
 (use-package mml-sec
   :commands
   (mml-secure-message-sign)
