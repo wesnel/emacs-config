@@ -1189,6 +1189,28 @@
   ;; Set up eglot for kotlin-ts-mode.
   (add-hook 'kotlin-ts-mode-hook #'wgn/kotlin-ts-mode-eglot-setup))
 
+;;;; Java support.
+(use-package java-ts-mode
+  :defer t
+
+  :preface
+  (defun wgn/java-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(java "https://github.com/tree-sitter/tree-sitter-java.git")))
+
+  ;; Open java files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(java-mode . java-ts-mode))
+
+  ;; Set up eglot for java-ts-mode.
+  (add-hook 'java-ts-mode-hook #'wgn/java-ts-mode-eglot-setup))
+
 ;;;; Nix support.
 (use-package nix-mode
   :ensure t
