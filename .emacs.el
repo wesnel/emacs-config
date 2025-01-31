@@ -1167,6 +1167,25 @@
   ;; Set up eglot for python-ts-mode.
   (add-hook 'python-ts-mode-hook #'wgn/python-ts-mode-eglot-setup))
 
+;;;; Kotlin support.
+(use-package kotlin-ts-mode
+  :ensure t
+  :mode "\\.kt\\'"
+
+  :preface
+  (defun wgn/kotlin-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    (eglot-ensure))
+
+  :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(kotlin . ("https://github.com/fwcd/tree-sitter-kotlin"))))
+
+  ;; Set up eglot for kotlin-ts-mode.
+  (add-hook 'kotlin-ts-mode-hook #'wgn/kotlin-ts-mode-eglot-setup))
+
 ;;;; Nix support.
 (use-package nix-mode
   :ensure t
