@@ -259,6 +259,7 @@
     :config
     (dolist (var '("ARTIFACTORY_PYPI_PASSWORD"
                    "ARTIFACTORY_PYPI_USERNAME"
+                   "EDITOR"
                    "GITHUB_TOKEN"
                    "GPG_AGENT_INFO"
                    "GPG_TTY"
