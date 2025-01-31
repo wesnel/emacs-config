@@ -263,6 +263,7 @@
                    "GITHUB_TOKEN"
                    "GPG_AGENT_INFO"
                    "GPG_TTY"
+                   "JAVA_HOME"
                    "LANG"
                    "LC_CTYPE"
                    "NIX_PATH"
