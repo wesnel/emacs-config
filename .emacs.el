@@ -126,15 +126,119 @@
                '("melpa" . "https://melpa.org/packages/")))
 
 ;;;; Note taking, time tracking, etc.
+;;
+;; http://doc.norang.ca/org-mode.html
 (use-package org
   :ensure t
+
+  :bind
+  (("C-c l" . #'org-store-link)
+   ("C-c a" . #'org-agenda)
+   ("C-c c" . #'org-capture))
+
+  :commands
+  (org-heading-components)
+
+  :preface
+  (defun wgn/verify-refile-target ()
+    "Exclude TODO keywords with a DONE state from refile targets."
+    (not (member (nth 2 (org-heading-components)) org-done-keywords)))
+
+  (defun wgn/org-auto-exclude-function (tag)
+    "Automatic task exclusion in the agenda with / RET"
+    (and (cond
+          ((string= tag "hold")
+           t))
+         (concat "-" tag)))
+
+  :config
+  (add-to-list 'org-modules 'org-crypt)
+  (add-to-list 'org-modules 'org-habit)
+  (add-to-list 'org-modules 'org-protocol)
 
   :custom
   (org-catch-invisible-edits 'show-and-error)
   (org-special-ctrl-a/e t)
-  (org-insert-heading-respect-content t)
+  (org-insert-heading-respect-content nil)
   (org-hide-emphasis-markers t)
-  (org-pretty-entities t))
+  (org-pretty-entities t)
+  (org-auto-align-tags nil)
+  (org-tags-column 0)
+  (org-agenda-tags-column 0)
+  (org-use-fast-todo-selection t)
+  (org-treat-S-cursor-todo-selection-as-state-change nil)
+  (org-agenda-files '("~/org"))
+  (org-directory "~/org")
+  (org-default-notes-file "~/org/refile.org")
+  (org-refile-use-outline-path t)
+  (org-refile-allow-creating-parent-nodes 'confirm)
+  (org-refile-target-verify-function #'wgn/verify-refile-target)
+  (org-indirect-buffer-display 'current-window)
+  (org-agenda-auto-exclude-function #'wgn/org-auto-exclude-function)
+  (org-enforce-todo-dependencies t)
+  (org-startup-indented t)
+  (org-cycle-separator-lines 0)
+  (org-reverse-note-order nil)
+  (org-log-done 'time)
+  (org-log-into-drawer t)
+  (org-log-state-notes-insert-after-drawers nil)
+  (org-deadline-warning-days 30)
+  (org-use-speed-commands t)
+  (org-blank-before-new-entry
+   '((heading)
+     (plain-list-item . auto)))
+  (org-refile-targets
+   '((nil :maxlevel . 9)
+     (org-agenda-files :maxlevel . 9)))
+  (org-todo-keywords
+   '((sequence "TODO(t)" "NEXT(n)" "|" "DONE(d)")
+     (sequence "WAITING(w@/!)" "HOLD(h@/!)" "|" "CANCELLED(c@/!)")))
+  (org-todo-keyword-faces
+   '(("TODO" :foreground "red" :weight bold)
+     ("NEXT" :foreground "blue" :weight bold)
+     ("DONE" :foreground "forest green" :weight bold)
+     ("WAITING" :foreground "orange" :weight bold)
+     ("HOLD" :foreground "magenta" :weight bold)
+     ("CANCELLED" :foreground "forest green" :weight bold)))
+  (org-todo-state-tags-triggers
+   '(("CANCELLED" ("CANCELLED" . t))
+     ("WAITING" ("WAITING" . t))
+     ("HOLD" ("WAITING") ("HOLD" . t))
+     (done ("WAITING") ("HOLD"))
+     ("TODO" ("WAITING") ("CANCELLED") ("HOLD"))
+     ("NEXT" ("WAITING") ("CANCELLED") ("HOLD"))
+     ("DONE" ("WAITING") ("CANCELLED") ("HOLD"))))
+  (org-capture-templates
+   `(("t" "todo" entry (file ,org-default-notes-file)
+      "* TODO %?\n%U\n%a\n")
+     ("r" "respond" entry (file ,org-default-notes-file)
+      "* NEXT Respond to %:from on %:subject\nSCHEDULED: %t\n%U\n%a\n" :immediate-finish t)
+     ("n" "note" entry (file ,org-default-notes-file)
+      "* %? :NOTE:\n%U\n%a\n")
+     ("j" "Journal" entry (file+datetree "~/git/org/diary.org")
+      "* %?\n%U\n")
+     ("w" "org-protocol" entry (file "~/git/org/refile.org")
+      "* TODO Review %c\n%U\n" :immediate-finish t)
+     ("h" "Habit" entry (file ,org-default-notes-file)
+      "* NEXT %?\n%U\n%a\nSCHEDULED: %(format-time-string \"%<<%Y-%m-%d %a .+1d/3d>>\")\n:PROPERTIES:\n:STYLE: habit\n:REPEAT_TO_STATE: NEXT\n:END:\n")))
+  (org-tag-alist
+   '(("WAITING" . ?w)
+     ("HOLD" . ?h)
+     ("PERSONAL" . ?P)
+     ("WORK" . ?W)
+     ("NOTE" . ?n)
+     ("CANCELLED" . ?c))))
+
+;;;; Store encrypted information in org files.
+(use-package org-crypt
+  :commands
+  (org-crypt-use-before-save-magic)
+
+  :init
+  (org-crypt-use-before-save-magic)
+
+  :custom
+  (org-tags-exclude-from-inheritance '("crypt")))
 
 ;;;; Use user shell $PATH.
 (when (memq window-system '(mac ns x))
