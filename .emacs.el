@@ -1176,6 +1176,8 @@
   :preface
   (defun wgn/kotlin-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(kotlin-ts-mode "kotlin-language-server"))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
