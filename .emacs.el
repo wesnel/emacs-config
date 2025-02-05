@@ -617,7 +617,12 @@
 ;;;; Balanced window margins.
 (use-package olivetti
   :ensure t
-  :defer t
+
+  :commands
+  (olivetti-mode)
+
+  :defines
+  (olivetti-mode-map)
 
   :custom
   (olivetti-body-width 0.7)
