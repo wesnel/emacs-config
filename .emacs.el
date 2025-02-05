@@ -614,6 +614,16 @@
   :custom
   (electric-pair-open-newline-between-pairs t))
 
+;;;; Balanced window margins.
+(use-package olivetti
+  :ensure t
+  :defer t
+
+  :custom
+  (olivetti-body-width 0.7)
+  (olivetti-minimum-body-width 80)
+  (olivetti-recall-visual-line-mode-entry-state t))
+
 ;;;; Focused presentation mode built on top of outline.
 (use-package logos
   :ensure t
@@ -627,11 +637,31 @@
   :custom
   (logos-outlines-are-pages t)
 
+  :defines
+  (logos-focus-mode-map)
+
   :bind
   (([remap narrow-to-region] . #'logos-narrow-dwim)
    ([remap forward-page] . #'logos-forward-page-dwim)
    ([remap backward-page] . #'logos-backward-page-dwim)
-   ("<f9>" . #'logos-focus-mode)))
+   ("<f9>" . #'logos-focus-mode)
+   :map logos-focus-mode-map
+   ([remap right-char] . #'logos-forward-page-dwim)
+   ([remap next-line] . #'logos-forward-page-dwim)
+   ([remap left-char] . #'logos-backward-page-dwim)
+   ([remap previous-line] . #'logos-backward-page-dwim))
+
+  :config
+  (setq-default
+   logos-hide-cursor t
+   logos-hide-mode-line t
+   logos-hide-header-line t
+   logos-hide-buffer-boundaries t
+   logos-hide-fringe t
+   logos-variable-pitch t
+   logos-buffer-read-only t
+   logos-scroll-lock t
+   logos-olivetti t))
 
 ;;;; Spell checxing and correction.
 (use-package jinx
