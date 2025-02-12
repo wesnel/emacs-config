@@ -1074,6 +1074,16 @@
 ;;
 ;; HACK: This is built-in to Emacs, but there is also a third-party
 ;;       go-mode which we will install next.
+;;
+;; NOTE: To enable snippet support in a project, type:
+;;
+;;       M-x add-dir-local-variable RET
+;;       go-ts-mode RET
+;;       eglot-workspace-configuration RET
+;;       (:TextDocumentClientCapabilities (:completion (:completionItem (:snippetSupport t)))) RET
+;;
+;;       Then, save the file which is generated inside the root of
+;;       your project folder.
 (use-package go-ts-mode
   :mode
   ("go\\.mod\\'" . go-mod-ts-mode)
