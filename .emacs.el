@@ -820,6 +820,19 @@
   :custom
   (checkdoc-package-keywords-flag t))
 
+;;;; Snippets.
+(use-package yasnippet
+  :ensure t
+
+  :commands
+  (yas-minor-mode
+   yas-reload-all)
+
+  :hook
+  (prog-mode . (lambda ()
+                 (yas-reload-all)
+                 (yas-minor-mode +1))))
+
 ;;;; Language server integration.
 (use-package eglot
   :ensure t
