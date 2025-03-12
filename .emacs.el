@@ -386,6 +386,7 @@
 (use-package dired
   :custom
   (ls-lisp-use-insert-directory-program nil)
+  (dired-kill-when-opening-new-dired-buffer t)
 
   :preface
   (defun wgn/fix-dired-ls ()
