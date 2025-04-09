@@ -1107,7 +1107,7 @@
   :preface
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
 
@@ -1189,7 +1189,7 @@
   :hook
   (go-ts-mode . (lambda ()
                   (require 'go-mode)
-                  (add-hook 'before-save-hook #'wgn/apply-gofmt t t))))
+                  (add-hook 'before-save-hook #'wgn/apply-gofmt nil t))))
 
 ;;;; Run Golang tests.
 (use-package gotest
@@ -1228,7 +1228,7 @@
                      ,(eglot-alternatives '(("@asdf@" "exec" "poetry" "run" "pylsp")
                                             ("poetry" "run" "pylsp")
                                             "pylsp"))))
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1253,7 +1253,7 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    '(kotlin-ts-mode "kotlin-language-server"))
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1271,7 +1271,7 @@
   :preface
   (defun wgn/java-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1294,7 +1294,7 @@
   :preface
   (defun wgn/nix-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1310,7 +1310,7 @@
   :preface
   (defun wgn/yaml-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1329,7 +1329,7 @@
   :preface
   (defun wgn/terraform-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :custom
@@ -1346,7 +1346,7 @@
   :preface
   (defun wgn/mhtml-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1368,7 +1368,7 @@
     ;; FIXME: Need to figure out how to change indent size.
     ;;
     ;; (with-eval-after-load 'eglot
-    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1392,7 +1392,7 @@
     ;; FIXME: Need to figure out how to change indent size.
     ;;
     ;; (with-eval-after-load 'eglot
-    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   (defun wgn/js-ts-mode-fix-auto-mode-alist ()
@@ -1434,7 +1434,7 @@
     ;; FIXME: Need to figure out how to change indent size.
     ;;
     ;; (with-eval-after-load 'eglot
-    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
 
     (eglot-ensure))
 
@@ -1473,7 +1473,7 @@
   :preface
   (defun wgn/css-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :init
@@ -1511,7 +1511,7 @@
   :preface
   (defun wgn/latex-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
   :custom
