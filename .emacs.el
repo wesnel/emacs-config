@@ -834,6 +834,14 @@
                  (yas-reload-all)
                  (yas-minor-mode +1))))
 
+;;;; Documentation in echo area.
+(use-package eldoc
+  :commands
+  (eldoc-documentation-compose-eagerly)
+
+  :config
+  (setq eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly))
+
 ;;;; Language server integration.
 (use-package eglot
   :ensure t
@@ -997,7 +1005,6 @@
    embark-dwim
    embark-bindings
    embark-prefix-help-command
-   embark-eldoc-first-target
    embark-completing-read-prompter
    embark--truncate-target)
 
@@ -1009,10 +1016,6 @@
   :init
   ;; Replace the key help with a completing-read interface:
   (setq prefix-help-command #'embark-prefix-help-command)
-
-  ;; Show the Embark target at point via Eldoc:
-  (add-hook 'eldoc-documentation-functions #'embark-eldoc-first-target)
-  (setq eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly)
 
   ;; Set up indicator strategy:
   (setq embark-indicators '(embark-highlight-indicator
