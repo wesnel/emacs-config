@@ -1074,6 +1074,18 @@
   :ensure t
   :mode "\\.http\\'")
 
+;;;; Flymake support for Golang linting.
+(use-package flymake-golangci
+  :ensure t
+
+  ;; TODO: If using a non-Nix configuration, you'll need to point this
+  ;;       towards your local git clone of elsewhere.  In this case,
+  ;;       you will also need to remove the `:ensure' line from above.
+  ; :load-path ("~/git/github.com/storvik/flymake-golangci")
+
+  :commands
+  (flymake-golangci-load-backend))
+
 ;;;; Basic Golang support.
 ;;
 ;; HACK: This is built-in to Emacs, but there is also a third-party
@@ -1096,6 +1108,7 @@
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
+    (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
 
   :init
