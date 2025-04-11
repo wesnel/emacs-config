@@ -1302,6 +1302,19 @@
   (add-hook 'nix-mode-hook #'wgn/nix-mode-eglot-setup))
 
 ;;;; YAML support.
+;;
+;; NOTE: To load a custom YAML schema in a project, create a
+;;       .dir-locals.el file including the following contents:
+;;
+;; ((yaml-ts-mode
+;;   . ((eglot-workspace-configuration
+;;       . (:yaml (:format (:enable t)
+;;                 :validate t
+;;                 :hover t
+;;                 :completion t
+;;                 :schemaStore (:enable t)
+;;                 :schemas (https://example.com/yaml-schema
+;;                           ["filename.yml" "filename.yaml"])))))))
 (use-package yaml-ts-mode
   :mode
   (("\\.yaml\\'" . yaml-ts-mode)
