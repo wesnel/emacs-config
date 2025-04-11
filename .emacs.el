@@ -873,8 +873,23 @@
    ("C-c C-l ?" . #'xref-find-references)
    ("C-c C-l r" . #'eglot-rename)
    ("C-c C-l i" . #'eglot-find-implementation)
-   ("C-c C-l d" . #'eldoc)
    ("C-c C-l e" . #'eglot-code-actions)))
+
+;;;; Pop-up window instead of echo area for Eldoc documentation
+(when (display-graphic-p)
+  (use-package eldoc-box
+    :ensure t
+
+    :custom
+    (eldoc-box-clear-with-C-g t)
+
+    :commands
+    (eldoc-box-help-at-point)
+
+    :hook
+    (eglot-managed-mode
+     . (lambda ()
+         (bind-key "C-c C-l d" #'eldoc-box-help-at-point 'eglot-mode-map)))))
 
 ;;;; Debug adapter integration.
 (use-package dape
