@@ -65,10 +65,7 @@ final: prev: let
   build-emacs-config = pkgs: build-deps: let
     deps = build-deps pkgs;
   in
-    pkgs.substituteAll {
-      name = "default.el";
-      src = ../.emacs.el;
-
+    pkgs.replaceVars ../default.el {
       inherit
         (deps)
         asdf
