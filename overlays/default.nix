@@ -244,6 +244,12 @@ final: prev: let
     build-deps-static
     (pkgs: pkgs.emacs);
 
+  wgn-emacs-pgtk =
+    build-emacs
+    final
+    build-deps-static
+    (pkgs: pkgs.emacs-git-pgtk);
+
   wgn-emacs-nox =
     build-emacs
     final
@@ -294,6 +300,7 @@ in {
     emacs-config
     emacs-config-dynamic
     wgn-emacs
+    wgn-emacs-pgtk
     wgn-emacs-nox
     wgn-emacs-macport
     wgn-emacs-macport-cross

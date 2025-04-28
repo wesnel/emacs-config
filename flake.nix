@@ -43,6 +43,7 @@
           emacs-config-dynamic
           wgn-emacs
           wgn-emacs-nox
+          wgn-emacs-pgtk
           wgn-emacs-macport
           wgn-emacs-macport-cross
           wgn-emacs-unstable
