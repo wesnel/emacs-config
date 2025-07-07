@@ -181,6 +181,25 @@ final: prev: let
             };
           };
 
+        flymake-golangci = let
+          rev = "5495d7f5a00b171358cc0f2501ba64b79a240ce5";
+          sha256 = "sha256-FZ7IfGsR4qGg2GIc7s7UVlNfHoI9cwE/KjX1UJXpRVk=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "flymake-golangci";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "storvik";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
         flymake-hledger = let
           rev = "80cffbc70aa72dc9de311e5cf172664f76b4b7e0";
           sha256 = "sha256-ZcSKhdPe643uzwRA5IjdLcDSU1Gd0hEL8CXSVB5/gys=";
