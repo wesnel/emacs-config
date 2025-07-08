@@ -66,17 +66,7 @@
 
       formatter = pkgs.alejandra;
     })
-    // flake-utils.lib.eachDefaultSystemPassThrough (system: let
-      pkgs = import nixpkgs {
-        overlays = [
-          default
-        ];
-
-        inherit
-          system
-          ;
-      };
-    in {
+    // flake-utils.lib.eachDefaultSystemPassThrough (system: {
       overlays = {
         inherit default;
 
@@ -104,6 +94,7 @@
         default = {
           config,
           lib,
+          pkgs,
           ...
         }: let
           cfg = config.home.programs.wgn.emacs;
@@ -146,6 +137,7 @@
         default = {
           config,
           lib,
+          pkgs,
           ...
         }: let
           cfg = config.programs.wgn.emacs;
