@@ -112,6 +112,13 @@
           };
 
           config = lib.mkIf cfg.enable {
+            xdg.configFile = {
+              "fish/conf.d/emacs-vterm.fish" = {
+                enable = config.home.programs.fish.enable;
+                source = "${pkgs.emacsPackages.vterm}/etc/emacs-vterm.fish";
+              };
+            };
+
             home = {
               file = {
                 ".emacs.d/etc/gnus/init.el" = lib.mkIf cfg.gnus.enable {
