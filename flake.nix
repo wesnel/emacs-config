@@ -24,7 +24,20 @@
   }: let
     default = final: prev:
       (import ./overlays final prev)
-      // (import emacs-overlay final prev);
+      // (import emacs-overlay final prev)
+      // {
+        parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
+          # HACK: On Mac, the file has the extension ".dylib",
+          #       but it needs to be ".so":
+          postInstall = ''
+            ${old.postInstall or ""}
+
+            if [ -e $out/lib/libparinfer_rust.dylib ]
+              then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
+            fi
+          '';
+        });
+      };
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
@@ -69,25 +82,6 @@
     // flake-utils.lib.eachDefaultSystemPassThrough (system: {
       overlays = {
         inherit default;
-
-        emacs = final: prev: {
-          emacs =
-            if final.stdenv.isDarwin
-            then final.wgn-emacs-macport
-            else final.wgn-emacs-unstable;
-
-          parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
-            # HACK: On Mac, the file has the extension ".dylib",
-            #       but it needs to be ".so":
-            postInstall = ''
-              ${old.postInstall or ""}
-
-              if [ -e $out/lib/libparinfer_rust.dylib ]
-                then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
-              fi
-            '';
-          });
-        };
       };
 
       homeManagerModules = {
@@ -115,7 +109,7 @@
             xdg.configFile = {
               "fish/conf.d/emacs-vterm.fish" = {
                 enable = config.programs.fish.enable;
-                source = "${pkgs.emacs.pkgs.vterm}/etc/emacs-vterm.fish";
+                source = "${pkgs.emacsPackages.vterm}/etc/emacs-vterm.fish";
               };
             };
 
