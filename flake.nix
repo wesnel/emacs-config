@@ -115,7 +115,7 @@
             xdg.configFile = {
               "fish/conf.d/emacs-vterm.fish" = {
                 enable = config.programs.fish.enable;
-                source = "${pkgs.emacsPackages.vterm}/etc/emacs-vterm.fish";
+                source = "${pkgs.emacs.pkgs.vterm}/etc/emacs-vterm.fish";
               };
             };
 
