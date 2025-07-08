@@ -109,7 +109,7 @@
             xdg.configFile = {
               "fish/conf.d/emacs-vterm.fish" = {
                 enable = config.programs.fish.enable;
-                source = "${pkgs.emacsPackages.vterm}/etc/emacs-vterm.fish";
+                source = "${pkgs.emacsPackages.vterm}/share/emacs/site-lisp/elpa/vterm-${pkgs.emacsPackages.vterm.version}/etc/emacs-vterm.fish";
               };
             };
 
