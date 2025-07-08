@@ -114,7 +114,7 @@
           config = lib.mkIf cfg.enable {
             xdg.configFile = {
               "fish/conf.d/emacs-vterm.fish" = {
-                enable = config.home.programs.fish.enable;
+                enable = config.programs.fish.enable;
                 source = "${pkgs.emacsPackages.vterm}/etc/emacs-vterm.fish";
               };
             };
