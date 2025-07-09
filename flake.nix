@@ -133,6 +133,7 @@
                 };
 
                 ".emacs.d/early-init.el".source = ./early-init.el;
+                ".emacs.d/etc/eshell/login".source = ./login.el;
               };
             };
           };
