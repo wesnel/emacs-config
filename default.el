@@ -96,6 +96,15 @@
   (size-indication-mode +1)
   (display-time))
 
+;;;; Idle "screensavers".
+(use-package zone
+  :commands
+  (zone
+   zone-when-idle)
+
+  :init
+  (zone-when-idle 300))
+
 (use-package server
   :commands
   (server-running-p
