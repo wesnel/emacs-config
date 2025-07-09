@@ -65,6 +65,10 @@ final: prev: let
   build-emacs-config = pkgs: build-deps: let
     deps = build-deps pkgs;
   in
+    # TODO: Split Emacs config across multiple files and combine into
+    # one default.el file with nix.  Include `:after` in all
+    # use-package forms in order to guarantee that packages are loaded
+    # in the correct order regardless of location in final file.
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
