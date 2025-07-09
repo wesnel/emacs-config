@@ -518,6 +518,16 @@
   :custom
   (magit-delta-delta-executable "@delta@"))
 
+;;;; Aggregate project TODO comments in magit.
+(use-package magit-todos
+  :ensure t
+
+  :commands
+  (magit-todos-mode)
+
+  :init
+  (magit-todos-mode +1))
+
 ;;;; Dockerfile support.
 (use-package dockerfile-ts-mode
   :mode "\\Dockerfile\\'"
