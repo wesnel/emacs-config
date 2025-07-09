@@ -102,6 +102,10 @@
 
                 # TODO: Add options to customize IMAP server, etc.
               };
+
+              llm = {
+                enable = lib.mkEnableOption "Enable LLM integration for Emacs";
+              };
             };
           };
 
@@ -110,6 +114,14 @@
               "fish/conf.d/emacs-vterm.fish" = {
                 enable = config.programs.fish.enable;
                 source = "${pkgs.emacsPackages.vterm}/share/emacs/site-lisp/elpa/vterm-${pkgs.emacsPackages.vterm.version}/etc/emacs-vterm.fish";
+              };
+            };
+
+            services = lib.mkIf cfg.llm.enable {
+              ollama = {
+                enable = true;
+                # TODO: Substitute the port into the Emacs configuration.
+                port = 11434;
               };
             };
 

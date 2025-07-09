@@ -1,4 +1,4 @@
-;;; .emacs.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
+;;; default.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
 
 ;; Copyright (C) 2024 Wesley Nelson
 
@@ -935,24 +935,65 @@
   :defines
   (copilot-bin))
 
-;;;; Interface for talking to ChatGPT.
+;;;; LLM integration.
 ;;
-;; NOTE: If you want to actually use ChatGPT, you need to store your
-;;       OpenAI credentials under auth-source.
-;;
-;; TODO: Integrate this with a local model.
-(use-package org-ai
+;; TODO: Only build this package if the Nix
+;; home.programs.wgn.emacs.llm.enable option is true.
+(use-package gptel
   :ensure t
 
   :commands
-  (org-ai-mode
-   org-ai-global-mode)
+  (gptel-send
+   gptel
+   gptel-rewrite
+   gptel-menu
+   gptel-add
+   gptel-add-file
+   gptel-org-set-topic
+   gptel-org-set-properties
+   gptel-make-ollama
+   gptel-tools)
 
-  :hook
-  (org-mode . org-ai-mode)
+  :config
+  (use-package gptel-integrations
+    :require t
 
-  :init
-  (org-ai-global-mode))
+    :commands
+    (gptel-mcp-connect
+     gptel-mcp-disconnect))
+
+  (setq
+   gptel-model 'mistral:latest
+   gptel-backend (gptel-make-ollama
+                  "Ollama"
+                  :host "localhost:11434"
+                  :stream t
+                  :models '(mistral:latest))))
+
+;;;; MCP integration.
+;;
+;; TODO: Only build this package if the Nix
+;; home.programs.wgn.emacs.llm.enable option is true.
+(use-package mcp
+  :ensure t
+
+  :custom
+  ;; TODO: Fill in some MCP servers.
+  (mcp-hub-servers nil)
+
+  :commands
+  (mcp-connect-server
+   mcp-make-text-tool)
+
+  :config
+  (use-package mcp-hub
+    :require t
+
+    :commands
+    (mcp-hub-get-all-tool
+     mcp-hub-start-all-server
+     mcp-hub
+     mcp-hub-start-server)))
 
 ;;;; Completion using the built-in *Completions* buffer.
 (use-package minibuffer
@@ -1762,6 +1803,6 @@
   :config
   (bbdb-initialize 'message 'gnus 'sendmail 'anniv))
 
-(provide '.emacs)
+(provide 'default)
 
-;;; .emacs.el ends here
+;;; default.el ends here
