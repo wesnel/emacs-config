@@ -954,21 +954,21 @@
    gptel-make-ollama
    gptel-tools)
 
+  :custom
+  (gptel-model 'gemma3:latest)
+  (gptel-backend (gptel-make-ollama
+                  "Ollama"
+                  :host "localhost:11434"
+                  :stream t
+                  :models '(gemma3:latest)))
+
   :config
   (use-package gptel-integrations
     :require t
 
     :commands
     (gptel-mcp-connect
-     gptel-mcp-disconnect))
-
-  (setq
-   gptel-model 'mistral:latest
-   gptel-backend (gptel-make-ollama
-                  "Ollama"
-                  :host "localhost:11434"
-                  :stream t
-                  :models '(mistral:latest))))
+     gptel-mcp-disconnect)))
 
 ;;;; MCP integration.
 ;;
