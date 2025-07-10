@@ -470,6 +470,16 @@
   :init
   (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search))
 
+;;;; Show hint of full path in headerline.
+(use-package breadcrumb
+  :ensure t
+
+  :commands
+  (breadcrumb-mode)
+
+  :init
+  (breadcrumb-mode +1))
+
 ;;;; Git interface.
 (use-package magit
   :ensure t
