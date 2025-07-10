@@ -303,6 +303,7 @@ final: prev: let
     build-deps-static
     (pkgs: pkgs.emacs-git-nox);
 
+  # TODO: Configurable app icon on MacOS.
   wgn-emacs-macport =
     build-emacs
     final
