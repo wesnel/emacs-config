@@ -648,6 +648,26 @@
   (olivetti-minimum-body-width 80)
   (olivetti-recall-visual-line-mode-entry-state t))
 
+;;;; Quickly jump between windows.
+(use-package ace-window
+  :ensure t
+
+  :commands
+  (ace-window)
+
+  :bind
+  (([remap other-window] . #'ace-window)))
+
+;;;; Automatic resizing of windows.
+(use-package golden-ratio
+  :ensure t
+
+  :commands
+  (golden-ratio-mode)
+
+  :init
+  (golden-ratio-mode +1))
+
 ;;;; Focused presentation mode built on top of outline.
 (use-package logos
   :ensure t
