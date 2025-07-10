@@ -1837,6 +1837,13 @@
   :config
   (bbdb-initialize 'message 'gnus 'sendmail 'anniv))
 
+;;;; Godbolt-like compiler explorer in Emacs.
+(use-package rmsbolt
+  :ensure t
+
+  :commands
+  (rmsbolt))
+
 (provide 'default)
 
 ;;; default.el ends here
