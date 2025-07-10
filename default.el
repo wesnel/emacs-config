@@ -148,6 +148,9 @@
   :commands
   (org-heading-components)
 
+  :defines
+  (org-mode-map)
+
   :preface
   (defun wgn/verify-refile-target ()
     "Exclude TODO keywords with a DONE state from refile targets."
@@ -1164,9 +1167,15 @@
    elsewhere-build-url))
 
 ;;;; Send HTTP requests from Emacs.
-(use-package restclient
+(use-package verb
   :ensure t
-  :mode "\\.http\\'")
+
+  :defines
+  (verb-command-map)
+
+  :config
+  ;; TODO: Is there a way to use `:bind-keymap' for this?
+  (define-key org-mode-map (kbd "C-c r") verb-command-map))
 
 ;;;; Flymake support for Golang linting.
 (use-package flymake-golangci
@@ -1594,19 +1603,6 @@
 
   ;; Set up eglot for css-ts-mode.
   (add-hook 'css-ts-mode-hook #'wgn/css-ts-mode-eglot-setup))
-
-;;;; Send HTTP requests from org-mode.
-(use-package ob-restclient
-  :ensure t
-
-  :preface
-  (defun wgn/set-up-ob-restclient ()
-    (org-babel-do-load-languages
-     'org-babel-load-languages
-     '((restclient . t))))
-
-  :init
-  (add-hook 'org-mode-hook #'wgn/set-up-ob-restclient))
 
 ;;;; TeX support.
 (use-package auctex
