@@ -441,22 +441,11 @@
   (recentf-mode +1))
 
 ;;;; Undo history as a tree.
-(use-package undo-tree
+(use-package vundo
   :ensure t
-  :diminish undo-tree-mode
-
-  :custom
-  (undo-tree-enable-undo-in-region t)
-  (undo-tree-visualizer-diff t)
 
   :commands
-  (global-undo-tree-mode)
-
-  :custom
-  (undo-tree-auto-save-history t)
-
-  :init
-  (global-undo-tree-mode +1))
+  (vundo))
 
 ;;;; Find identifier by reference in many major modes.
 (use-package xref
