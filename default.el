@@ -61,6 +61,11 @@
   (display-time-use-mail-icon t)
   ;; Allow minibuffer command while in a minibuffer command.
   (enable-recursive-minibuffers t)
+  ;; Do not allow the cursor in the minibuffer prompt.
+  (minibuffer-prompt-properties
+   '(read-only t cursor-intangible t face minibuffer-prompt))
+  ;; Enable mouse-based context menu.
+  (context-menu-mode t)
   ;; Mail configuration.
   ;; TODO: Make configurable via Nix.
   (mail-sources `((imap :server "imap.fastmail.com"
@@ -421,6 +426,9 @@
 
 ;;;; Persist history over Emacs restarts.
 (use-package savehist
+  :commands
+  (savehist-mode)
+
   :custom
   (savehist-additional-variables '(search-ring regexp-search-ring))
   (savehist-autosave-interval 60)
@@ -430,11 +438,17 @@
 
 ;;;; Remember your location in a file.
 (use-package saveplace
+  :commands
+  (save-place-mode)
+
   :init
   (save-place-mode +1))
 
 ;;;; Save recent files.
 (use-package recentf
+  :commands
+  (recentf-mode)
+
   :custom
   (recentf-max-saved-items 500)
   (recentf-max-menu-items 15)
@@ -651,26 +665,6 @@
   (olivetti-minimum-body-width 80)
   (olivetti-recall-visual-line-mode-entry-state t))
 
-;;;; Quickly jump between windows.
-(use-package ace-window
-  :ensure t
-
-  :commands
-  (ace-window)
-
-  :bind
-  (([remap other-window] . #'ace-window)))
-
-;;;; Automatic resizing of windows.
-(use-package golden-ratio
-  :ensure t
-
-  :commands
-  (golden-ratio-mode)
-
-  :init
-  (golden-ratio-mode +1))
-
 ;;;; Focused presentation mode built on top of outline.
 (use-package logos
   :ensure t
@@ -713,6 +707,7 @@
 ;;;; Spell checxing and correction.
 (use-package jinx
   :ensure t
+  :diminish jinx-mode
 
   :custom
   (ispell-program-name "enchant-2")
@@ -877,6 +872,8 @@
 
 ;;;; Documentation in echo area.
 (use-package eldoc
+  :diminish eldoc-mode
+
   :commands
   (eldoc-documentation-compose-eagerly)
 
@@ -1036,47 +1033,149 @@
      mcp-hub
      mcp-hub-start-server)))
 
+;;;; Improved `completing-read' functions.
+(use-package consult
+  :ensure t
+
+  :commands
+  (consult-bookmark
+   consult-buffer
+   consult-buffer-other-frame
+   consult-buffer-other-tab
+   consult-buffer-other-window
+   consult-compile-error
+   consult-complex-command
+   consult-find
+   consult-flymake
+   consult-focus-lines
+   consult-git-grep
+   consult-global-mark
+   consult-goto-line
+   consult-grep
+   consult-history
+   consult-imenu
+   consult-imenu-multi
+   consult-info
+   consult-isearch-history
+   consult-keep-lines
+   consult-kmacro
+   consult-line
+   consult-line-multi
+   consult-locate
+   consult-man
+   consult-mark
+   consult-mode-command
+   consult-outline
+   consult-project-buffer
+   consult-register
+   consult-register-load
+   consult-register-store
+   consult-ripgrep
+   consult-xref
+   consult-yank-pop)
+
+  :bind
+  (;; C-c bindings in `mode-specific-map'
+   ("C-c M-x" . #'consult-mode-command)
+   ("C-c h" . #'consult-history)
+   ("C-c k" . #'consult-kmacro)
+   ("C-c m" . #'consult-man)
+   ("C-c i" . #'consult-info)
+   ([remap Info-search] . #'consult-info)
+   ;; C-x bindings in `ctl-x-map'
+   ("C-x M-:" . #'consult-complex-command)     ;; orig. repeat-complex-command
+   ("C-x b" . #'consult-buffer)                ;; orig. switch-to-buffer
+   ("C-x 4 b" . #'consult-buffer-other-window) ;; orig. switch-to-buffer-other-window
+   ("C-x 5 b" . #'consult-buffer-other-frame)  ;; orig. switch-to-buffer-other-frame
+   ("C-x t b" . #'consult-buffer-other-tab)    ;; orig. switch-to-buffer-other-tab
+   ("C-x r b" . #'consult-bookmark)            ;; orig. bookmark-jump
+   ("C-x p b" . #'consult-project-buffer)      ;; orig. project-switch-to-buffer
+   ;; Custom M-# bindings for fast register access
+   ("M-#" . #'consult-register-load)
+   ("M-'" . #'consult-register-store)          ;; orig. abbrev-prefix-mark (unrelated)
+   ("C-M-#" . #'consult-register)
+   ;; Other custom bindings
+   ("M-y" . #'consult-yank-pop)                ;; orig. yank-pop
+   ;; M-g bindings in `goto-map'
+   ("M-g e" . #'consult-compile-error)
+   ("M-g f" . #'consult-flymake)               ;; Alternative: consult-flycheck
+   ("M-g g" . #'consult-goto-line)             ;; orig. goto-line
+   ("M-g M-g" . #'consult-goto-line)           ;; orig. goto-line
+   ("M-g o" . #'consult-outline)               ;; Alternative: consult-org-heading
+   ("M-g m" . #'consult-mark)
+   ("M-g k" . #'consult-global-mark)
+   ("M-g i" . #'consult-imenu)
+   ("M-g I" . #'consult-imenu-multi)
+   ;; M-s bindings in `search-map'
+   ("M-s d" . #'consult-find)                  ;; Alternative: consult-fd
+   ("M-s c" . #'consult-locate)
+   ("M-s g" . #'consult-grep)
+   ("M-s G" . #'consult-git-grep)
+   ("M-s r" . #'consult-ripgrep)
+   ("M-s l" . #'consult-line)
+   ("M-s L" . #'consult-line-multi)
+   ("M-s k" . #'consult-keep-lines)
+   ("M-s u" . #'consult-focus-lines)
+   ;; Isearch integration
+   ("M-s e" . #'consult-isearch-history)
+   :map isearch-mode-map
+   ("M-e" . #'consult-isearch-history)         ;; orig. isearch-edit-string
+   ("M-s e" . #'consult-isearch-history)       ;; orig. isearch-edit-string
+   ("M-s l" . #'consult-line)                  ;; needed by consult-line to detect isearch
+   ("M-s L" . #'consult-line-multi)            ;; needed by consult-line to detect isearch
+   ;; Minibuffer history
+   :map minibuffer-local-map
+   ("M-s" . #'consult-history)                 ;; orig. next-matching-history-element
+   ("M-r" . #'consult-history)))               ;; orig. previous-matching-history-element
+
+;;;; Cross-references.
+(use-package xref
+  :custom
+  (xref-show-xrefs-function #'consult-xref)
+  (xref-show-definitions-function #'consult-xref))
+
+;;;; Custom `completion-at-point' completion.
+(use-package corfu
+  :ensure t
+
+  :commands
+  (global-corfu-mode)
+
+  :config
+  (unless (display-graphic-p)
+    (use-package corfu-terminal
+      :ensure t
+
+      :commands
+      (corfu-terminal-mode)
+
+      :init
+      (corfu-terminal-mode +1)))
+
+  :init
+ (global-corfu-mode +1))
+
 ;;;; Completion using the built-in *Completions* buffer.
 (use-package minibuffer
-  :preface
-  (defun wgn/sort-by-alpha-length (elems)
-    (sort elems (lambda (c1 c2)
-                  (or (string-version-lessp c1 c2)
-                      (< (length c1) (length c2))))))
-
-  (defun wgn/sort-by-history (elems)
-    (if-let ((hist (and (not (eq minibuffer-history-variable t))
-                        (symbol-value minibuffer-history-variable))))
-        (minibuffer--sort-by-position hist elems)
-      (wgn/sort-by-alpha-length elems)))
-
-  (defun wgn/completion-category ()
-    (when-let ((window (active-minibuffer-window)))
-      (with-current-buffer (window-buffer window)
-        (completion-metadata-get
-         (completion-metadata (buffer-substring-no-properties
-                               (minibuffer-prompt-end)
-                               (max (minibuffer-prompt-end) (point)))
-                              minibuffer-completion-table
-                              minibuffer-completion-predicate)
-         'category))))
-
-  (defun wgn/sort-multi-category (elems)
-    (pcase (wgn/completion-category)
-      ('nil elems) ; no sorting
-      ('kill-ring elems)
-      (_ (wgn/sort-by-history elems))))
-
   :custom
   (completions-format 'one-column)
   (completions-header-format nil)
   (completions-max-height 20)
   (completion-auto-help 'always)
   (completion-auto-select 'second-tab)
-  (completions-sort #'wgn/sort-multi-category)
   (completion-ignore-case t)
   (read-buffer-completion-ignore-case t)
   (read-file-name-completion-ignore-case t))
+
+;;;; Custom minibuffer-based completion.
+(use-package vertico
+  :ensure t
+
+  :commands
+  (vertico-mode)
+
+  :init
+  (vertico-mode +1))
 
 ;;;; Rich annotations in the minibuffer completion.
 (use-package marginalia
@@ -1106,9 +1205,9 @@
    embark--truncate-target)
 
   :bind
-  (("C-." . embark-act)
-   ("M-." . embark-dwim)
-   ("C-h B" . embark-bindings))
+  (("C-." . #'embark-act)
+   ("M-." . #'embark-dwim)
+   ("C-h B" . #'embark-bindings))
 
   :init
   ;; Replace the key help with a completing-read interface:
@@ -1116,14 +1215,7 @@
 
   ;; Set up indicator strategy:
   (setq embark-indicators '(embark-highlight-indicator
-                            embark-isearch-highlight-indicator))
-
-  :config
-  ;; Hide the mode line of the Embark live/completions buffers:
-  (add-to-list 'display-buffer-alist
-               '("\\`\\*Embark Collect \\(Live\\|Completions\\)\\*"
-                 nil
-                 (window-parameters (mode-line-format . none)))))
+                            embark-isearch-highlight-indicator)))
 
 ;;;; More helpful documentation for Emacs Lisp.
 (use-package helpful
@@ -1694,6 +1786,7 @@
 ;;;; Indicate the git diff in the margin.
 (use-package git-gutter
   :ensure t
+  :diminish git-gutter-mode
 
   :commands
   (global-git-gutter-mode)
