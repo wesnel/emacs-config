@@ -1217,6 +1217,13 @@
   (setq embark-indicators '(embark-highlight-indicator
                             embark-isearch-highlight-indicator)))
 
+;;;; Integration between embark and consult.
+(use-package embark-consult
+  :ensure t
+
+  :hook
+  (embark-collect-mode . consult-preview-at-point-mode))
+
 ;;;; More helpful documentation for Emacs Lisp.
 (use-package helpful
   :ensure t
