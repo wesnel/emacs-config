@@ -1809,13 +1809,20 @@
 
   :commands
   (doom-themes-visual-bell-config
-   doom-themes-org-config)
+   doom-themes-org-config
+   doom-themes-set-faces)
 
   :custom
   (doom-themes-enable-bold t)   ; if nil, bold is universally disabled
   (doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
   :init
+  (doom-themes-set-faces
+    'doom-solarized-dark
+    ;; Fix annoyingly bright tab character:
+    '(whitespace-tab :inherit 'whitespace-space))
+
+
   (load-theme 'doom-solarized-dark :no-confirm)
 
   (doom-themes-visual-bell-config)
