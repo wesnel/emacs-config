@@ -1817,13 +1817,10 @@
   (doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
   :init
-  (doom-themes-set-faces
-    'doom-solarized-dark
-    ;; Fix annoyingly bright tab character:
-    '(whitespace-tab :inherit 'whitespace-space))
-
-
   (load-theme 'doom-solarized-dark :no-confirm)
+  (custom-set-faces
+   ;; Fix annoyingly bright tab character:
+   `(whitespace-tab ((t (:background ,(doom-color 'unspecified))))))
 
   (doom-themes-visual-bell-config)
   (doom-themes-org-config))
