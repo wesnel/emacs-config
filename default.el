@@ -1820,7 +1820,7 @@
   (load-theme 'doom-solarized-dark :no-confirm)
   (custom-set-faces
    ;; Fix annoyingly bright tab character:
-   `(whitespace-tab ((t (:background ,(doom-color 'unspecified))))))
+   '(whitespace-tab ((t (:background unspecified)))))
 
   (doom-themes-visual-bell-config)
   (doom-themes-org-config))
