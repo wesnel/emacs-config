@@ -101,7 +101,7 @@
   (size-indication-mode +1)
   (display-time)
   (add-to-list 'default-frame-alist
-               '(font . "ComicShannsMono Nerd Font-10")))
+               '(font . "ComicShannsMono Nerd Font-12")))
 
 ;;;; Idle "screensavers".
 (use-package zone
@@ -1816,7 +1816,7 @@
   (doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
   :init
-  (load-theme 'doom-oksolar-dark :no-confirm)
+  (load-theme 'doom-solarized-dark :no-confirm)
 
   (doom-themes-visual-bell-config)
   (doom-themes-org-config))
@@ -1832,8 +1832,8 @@
 
     :custom
     (auto-dark-allow-osascript t)
-    (auto-dark-dark-theme 'doom-oksolar-dark)
-    (auto-dark-light-theme 'doom-oksolar-light)
+    (auto-dark-dark-theme 'doom-solarized-dark)
+    (auto-dark-light-theme 'doom-solarized-light)
 
     :init
     (auto-dark-mode +1)))
