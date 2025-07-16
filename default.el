@@ -99,7 +99,9 @@
   (line-number-mode +1)
   (column-number-mode +1)
   (size-indication-mode +1)
-  (display-time))
+  (display-time)
+  (add-to-list 'default-frame-alist
+               '(font . "ComicShannsMono Nerd Font-10")))
 
 ;;;; Idle "screensavers".
 (use-package zone
@@ -1802,15 +1804,22 @@
   (global-git-gutter-mode +1))
 
 ;;;; Color scheme.
-(use-package modus-themes
+(use-package doom-themes
   :ensure t
 
+  :commands
+  (doom-themes-visual-bell-config
+   doom-themes-org-config)
+
   :custom
-  (modus-themes-italic-constructs t)
-  (modus-themes-bold-constructs t)
+  (doom-themes-enable-bold t)   ; if nil, bold is universally disabled
+  (doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
   :init
-  (load-theme 'modus-vivendi-tinted :no-confirm))
+  (load-theme 'doom-oksolar-dark :no-confirm)
+
+  (doom-themes-visual-bell-config)
+  (doom-themes-org-config))
 
 ;;;; Use system dark mode settings for theme.
 (when (memq system-type '(darwin))
@@ -1823,8 +1832,8 @@
 
     :custom
     (auto-dark-allow-osascript t)
-    (auto-dark-dark-theme 'modus-vivendi-tinted)
-    (auto-dark-light-theme 'modus-operandi-tinted)
+    (auto-dark-dark-theme 'doom-oksolar-dark)
+    (auto-dark-light-theme 'doom-oksolar-light)
 
     :init
     (auto-dark-mode +1)))

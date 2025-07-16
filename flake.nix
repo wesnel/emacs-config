@@ -160,6 +160,10 @@
           };
 
           config = lib.mkIf cfg.enable {
+            fonts.packages = with pkgs.nerd-fonts; [
+              comic-shanns-mono
+            ];
+
             environment = {
               pathsToLink = [
                 "/share/hunspell"
