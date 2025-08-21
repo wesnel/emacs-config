@@ -1784,14 +1784,6 @@
    htmlize-many-files
    htmlize-many-files-dired))
 
-;;;; Pretty styling in org-mode buffers.
-(use-package org-modern
-  :ensure t
-
-  :hook
-  ((org-mode . org-modern-mode)
-   (org-agenda-finalize . org-modern-agenda)))
-
 ;;;; Indicate the git diff in the margin.
 (use-package git-gutter
   :ensure t
