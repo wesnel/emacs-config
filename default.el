@@ -1429,8 +1429,8 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    `((python-mode python-ts-mode) .
-                     ,(eglot-alternatives '(("poetry" "run" "pylsp")
-                                            "pylsp"))))
+                     ,(eglot-alternatives '("pylsp"
+                                            ("poetry" "run" "pylsp")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
