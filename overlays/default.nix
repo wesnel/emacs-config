@@ -2,7 +2,6 @@ final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
-    asdf = "asdf";
     delta = "delta";
     direnv = "direnv";
     gs = "gs";
@@ -19,10 +18,6 @@ final: prev: let
   # configuration, and their Nix store paths will be statically
   # linked in the built Emacs configuration.
   build-deps-static = pkgs: {
-    asdf = let
-      pkg = pkgs.asdf-vm;
-    in "${pkg}/bin/asdf";
-
     delta = let
       pkg = pkgs.delta;
     in "${pkg}/bin/delta";
@@ -72,7 +67,6 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
-        asdf
         delta
         direnv
         gs
