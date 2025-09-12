@@ -100,8 +100,14 @@
   (column-number-mode +1)
   (size-indication-mode +1)
   (display-time)
+
+  ;; Change font.
   (add-to-list 'default-frame-alist
-               '(font . "ComicShannsMono Nerd Font-12")))
+               '(font . "ComicShannsMono Nerd Font-12"))
+
+  ;; Change startup frame size.
+  (add-to-list 'default-frame-alist '(height . 40))
+  (add-to-list 'default-frame-alist '(width . 120)))
 
 ;;;; Idle "screensavers".
 (use-package zone
