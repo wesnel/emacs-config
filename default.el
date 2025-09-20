@@ -254,6 +254,10 @@
      ("NOTE" . ?n)
      ("CANCELLED" . ?c))))
 
+;;;; CSL citation processor.
+(use-package citeproc
+  :ensure t)
+
 ;;;; Store encrypted information in org files.
 (use-package org-crypt
   :commands
