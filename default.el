@@ -1024,7 +1024,8 @@
    ("C-c <return>" . #'gptel-send))
 
   :config
-  (setq gptel-backend (gptel-make-gh-copilot "Copilot")))
+  (setq gptel-model "gpt-4o"
+        gptel-backend (gptel-make-gh-copilot "Copilot")))
 
 ;;;; Improved `completing-read' functions.
 (use-package consult
