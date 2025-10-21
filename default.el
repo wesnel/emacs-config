@@ -844,8 +844,15 @@
   (vterm
    vterm-other-window)
 
+  :defines
+  (vterm-mode-map)
+
   :custom
   (vterm-max-scrollback 100000)
+
+  :bind
+  (:map vterm-mode-map
+   ([return] . nil))
 
   :preface
   (defun wgn/project-vterm ()
