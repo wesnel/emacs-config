@@ -1018,7 +1018,8 @@
    gptel-tools)
 
   :bind
-  (("C->" . #'gptel-send))
+  (("C-c RET" . #'gptel-send)
+   ("C-c <return>" . #'gptel-send))
 
   :config
   (setq gptel-backend (gptel-make-gh-copilot "Copilot")))
