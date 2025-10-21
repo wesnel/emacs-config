@@ -1183,6 +1183,7 @@
   :commands
   (embark-act
    embark-dwim
+   embark-export
    embark-bindings
    embark-prefix-help-command
    embark-completing-read-prompter
@@ -1191,7 +1192,9 @@
   :bind
   (("C-." . #'embark-act)
    ("M-." . #'embark-dwim)
-   ("C-h B" . #'embark-bindings))
+   ("C-h B" . #'embark-bindings)
+   :map minibuffer-mode-map
+   ("M-." . #'embark-export))
 
   :init
   ;; Replace the key help with a completing-read interface:
