@@ -965,7 +965,7 @@
   :config
   (dape-breakpoint-global-mode)
 
-  (add-hook 'dape-on-start-hooks
+  (add-hook 'dape-start-hook
             (lambda ()
               (save-some-buffers t t))))
 
