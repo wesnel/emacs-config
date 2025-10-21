@@ -1422,7 +1422,6 @@
 
 ;;;; C# support.
 (use-package csharp-ts-mode
-  :ensure t
   :mode "\\.cs\\'"
 
   :preface
