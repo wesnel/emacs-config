@@ -107,7 +107,11 @@
 
   ;; Change startup frame size.
   (add-to-list 'default-frame-alist '(height . 40))
-  (add-to-list 'default-frame-alist '(width . 120)))
+  (add-to-list 'default-frame-alist '(width . 120))
+
+  ;; Trust this file.
+  ;; TODO: Make this configurable or automatic?
+  (add-to-list 'trusted-files "~/git/github.com/wesnel/emacs-config/default.el"))
 
 ;;;; Idle "screensavers".
 (use-package zone
