@@ -986,6 +986,7 @@
 
   :custom
   (copilot-server-executable "@copilot@")
+  (copilot-indent-offset-warning-disable t)
 
   :bind
   (:map copilot-completion-map
@@ -1013,9 +1014,9 @@
   (("C-RET" . #'gptel-send)
    ("C-<return>" . #'gptel-send))
 
-  :custom
-  (gptel-model 'claude-4.5-sonnet)
-  (gptel-backend (gptel-make-gh-copilot "Copilot")))
+  :config
+  (setq gptel-model 'claude-4.5-sonnet
+        gptel-backend (gptel-make-gh-copilot "Copilot")))
 
 ;;;; Improved `completing-read' functions.
 (use-package consult
