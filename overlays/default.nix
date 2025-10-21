@@ -2,6 +2,7 @@ final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
+    copilot = "copilot-language-server";
     delta = "delta";
     direnv = "direnv";
     gs = "gs";
@@ -18,6 +19,10 @@ final: prev: let
   # configuration, and their Nix store paths will be statically
   # linked in the built Emacs configuration.
   build-deps-static = pkgs: {
+    copilot = let
+      pkg = pkgs.copilot-language-server;
+    in "${pkg}/bin/copilot-language-server";
+
     delta = let
       pkg = pkgs.delta;
     in "${pkg}/bin/delta";
@@ -67,6 +72,7 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
+        copilot
         delta
         direnv
         gs
@@ -151,25 +157,6 @@ final: prev: let
 
             src = pkgs.fetchFromGitHub {
               owner = "wesnel";
-              repo = pname;
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          };
-
-        emacs-copilot = let
-          rev = "c629d3951df88b48bdc47620b33d2588508d73be";
-          sha256 = "0m6by3m1k1jlbjzgh9fkdsnkcydpxvv6jbg644822dkynvirgihm";
-        in
-          ePkgs.trivialBuild rec {
-            pname = "emacs-copilot";
-            version = rev;
-
-            src = pkgs.fetchFromGitHub {
-              owner = "jart";
               repo = pname;
 
               inherit

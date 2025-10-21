@@ -965,30 +965,30 @@
             (lambda ()
               (save-some-buffers t t))))
 
-;;;; Coding copilot with local model.
-(use-package emacs-copilot
+;;;; GitHub Copilot.
+(use-package copilot
   :ensure t
 
-  ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of emacs-copilot.  In this
-  ;;       case, you will also need to remove the `:ensure' line from
-  ;;       above.
-  ; :load-path ("~/git/github.com/jart/emacs-copilot")
-
-  :bind
-  (:map prog-mode-map
-   ("C-c C-k" . #'copilot-complete))
+  :hook
+  (prog-mode . copilot-mode)
 
   :commands
-  (copilot-complete)
+  (copilot-mode
+   copilot-login
+   copilot-accept-completion)
 
   :defines
-  (copilot-bin))
+  (copilot-completion-map)
+
+  :custom
+  (copilot-server-executable "@copilot@")
+
+  :bind
+  (:map copilot-completion-map
+   ("M-RET" . #'copilot-accept-completion)
+   ("M-<return>" . #'copilot-accept-completion)))
 
 ;;;; LLM integration.
-;;
-;; TODO: Only build this package if the Nix
-;; home.programs.wgn.emacs.llm.enable option is true.
 (use-package gptel
   :ensure t
 
@@ -1002,48 +1002,16 @@
    gptel-org-set-topic
    gptel-org-set-properties
    gptel-make-ollama
+   gptel-make-gh-copilot
    gptel-tools)
 
-  :custom
-  (gptel-model 'gemma3:latest)
-  (gptel-backend (gptel-make-ollama
-                  "Ollama"
-                  :host "localhost:11434"
-                  :stream t
-                  :models '(gemma3:latest)))
-
-  :config
-  (use-package gptel-integrations
-    :require t
-
-    :commands
-    (gptel-mcp-connect
-     gptel-mcp-disconnect)))
-
-;;;; MCP integration.
-;;
-;; TODO: Only build this package if the Nix
-;; home.programs.wgn.emacs.llm.enable option is true.
-(use-package mcp
-  :ensure t
+  :bind
+  (("C-RET" . #'gptel-send)
+   ("C-<return>" . #'gptel-send))
 
   :custom
-  ;; TODO: Fill in some MCP servers.
-  (mcp-hub-servers nil)
-
-  :commands
-  (mcp-connect-server
-   mcp-make-text-tool)
-
-  :config
-  (use-package mcp-hub
-    :require t
-
-    :commands
-    (mcp-hub-get-all-tool
-     mcp-hub-start-all-server
-     mcp-hub
-     mcp-hub-start-server)))
+  (gptel-model 'claude-4.5-sonnet)
+  (gptel-backend (gptel-make-gh-copilot "Copilot")))
 
 ;;;; Improved `completing-read' functions.
 (use-package consult
