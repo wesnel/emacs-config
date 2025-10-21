@@ -852,6 +852,8 @@
 
   :bind
   (:map vterm-mode-map
+   ([return] . nil)
+   :map vterm-copy-mode-map
    ([return] . nil))
 
   :preface
