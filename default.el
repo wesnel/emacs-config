@@ -4,7 +4,7 @@
 
 ;; Author: Wesley Nelson <wgn@wgn.dev>
 ;; Maintainer: Wesley Nelson <wgn@wgn.dev>
-;; URL: https://git.sr.ht/~wgn/emacs-config
+;; URL: https://git.sr.ht/~wgn/emacs-config/
 
 ;; Package-Requires: ((emacs "29.1"))
 
