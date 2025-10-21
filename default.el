@@ -111,7 +111,7 @@
 
   ;; Trust this file.
   ;; TODO: Make this configurable or automatic?
-  (add-to-list 'trusted-files "~/git/github.com/wesnel/emacs-config/default.el"))
+  (add-to-list 'trusted-content "~/git/github.com/wesnel/emacs-config/default.el"))
 
 ;;;; Idle "screensavers".
 (use-package zone
