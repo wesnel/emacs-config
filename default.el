@@ -1428,7 +1428,7 @@
   (defun wgn/csharp-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
-                   '(csharp-ts-mode "OmniSharp"))
+                   '(csharp-ts-mode "OmniSharp" "--languageserver"))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
