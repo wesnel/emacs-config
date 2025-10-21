@@ -289,7 +289,7 @@ final: prev: let
     build-emacs
     final
     build-deps-static
-    (pkgs: pkgs.emacs29-macport);
+    (pkgs: pkgs.emacs30-macport);
 
   # FIXME: My goal is to build a MacOS executable from Linux.
   #        Unfortunately this currently fails with the error:
@@ -299,7 +299,7 @@ final: prev: let
     build-emacs
     final.pkgsCross.x86_64-darwin
     build-deps-static
-    (pkgs: pkgs.emacs29-macport);
+    (pkgs: pkgs.emacs30-macport);
 in {
   inherit
     emacs-config
