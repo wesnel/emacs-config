@@ -1125,19 +1125,8 @@
   :commands
   (global-corfu-mode)
 
-  :config
-  (unless (display-graphic-p)
-    (use-package corfu-terminal
-      :ensure t
-
-      :commands
-      (corfu-terminal-mode)
-
-      :init
-      (corfu-terminal-mode +1)))
-
   :init
- (global-corfu-mode +1))
+  (global-corfu-mode +1))
 
 ;;;; Completion using the built-in *Completions* buffer.
 (use-package minibuffer
