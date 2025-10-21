@@ -1420,6 +1420,34 @@
   ;; Set up eglot for python-ts-mode.
   (add-hook 'python-ts-mode-hook #'wgn/python-ts-mode-eglot-setup))
 
+;;;; C# support.
+(use-package csharp-ts-mode
+  :ensure t
+  :mode "\\.cs\\'"
+
+  :preface
+  (defun wgn/csharp-ts-mode-eglot-setup ()
+    (with-eval-after-load 'eglot
+      (add-to-list 'eglot-server-programs
+                   '(csharp-ts-mode "omnisharp-roslyn"))
+      (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
+    (eglot-ensure))
+
+  :init
+  (with-eval-after-load 'treesit
+    (add-to-list 'treesit-language-source-alist
+                 '(csharp "https://github.com/tree-sitter/tree-sitter-c-sharp.git")))
+
+  ;; Open go files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(csharp-mode . csharp-ts-mode))
+
+  ;; Set up eglot for csharp-ts-mode.
+  (add-hook 'csharp-ts-mode-hook #'wgn/csharp-ts-mode-eglot-setup)
+
+  ;; CamelCase aware editing operations.
+  (add-hook 'csharp-ts-mode-hook #'subword-mode))
+
 ;;;; Kotlin support.
 (use-package kotlin-ts-mode
   :ensure t
