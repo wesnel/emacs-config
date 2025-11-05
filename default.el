@@ -955,6 +955,8 @@
          (bind-key "C-c C-l d" #'eldoc-box-help-at-point 'eglot-mode-map)))))
 
 ;;;; Debug adapter integration.
+;;
+;; TODO: Evaluate whether I prefer this over the built-in Grand Unified Debugger (GUD).
 (use-package dape
   :ensure t
 
@@ -1389,6 +1391,16 @@
    go-test-current-project
    go-test-current-benchmark
    go-run))
+
+;;;; Support for Go in Emacs' built-in Grand Unified Debugger (GUD).
+;;
+;; TODO: Evaluate whether I prefer this or the `dape' integration.
+(use-package go-dlv
+  :ensure t
+
+  :commands
+  (dlv
+   dlv-current-func))
 
 ;;;; Python support.
 ;;
