@@ -1026,7 +1026,7 @@
    ("C-c <return>" . #'gptel-send))
 
   :config
-  (setq gptel-model "gpt-4o"
+  (setq gptel-model "gemini-2.5-pro"
         gptel-backend (gptel-make-gh-copilot "Copilot")))
 
 ;;;; Improved `completing-read' functions.
