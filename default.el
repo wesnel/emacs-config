@@ -749,12 +749,6 @@
   :init
   (global-devil-mode +1))
 
-(when (display-graphic-p)
-  (use-package doc-view
-    :init
-    (add-to-list 'exec-path "@gs@")
-    (add-to-list 'exec-path "@mupdf@")))
-
 (use-package grep
   :defines
   (grep-mode-map))
@@ -1786,15 +1780,17 @@
   :hook
   ((markdown-mode gfm-mode) . markdown-toc-mode))
 
-;;;; Reading EPUB files.
-(use-package nov
+;;;; Reading documents.
+(use-package reader
   :ensure t
 
-  :init
-  (add-hook 'nov-mode-hook #'wgn/disable-line-numbers)
+  :commands
+  (reader-mode)
 
   :mode
-  ("\\.epub\\'" . nov-mode))
+  (("\\.epub\\'" . reader-mode)
+   ("\\.pdf\\'" . reader-mode)
+   ("\\.mobi\\'" . reader-mode)))
 
 ;;;; Convert buffers to HTML (including org-mode).
 (use-package htmlize

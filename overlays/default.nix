@@ -5,10 +5,8 @@ final: prev: let
     copilot = "copilot-language-server";
     delta = "delta";
     direnv = "direnv";
-    gs = "gs";
     hledger = "hledger";
     multimarkdown = "multimarkdown";
-    mupdf = "mupdf";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
     pass = "pass";
     rg = "rg";
@@ -31,10 +29,6 @@ final: prev: let
       pkg = pkgs.direnv;
     in "${pkg}/bin/direnv";
 
-    gs = let
-      pkg = pkgs.ghostscript;
-    in "${pkg}/bin";
-
     hledger = let
       pkg = pkgs.hledger;
     in "${pkg}/bin";
@@ -42,10 +36,6 @@ final: prev: let
     multimarkdown = let
       pkg = pkgs.multimarkdown;
     in "${pkg}/bin/multimarkdown";
-
-    mupdf = let
-      pkg = pkgs.mupdf;
-    in "${pkg}/bin";
 
     parinfer = let
       pkg = pkgs.parinfer-rust-emacs;
@@ -75,10 +65,8 @@ final: prev: let
         copilot
         delta
         direnv
-        gs
         hledger
         multimarkdown
-        mupdf
         parinfer
         pass
         rg
@@ -221,6 +209,69 @@ final: prev: let
                 sha256
                 ;
             };
+          };
+
+        reader = let
+          rev = "a76b1a0e13774be57bed186edf1e5bee8eeb0a56";
+          sha256 = "sha256-pC51uw6xSB6ZuGyxAJAYUT3SInC4T3SDcb+haPy/b6o=";
+
+          # HACK: It seems that this must be manually updated to an arbitrary date.
+          version = "20251209";
+
+          src = final.fetchFromGitea {
+            domain = "codeberg.org";
+            owner = "divyaranjan";
+            repo = "emacs-reader";
+            hash = sha256;
+
+            inherit
+              rev
+              ;
+          };
+
+          render-core = final.stdenv.mkDerivation {
+            pname = "render-core";
+
+            strictDeps = true;
+
+            buildFlags = [
+              "CC=cc"
+              "USE_PKGCONFIG=yes"
+            ];
+
+            nativeBuildInputs = with final; [
+              pkg-config
+            ];
+
+            buildInputs = with final; [
+              mupdf-headless
+            ];
+
+            installPhase = ''
+              runHook preInstall
+
+              install -Dm444 -t $out/lib/ render-core${final.stdenv.targetPlatform.extensions.sharedLibrary}
+
+              runHook postInstall
+            '';
+
+            inherit
+              src
+              version
+              ;
+          };
+        in
+          ePkgs.melpaBuild {
+            pname = "reader";
+
+            files = ''
+              (:defaults "${final.lib.getLib render-core}/lib/render-core.*"))
+            '';
+
+            inherit
+              src
+              version
+              ;
           };
 
         scratch = let
