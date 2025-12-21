@@ -83,7 +83,45 @@ final: prev: let
 
       extraEmacsPackages = ePkgs:
         with ePkgs; [
-          treesit-grammars.with-all-grammars
+          (treesit-grammars.with-grammars
+            (grammars:
+              with grammars; [
+                tree-sitter-bash
+                tree-sitter-bibtex
+                tree-sitter-c
+                tree-sitter-clojure
+                tree-sitter-cmake
+                tree-sitter-commonlisp
+                tree-sitter-cpp
+                tree-sitter-css
+                tree-sitter-dockerfile
+                tree-sitter-elisp
+                tree-sitter-elixir
+                tree-sitter-erlang
+                tree-sitter-fish
+                tree-sitter-gdscript
+                tree-sitter-go
+                tree-sitter-go-template
+                tree-sitter-godot-resource
+                tree-sitter-gomod
+                tree-sitter-gowork
+                tree-sitter-graphql
+                tree-sitter-html
+                tree-sitter-java
+                tree-sitter-javascript
+                tree-sitter-json
+                tree-sitter-latex
+                tree-sitter-make
+                tree-sitter-markdown
+                tree-sitter-nix
+                tree-sitter-python
+                tree-sitter-regex
+                tree-sitter-sql
+                tree-sitter-toml
+                tree-sitter-tsx
+                tree-sitter-typescript
+                tree-sitter-yaml
+              ]))
         ];
 
       override = ePkgs: ePrev: {
