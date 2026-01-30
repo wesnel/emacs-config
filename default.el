@@ -974,70 +974,6 @@
             (lambda ()
               (save-some-buffers t t))))
 
-;;;; GitHub Copilot.
-(use-package copilot
-  :ensure t
-
-  :hook
-  (prog-mode . copilot-mode)
-
-  :commands
-  (copilot-mode
-   copilot-login
-   copilot-accept-completion)
-
-  :defines
-  (copilot-completion-map)
-
-  :custom
-  (copilot-server-executable "@copilot@")
-  (copilot-indent-offset-warning-disable t)
-
-  :bind
-  (:map copilot-completion-map
-   ("M-RET" . #'copilot-accept-completion)
-   ("M-<return>" . #'copilot-accept-completion)))
-
-;;;; LLM integration.
-(use-package gptel
-  :ensure t
-
-  :commands
-  (gptel-send
-   gptel
-   gptel-rewrite
-   gptel-menu
-   gptel-add
-   gptel-add-file
-   gptel-org-set-topic
-   gptel-org-set-properties
-   gptel-make-ollama
-   gptel-make-gh-copilot
-   gptel-tools)
-
-  :bind
-  (("C-c RET" . #'gptel-send)
-   ("C-c <return>" . #'gptel-send))
-
-  :config
-  (gptel-make-ollama "Ollama"
-    :host "localhost:11434"
-    :stream t
-    :models '(mistral:latest))
-  (setq gptel-model "gemini-2.5-pro"
-        gptel-backend (gptel-make-gh-copilot "Copilot")))
-
-;;;; LLM agent integration.
-(use-package gptel-agent
-  :ensure t
-
-  :commands
-  (gptel-agent
-   gptel-agent-update)
-
-  :config
-  (gptel-agent-update))
-
 ;;;; Improved `completing-read' functions.
 (use-package consult
   :ensure t
@@ -1188,7 +1124,8 @@
   :defines
   (embark-indicators
    embark-highlight-indicator
-   embark-isearch-highlight-indicator)
+   embark-isearch-highlight-indicator
+   embark-general-map)
 
   :commands
   (embark-act
@@ -1220,6 +1157,81 @@
 
   :hook
   (embark-collect-mode . consult-preview-at-point-mode))
+
+;;;; GitHub Copilot.
+(use-package copilot
+  :ensure t
+
+  :hook
+  (prog-mode . copilot-mode)
+
+  :commands
+  (copilot-mode
+   copilot-login
+   copilot-accept-completion)
+
+  :defines
+  (copilot-completion-map)
+
+  :custom
+  (copilot-server-executable "@copilot@")
+  (copilot-indent-offset-warning-disable t)
+
+  :bind
+  (:map copilot-completion-map
+   ("M-RET" . #'copilot-accept-completion)
+   ("M-<return>" . #'copilot-accept-completion)))
+
+;;;; LLM integration.
+(use-package gptel
+  :ensure t
+
+  :commands
+  (gptel-send
+   gptel
+   gptel-rewrite
+   gptel-menu
+   gptel-add
+   gptel-add-file
+   gptel-org-set-topic
+   gptel-org-set-properties
+   gptel-make-ollama
+   gptel-make-gh-copilot
+   gptel-tools)
+
+  :bind
+  (("C-c RET" . #'gptel-send)
+   ("C-c <return>" . #'gptel-send))
+
+  :config
+  (gptel-make-ollama "Ollama"
+    :host "localhost:11434"
+    :stream t
+    :models '(mistral:latest))
+  (setq gptel-model "gemini-2.5-pro"
+        gptel-backend (gptel-make-gh-copilot "Copilot")))
+
+;;;; LLM agent integration.
+(use-package gptel-agent
+  :ensure t
+
+  :commands
+  (gptel-agent
+   gptel-agent-update)
+
+  :config
+  (gptel-agent-update))
+
+;;;; Convenient LLM-based quick lookup of thing at point.
+(use-package gptel-quick
+  :ensure t
+
+  :commands
+  (gptel-quick)
+
+  :bind
+  (:map embark-general-map
+   ("?" . #'gptel-quick)))
 
 ;;;; More helpful documentation for Emacs Lisp.
 (use-package helpful
