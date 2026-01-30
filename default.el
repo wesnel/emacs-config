@@ -924,6 +924,9 @@
    eglot-code-actions
    eglot-format-buffer)
 
+  :custom
+  (eglot-code-action-indentations '(eldoc-hint nearby))
+
   :bind
   (:map eglot-mode-map
    ("C-c C-l ." . #'xref-find-definitions)
