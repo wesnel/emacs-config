@@ -925,7 +925,7 @@
    eglot-format-buffer)
 
   :custom
-  (eglot-code-action-indications '(eldoc-hint nearby))
+  (eglot-code-action-indications '(eldoc-hint))
 
   :bind
   (:map eglot-mode-map
