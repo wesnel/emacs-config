@@ -1027,6 +1027,17 @@
   (setq gptel-model "gemini-2.5-pro"
         gptel-backend (gptel-make-gh-copilot "Copilot")))
 
+;;;; LLM agent integration.
+(use-package gptel-agent
+  :ensure t
+
+  :commands
+  (gptel-agent
+   gptel-agent-update)
+
+  :config
+  (gptel-agent-update))
+
 ;;;; Improved `completing-read' functions.
 (use-package consult
   :ensure t
