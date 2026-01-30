@@ -1020,6 +1020,10 @@
    ("C-c <return>" . #'gptel-send))
 
   :config
+  (gptel-make-ollama "Ollama"
+    :host "localhost:11434"
+    :stream t
+    :models '(mistral:latest))
   (setq gptel-model "gemini-2.5-pro"
         gptel-backend (gptel-make-gh-copilot "Copilot")))
 
