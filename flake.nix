@@ -174,7 +174,7 @@
               in
                 (with pkgs; [
                   pkg
-                  enchant2
+                  enchant_2
                   nuspell
                 ])
                 ++ (with pkgs.hunspellDicts; [
