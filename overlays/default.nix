@@ -230,6 +230,25 @@ final: prev: let
             };
           };
 
+        gptel-quick = let
+          rev = "018ff2be8f860a1e8fe3966eec418ad635620c38";
+          sha256 = "sha256-7a5+YQifwtVYHP6qQXS1yxA42bVGXmErirra0TrSSQ0=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "gptel-quick";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "karthink";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
         ijanet-mode = let
           rev = "2821db192fd0733d402cbd1c58f6060aa02ef100";
           sha256 = "sha256-Ljuj6Oc28xgi5N1XCp4TjHUtR83FFcVBN6dhTi/7qwk=";
