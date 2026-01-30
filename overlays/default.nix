@@ -238,6 +238,10 @@ final: prev: let
             pname = "gptel-quick";
             version = rev;
 
+            packageRequires = with ePkgs; [
+              gptel
+            ];
+
             src = pkgs.fetchFromGitHub {
               owner = "karthink";
               repo = pname;
