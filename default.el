@@ -1120,6 +1120,10 @@
   :init
   (marginalia-mode +1))
 
+;;;; Integration between embark and consult.
+(use-package embark-consult
+  :ensure t)
+
 ;;;; Perform actions on point.
 (use-package embark
   :ensure t
@@ -1153,13 +1157,6 @@
   ;; Set up indicator strategy:
   (setq embark-indicators '(embark-highlight-indicator
                             embark-isearch-highlight-indicator)))
-
-;;;; Integration between embark and consult.
-(use-package embark-consult
-  :ensure t
-
-  :hook
-  (embark-collect-mode . consult-preview-at-point-mode))
 
 ;;;; GitHub Copilot.
 (use-package copilot
