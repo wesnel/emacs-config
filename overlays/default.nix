@@ -5,6 +5,7 @@ final: prev: let
     copilot = "copilot-language-server";
     delta = "delta";
     direnv = "direnv";
+    git = "git";
     hledger = "hledger";
     multimarkdown = "multimarkdown";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
@@ -28,6 +29,10 @@ final: prev: let
     direnv = let
       pkg = pkgs.direnv;
     in "${pkg}/bin/direnv";
+
+    git = let
+      pkg = pkgs.git;
+    in "${pkg}/bin/git";
 
     hledger = let
       pkg = pkgs.hledger;
@@ -65,6 +70,7 @@ final: prev: let
         copilot
         delta
         direnv
+        git
         hledger
         multimarkdown
         parinfer
