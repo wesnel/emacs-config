@@ -1189,7 +1189,7 @@
   (copilot-completion-map)
 
   :custom
-  (copilot-server-executable "@copilot@")
+  (copilot-server-executable "@copilotlsp@")
   (copilot-indent-offset-warning-disable t)
 
   :bind
@@ -1226,7 +1226,7 @@
   (setq gptel-model "gemini-2.5-pro"
         gptel-backend (gptel-make-gh-copilot "Copilot")))
 
-;;;; LLM agent integration.
+;;;; Agent integration for `gptel'.
 (use-package gptel-agent
   :ensure t
 
@@ -1236,6 +1236,23 @@
 
   :config
   (gptel-agent-update))
+
+;;;; Shell for interacting with LLM agents.
+(use-package agent-shell
+  :ensure t
+
+  :defines
+  (agent-shell-github-environment)
+
+  :commands
+  (agent-shell
+   agent-shell-github-start-copilot
+   agent-shell-make-environment-variables)
+
+  :custom
+  (agent-shell-github-environment
+   (agent-shell-make-environment-variables :inherit-env t)
+   agent-shell-github-command '("@copilotcli@" "--acp")))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick

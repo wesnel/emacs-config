@@ -2,7 +2,8 @@ final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
-    copilot = "copilot-language-server";
+    copilotcli = "copilot";
+    copilotlsp = "copilot-language-server";
     delta = "delta";
     direnv = "direnv";
     git = "git";
@@ -18,7 +19,11 @@ final: prev: let
   # configuration, and their Nix store paths will be statically
   # linked in the built Emacs configuration.
   build-deps-static = pkgs: {
-    copilot = let
+    copilotcli = let
+      pkg = pkgs.github-copilot-cli;
+    in "${pkg}/bin/copilot";
+
+    copilotlsp = let
       pkg = pkgs.copilot-language-server;
     in "${pkg}/bin/copilot-language-server";
 
@@ -67,7 +72,8 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
-        copilot
+        copilotcli
+        copilotlsp
         delta
         direnv
         git
