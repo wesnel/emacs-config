@@ -1162,8 +1162,23 @@
 (use-package copilot
   :ensure t
 
+  :preface
+  (defun wgn/is-in-org (org-name)
+    (when-let* ((project (project-current))
+                (project-root (project-root project)))
+     (let ((default-directory project-root)
+           (remote-url nil))
+       (with-temp-buffer
+         (when (= 0 (call-process "@git@" nil t nil "config" "--get" "remote.origin.url"))
+           (setq remote-url (string-trim (buffer-string)))))
+       (when remote-url
+         (string-match-p (concat "github\\.com[:/]" (regexp-quote org-name) "/") remote-url)))))
+
   :hook
-  (prog-mode . copilot-mode)
+  (prog-mode . (lambda ()
+                 ;; Only use Copilot on Shipt repositories.
+                 (when (wgn/is-in-org "shipt")
+                   (copilot-mode))))
 
   :commands
   (copilot-mode
