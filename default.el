@@ -1385,54 +1385,59 @@
   (add-hook 'go-ts-mode-hook #'subword-mode)
 
   :config
-  (add-to-list
-   'agent-shell-mcp-servers
-   `((name . "language-server")
-     (command . "@mcplsp@")
-     (args . ("--workspace" ,(project-current) "--lsp" "gopls"))
-     (env . (((name . "LOG_LEVEL") (value . "info"))))))
-  (add-to-list
-   'mcp-hub-servers
-   `(("language-server" .
-      (:command
-       "@mcplsp@"
-       :args
-       ("--workspace" ,(project-current) "--lsp" "gopls")
-       :roots
-       ((project-current))
-       :env
-       (:LOG_LEVEL "info")))))
+  ;; Configure Go-specific MCP servers:
+  ;; TODO: Not sure if this works.
+  (with-eval-after-load 'agent-shell
+    (add-to-list
+     'agent-shell-mcp-servers
+     `((name . "language-server")
+       (command . "@mcplsp@")
+       (args . ("--workspace" ,(project-current) "--lsp" "gopls"))
+       (env . (((name . "LOG_LEVEL") (value . "info")))))))
+  (with-eval-after-load 'mcp
+    (add-to-list
+     'mcp-hub-servers
+     `(("language-server" .
+        (:command
+         "@mcplsp@"
+         :args
+         ("--workspace" ,(project-current) "--lsp" "gopls")
+         :roots
+         ((project-current))
+         :env
+         (:LOG_LEVEL "info"))))))
 
   ;; Configure dape for delve:
-  (add-to-list
-   'dape-configs
-   `(delve-unit-test
-     modes (go-mode go-ts-mode)
-     ensure dape-ensure-command
-     fn dape-config-autoport
-     command "dlv"
-     command-args ("dap" "--listen" "127.0.0.1::autoport")
-     command-cwd dape-cwd-fn
-     port :autoport
-     :type "debug"
-     :request "launch"
-     :mode (lambda ()
-             (if (string-suffix-p "_test.go" (buffer-name))
-                 "test"
-               "debug"))
-     :cwd dape-cwd-fn
-     :program (lambda ()
-                (if (string-suffix-p "_test.go" (buffer-name))
-                    (concat "./" (file-relative-name default-directory (funcall dape-cwd-fn)))
-                  (funcall dape-cwd-fn)))
-     :args (lambda ()
-             (require 'which-func)
-             (if (string-suffix-p "_test.go" (buffer-name))
-                 (when-let* ((test-name (which-function))
-                             (test-regexp (concat "^" test-name "$")))
-                   (if test-name `["-test.run" ,test-regexp]
-                     (error "No test selected"))))
-             []))))
+  (with-eval-after-load 'dape
+    (add-to-list
+     'dape-configs
+     `(delve-unit-test
+       modes (go-mode go-ts-mode)
+       ensure dape-ensure-command
+       fn dape-config-autoport
+       command "dlv"
+       command-args ("dap" "--listen" "127.0.0.1::autoport")
+       command-cwd dape-cwd-fn
+       port :autoport
+       :type "debug"
+       :request "launch"
+       :mode (lambda ()
+               (if (string-suffix-p "_test.go" (buffer-name))
+                   "test"
+                 "debug"))
+       :cwd dape-cwd-fn
+       :program (lambda ()
+                  (if (string-suffix-p "_test.go" (buffer-name))
+                      (concat "./" (file-relative-name default-directory (funcall dape-cwd-fn)))
+                    (funcall dape-cwd-fn)))
+       :args (lambda ()
+               (require 'which-func)
+               (if (string-suffix-p "_test.go" (buffer-name))
+                   (when-let* ((test-name (which-function))
+                               (test-regexp (concat "^" test-name "$")))
+                     (if test-name `["-test.run" ,test-regexp]
+                       (error "No test selected"))))
+               [])))))
 
 ;;;; Extra Golang support.
 ;;
