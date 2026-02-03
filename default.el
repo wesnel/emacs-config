@@ -1254,7 +1254,7 @@
               (project-root (project-root project))
               (mcp-config-file (expand-file-name "mcp-config.json" project-root))
               ((file-exists-p mcp-config-file)))
-        '("@copilotcli@" "--acp" "--stdio" "--additional-mcp-config" "@mcp-config.json")
+        `("@copilotcli@" "--acp" "--stdio" "--additional-mcp-config" ,(concat "@" mcp-config-file))
       agent-shell-github-command))
   (defun wgn/agent-shell-run-with-local-mcp-config (orig-fun &rest args)
     ;; FIXME: This modifies a global variable.
