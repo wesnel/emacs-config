@@ -1248,6 +1248,18 @@
   :defines
   (agent-shell-mcp-servers)
 
+  :preface
+  (defun wgn/agent-shell-with-local-mcp-config (orig-fun &rest args)
+    (let ((agent-shell-github-command
+           (if-let* ((project (project-current))
+                     (project-root (project-root project))
+                     (mcp-config-file (expand-file-name "mcp-config.json" project-root))
+                     ((file-exists-p mcp-config-file)))
+               (append agent-shell-github-command
+                       '("--additional-mcp-config" "@mcp-config.json"))
+             agent-shell-github-command)))
+      (apply orig-fun args)))
+
   :commands
   (agent-shell
    agent-shell-github-start-copilot
@@ -1366,7 +1378,64 @@
   (add-hook 'go-ts-mode-hook #'wgn/go-ts-mode-eglot-setup)
 
   ;; CamelCase aware editing operations.
-  (add-hook 'go-ts-mode-hook #'subword-mode))
+  (add-hook 'go-ts-mode-hook #'subword-mode)
+
+  :config
+  (with-eval-after-load 'agent-shell
+    (advice-add #'agent-shell :around #'wgn/agent-shell-with-local-mcp-config)
+    ;; FIXME: This doesn't seem to work.
+    (add-to-list
+     'agent-shell-mcp-servers
+     `((name . "gopls")
+       (command . "mcp-language-server")
+       (args . ("--workspace" ,(directory-file-name
+                                (expand-file-name
+                                 (project-root (project-current))))
+                "--lsp" "gopls"))
+       (env . (((name . "LOG_LEVEL") (value . "info")))))))
+  (with-eval-after-load 'mcp-hub
+    (add-to-list
+     'mcp-hub-servers
+     `("gopls" .
+       (:command
+        "mcp-language-server"
+        :args
+        ("--workspace" ,(directory-file-name
+                         (expand-file-name
+                          (project-root (project-current))))
+         "--lsp" "gopls")
+        :env
+        (:LOG_LEVEL "info")))))
+  (with-eval-after-load 'dape
+    (add-to-list
+     'dape-configs
+     `(delve-unit-test
+       modes (go-mode go-ts-mode)
+       ensure dape-ensure-command
+       fn dape-config-autoport
+       command "dlv"
+       command-args ("dap" "--listen" "127.0.0.1::autoport")
+       command-cwd dape-cwd-fn
+       port :autoport
+       :type "debug"
+       :request "launch"
+       :mode (lambda ()
+               (if (string-suffix-p "_test.go" (buffer-name))
+                   "test"
+                 "debug"))
+       :cwd dape-cwd-fn
+       :program (lambda ()
+                  (if (string-suffix-p "_test.go" (buffer-name))
+                      (concat "./" (file-relative-name default-directory (funcall dape-cwd-fn)))
+                    (funcall dape-cwd-fn)))
+       :args (lambda ()
+               (require 'which-func)
+               (if (string-suffix-p "_test.go" (buffer-name))
+                   (when-let* ((test-name (which-function))
+                               (test-regexp (concat "^" test-name "$")))
+                     (if test-name `["-test.run" ,test-regexp]
+                       (error "No test selected"))))
+               [])))))
 
 ;;;; Extra Golang support.
 ;;
