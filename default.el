@@ -1392,7 +1392,7 @@
      'agent-shell-mcp-servers
      `((name . "language-server")
        (command . "@mcplsp@")
-       (args . ("--workspace" ,(project-current) "--lsp" "gopls"))
+       (args . ("--workspace" ,(project-root (project-current)) "--lsp" "gopls"))
        (env . (((name . "LOG_LEVEL") (value . "info")))))))
   (with-eval-after-load 'mcp-hub
     (add-to-list
@@ -1401,7 +1401,7 @@
         (:command
          "@mcplsp@"
          :args
-         ("--workspace" ,(project-current) "--lsp" "gopls")
+         ("--workspace" ,(project-root (project-current)) "--lsp" "gopls")
          :roots
          ((project-current))
          :env
