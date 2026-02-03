@@ -1197,6 +1197,17 @@
    ("M-RET" . #'copilot-accept-completion)
    ("M-<return>" . #'copilot-accept-completion)))
 
+;;;; MCP integration.
+(use-package mcp
+  :ensure t
+
+  :defines
+  (mcp-hub-servers)
+
+  :commands
+  (mcp-hub
+   mcp-hub-start-all-server))
+
 ;;;; LLM integration.
 (use-package gptel
   :ensure t
@@ -1219,6 +1230,8 @@
    ("C-c <return>" . #'gptel-send))
 
   :config
+  (require 'gptel-integrations)
+
   (gptel-make-ollama "Ollama"
     :host "localhost:11434"
     :stream t
@@ -1242,7 +1255,7 @@
   :ensure t
 
   :defines
-  (agent-shell-github-environment)
+  (agent-shell-mcp-servers)
 
   :commands
   (agent-shell
@@ -1372,6 +1385,24 @@
   (add-hook 'go-ts-mode-hook #'subword-mode)
 
   :config
+  (add-to-list
+   'agent-shell-mcp-servers
+   `((name . "language-server")
+     (command . "@mcplsp@")
+     (args . ("--workspace" ,(project-current) "--lsp" "gopls"))
+     (env . (((name . "LOG_LEVEL") (value . "info"))))))
+  (add-to-list
+   'mcp-hub-servers
+   `(("language-server" .
+      (:command
+       "@mcplsp@"
+       :args
+       ("--workspace" ,(project-current) "--lsp" "gopls")
+       :roots
+       ((project-current))
+       :env
+       (:LOG_LEVEL "info")))))
+
   ;; Configure dape for delve:
   (add-to-list
    'dape-configs

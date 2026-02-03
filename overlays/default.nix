@@ -8,6 +8,7 @@ final: prev: let
     direnv = "direnv";
     git = "git";
     hledger = "hledger";
+    mcplsp = "mcp-language-server";
     multimarkdown = "multimarkdown";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
     pass = "pass";
@@ -42,6 +43,10 @@ final: prev: let
     hledger = let
       pkg = pkgs.hledger;
     in "${pkg}/bin";
+
+    mcplsp = let
+      pkg = pkgs.mcp-language-server;
+    in "${pkg}/bin/mcp-language-server";
 
     multimarkdown = let
       pkg = pkgs.multimarkdown;
