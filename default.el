@@ -581,11 +581,6 @@
 (use-package ijanet-mode
   :ensure t
 
-  ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of ijanet-mode.  In this case,
-  ;;       you will also need to remove the `:ensure' line from above.
-  ; :load-path ("~/git/github.com/serialdev/ijanet-mode")
-
   :commands
   (ijanet
    ijanet-eval-buffer
@@ -781,11 +776,6 @@
 ;;;; Structured editing and navigation based on tree-sitter.
 (use-package combobulate
   :ensure t
-
-  ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of combobulate.  In this case,
-  ;;       you will also need to remove the `:ensure' line from above.
-  ; :load-path ("~/git/github.com/mickeynp/combobulate")
 
   :custom
   (combobulate-key-prefix "C-c o")
@@ -1311,11 +1301,6 @@
 (use-package elsewhere
   :ensure t
 
-  ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of elsewhere.  In this case,
-  ;;       you will also need to remove the `:ensure' line from above.
-  ; :load-path ("~/git/github.com/wesnel/elsewhere")
-
   :commands
   (elsewhere-open
    elsewhere-build-url))
@@ -1334,11 +1319,6 @@
 ;;;; Flymake support for Golang linting.
 (use-package flymake-golangci
   :ensure t
-
-  ;; TODO: If using a non-Nix configuration, you'll need to point this
-  ;;       towards your local git clone of elsewhere.  In this case,
-  ;;       you will also need to remove the `:ensure' line from above.
-  ; :load-path ("~/git/github.com/storvik/flymake-golangci")
 
   :commands
   (flymake-golangci-load-backend))
