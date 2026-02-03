@@ -1394,7 +1394,7 @@
        (command . "@mcplsp@")
        (args . ("--workspace" ,(project-current) "--lsp" "gopls"))
        (env . (((name . "LOG_LEVEL") (value . "info")))))))
-  (with-eval-after-load 'mcp
+  (with-eval-after-load 'mcp-hub
     (add-to-list
      'mcp-hub-servers
      `(("language-server" .
