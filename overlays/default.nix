@@ -83,6 +83,7 @@ final: prev: let
         direnv
         git
         hledger
+        mcplsp
         multimarkdown
         parinfer
         pass
