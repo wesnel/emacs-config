@@ -1,7 +1,11 @@
 ;;; Directory Local Variables            -*- no-byte-compile: t -*-
 ;;; For more information see (info "(emacs) Directory Variables")
 
-((go-ts-mode
+((agent-shell-mode
+  . ((agent-shell-github-command
+      (append agent-shell-github-command
+              '("--additional-mcp-config" "@mcp-config.json")))))
+ (go-ts-mode
   . ((eval
       . (progn
           (with-eval-after-load 'agent-shell
