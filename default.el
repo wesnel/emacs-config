@@ -1402,8 +1402,6 @@
          "@mcplsp@"
          :args
          ("--workspace" ,(project-root (project-current)) "--lsp" "gopls")
-         :roots
-         (,(project-root (project-current)))
          :env
          (:LOG_LEVEL "info")))))
 
