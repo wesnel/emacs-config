@@ -1,15 +1,11 @@
 ;;; Directory Local Variables            -*- no-byte-compile: t -*-
 ;;; For more information see (info "(emacs) Directory Variables")
 
-((agent-shell-mode
-  ;; FIXME: This is only necessary because `agent-shell-mcp-servers' isn't respected.
-  . ((agent-shell-github-command
-      (append agent-shell-github-command
-              '("--additional-mcp-config" "@mcp-config.json")))))
- (go-ts-mode
+((go-ts-mode
   . ((eval
       . (progn
           (with-eval-after-load 'agent-shell
+            ;; FIXME: This doesn't seem to work.
             (add-to-list
              'agent-shell-mcp-servers
              `((name . "gopls")
