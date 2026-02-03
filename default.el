@@ -1165,11 +1165,11 @@
          (string-match-p (concat "github\\.com[:/]" (regexp-quote org-name) "/") remote-url)))))
 
   :hook
-  (prog-mode . (lambda ()
-                 ;; Only use Copilot on Shipt repositories.
-                 ;; TODO: Would it be better to unconditionally enable the mode in .dir-locals.el?
-                 (when (wgn/is-in-org "shipt")
-                   (copilot-mode))))
+  (prog-mode
+   . (lambda ()
+       ;; Only use Copilot on Shipt repositories.
+       (when (wgn/is-in-org "shipt")
+         (copilot-mode))))
 
   :commands
   (copilot-mode
@@ -1249,20 +1249,18 @@
   (agent-shell-mcp-servers)
 
   :preface
-  (defun wgn/agent-shell-with-local-mcp-config (orig-fun &rest args)
-    (let* ((original-command agent-shell-github-command)
-           (agent-shell-github-command
-            (if-let* ((project (project-current))
-                      (project-root (project-root project))
-                      (mcp-config-file (expand-file-name "mcp-config.json" project-root))
-                      ((file-exists-p mcp-config-file)))
-                (append agent-shell-github-command
-                        '("--additional-mcp-config" "@mcp-config.json"))
-              agent-shell-github-command)))
-      (setq agent-shell-github-command agent-shell-github-command)
-      (unwind-protect
-          (apply orig-fun args)
-        (setq agent-shell-github-command original-command))))
+  (defun wgn/agent-shell-command-with-local-mcp-config ()
+    (if-let* ((project (project-current))
+              (project-root (project-root project))
+              (mcp-config-file (expand-file-name "mcp-config.json" project-root))
+              ((file-exists-p mcp-config-file)))
+        (append agent-shell-github-command
+                '("--additional-mcp-config" "@mcp-config.json"))
+      agent-shell-github-command))
+  (defun wgn/agent-shell-run-with-local-mcp-config (orig-fun &rest args)
+    ;; FIXME: This modifies a global variable.
+    (setq agent-shell-github-command (wgn/agent-shell-command-with-local-mcp-config))
+    (apply orig-fun args))
 
   :commands
   (agent-shell
@@ -1274,6 +1272,7 @@
   (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
 
   :config
+  (advice-add #'agent-shell :around #'wgn/agent-shell-run-with-local-mcp-config)
   (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
         agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
 
@@ -1386,7 +1385,6 @@
 
   :config
   (with-eval-after-load 'agent-shell
-    (advice-add #'agent-shell :around #'wgn/agent-shell-with-local-mcp-config)
     ;; FIXME: This doesn't seem to work.
     (add-to-list
      'agent-shell-mcp-servers
