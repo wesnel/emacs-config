@@ -1254,8 +1254,7 @@
               (project-root (project-root project))
               (mcp-config-file (expand-file-name "mcp-config.json" project-root))
               ((file-exists-p mcp-config-file)))
-        (append agent-shell-github-command
-                '("--additional-mcp-config" "@mcp-config.json"))
+        '("@copilotcli@" "--acp" "--stdio" "--additional-mcp-config" "@mcp-config.json")
       agent-shell-github-command))
   (defun wgn/agent-shell-run-with-local-mcp-config (orig-fun &rest args)
     ;; FIXME: This modifies a global variable.
@@ -1271,8 +1270,10 @@
   :custom
   (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
 
-  :config
+  :init
   (advice-add #'agent-shell :around #'wgn/agent-shell-run-with-local-mcp-config)
+
+  :config
   (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
         agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
 
