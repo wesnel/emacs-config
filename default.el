@@ -1250,6 +1250,24 @@
   :config
   (gptel-agent-update))
 
+;;;; Shell for interacting with LLM agents.
+(use-package agent-shell
+  :ensure t
+
+  :defines
+  (agent-shell-mcp-servers)
+
+  :commands
+  (agent-shell
+   agent-shell-github-start-copilot
+   agent-shell-make-environment-variables
+   agent-shell-github-make-copilot-config)
+
+  :config
+  (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
+        agent-shell-github-command '("@copilotlsp@" "--acp")
+        agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
+
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
   :ensure t
@@ -1369,6 +1387,17 @@
 
   :config
   ;; Configure Go-specific MCP servers:
+  ;; TODO: Not sure if this works.
+  (with-eval-after-load 'agent-shell
+    (add-to-list
+     'agent-shell-mcp-servers
+     `((name . "language-server")
+       (command . "@mcplsp@")
+       (args . ("--workspace" ,(directory-file-name
+                                (expand-file-name
+                                 (project-root (project-current))))
+                "--lsp" "gopls"))
+       (env . (((name . "LOG_LEVEL") (value . "info")))))))
   (with-eval-after-load 'mcp-hub
     (add-to-list
      'mcp-hub-servers
