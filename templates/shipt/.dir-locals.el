@@ -2,6 +2,7 @@
 ;;; For more information see (info "(emacs) Directory Variables")
 
 ((agent-shell-mode
+  ;; FIXME: This is only necessary because `agent-shell-mcp-servers' isn't respected.
   . ((agent-shell-github-command
       (append agent-shell-github-command
               '("--additional-mcp-config" "@mcp-config.json")))))
@@ -11,7 +12,7 @@
           (with-eval-after-load 'agent-shell
             (add-to-list
              'agent-shell-mcp-servers
-             `((name . "language-server")
+             `((name . "gopls")
                (command . "mcp-language-server")
                (args . ("--workspace" ,(directory-file-name
                                         (expand-file-name
@@ -21,7 +22,7 @@
           (with-eval-after-load 'mcp-hub
             (add-to-list
              'mcp-hub-servers
-             `("language-server" .
+             `("gopls" .
                (:command
                 "mcp-language-server"
                 :args

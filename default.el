@@ -1254,9 +1254,11 @@
    agent-shell-make-environment-variables
    agent-shell-github-make-copilot-config)
 
+  :custom
+  (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
+
   :config
   (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-github-command '("@copilotcli@" "--acp" "--stdio")
         agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
