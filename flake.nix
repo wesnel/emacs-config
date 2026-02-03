@@ -94,6 +94,12 @@
         inherit default;
       };
 
+      templates = {
+        shipt = {
+          path = ./templates/shipt;
+        };
+      };
+
       homeManagerModules = {
         default = {
           config,

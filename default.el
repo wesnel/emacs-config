@@ -1167,6 +1167,7 @@
   :hook
   (prog-mode . (lambda ()
                  ;; Only use Copilot on Shipt repositories.
+                 ;; TODO: Would it be better to unconditionally enable the mode in .dir-locals.el?
                  (when (wgn/is-in-org "shipt")
                    (copilot-mode))))
 
@@ -1363,66 +1364,7 @@
   (add-hook 'go-ts-mode-hook #'wgn/go-ts-mode-eglot-setup)
 
   ;; CamelCase aware editing operations.
-  (add-hook 'go-ts-mode-hook #'subword-mode)
-
-  :config
-  ;; Configure Go-specific MCP servers:
-  ;; TODO: Not sure if this works.
-  (with-eval-after-load 'agent-shell
-    (add-to-list
-     'agent-shell-mcp-servers
-     `((name . "language-server")
-       (command . "@mcplsp@")
-       (args . ("--workspace" ,(directory-file-name
-                                (expand-file-name
-                                 (project-root (project-current))))
-                "--lsp" "gopls"))
-       (env . (((name . "LOG_LEVEL") (value . "info")))))))
-  (with-eval-after-load 'mcp-hub
-    (add-to-list
-     'mcp-hub-servers
-     `("language-server" .
-        (:command
-         "@mcplsp@"
-         :args
-         ("--workspace" ,(directory-file-name
-                          (expand-file-name
-                           (project-root (project-current))))
-          "--lsp" "gopls")
-         :env
-         (:LOG_LEVEL "info")))))
-
-  ;; Configure dape for delve:
-  (with-eval-after-load 'dape
-    (add-to-list
-     'dape-configs
-     `(delve-unit-test
-       modes (go-mode go-ts-mode)
-       ensure dape-ensure-command
-       fn dape-config-autoport
-       command "dlv"
-       command-args ("dap" "--listen" "127.0.0.1::autoport")
-       command-cwd dape-cwd-fn
-       port :autoport
-       :type "debug"
-       :request "launch"
-       :mode (lambda ()
-               (if (string-suffix-p "_test.go" (buffer-name))
-                   "test"
-                 "debug"))
-       :cwd dape-cwd-fn
-       :program (lambda ()
-                  (if (string-suffix-p "_test.go" (buffer-name))
-                      (concat "./" (file-relative-name default-directory (funcall dape-cwd-fn)))
-                    (funcall dape-cwd-fn)))
-       :args (lambda ()
-               (require 'which-func)
-               (if (string-suffix-p "_test.go" (buffer-name))
-                   (when-let* ((test-name (which-function))
-                               (test-regexp (concat "^" test-name "$")))
-                     (if test-name `["-test.run" ,test-regexp]
-                       (error "No test selected"))))
-               [])))))
+  (add-hook 'go-ts-mode-hook #'subword-mode))
 
 ;;;; Extra Golang support.
 ;;
