@@ -1271,6 +1271,7 @@
   (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
 
   :init
+  ;; FIXME: This doesn't seem to work.
   (advice-add #'agent-shell :around #'wgn/agent-shell-run-with-local-mcp-config)
 
   :config
