@@ -1250,15 +1250,19 @@
 
   :preface
   (defun wgn/agent-shell-with-local-mcp-config (orig-fun &rest args)
-    (let ((agent-shell-github-command
-           (if-let* ((project (project-current))
-                     (project-root (project-root project))
-                     (mcp-config-file (expand-file-name "mcp-config.json" project-root))
-                     ((file-exists-p mcp-config-file)))
-               (append agent-shell-github-command
-                       '("--additional-mcp-config" "@mcp-config.json"))
-             agent-shell-github-command)))
-      (apply orig-fun args)))
+    (let* ((original-command agent-shell-github-command)
+           (agent-shell-github-command
+            (if-let* ((project (project-current))
+                      (project-root (project-root project))
+                      (mcp-config-file (expand-file-name "mcp-config.json" project-root))
+                      ((file-exists-p mcp-config-file)))
+                (append agent-shell-github-command
+                        '("--additional-mcp-config" "@mcp-config.json"))
+              agent-shell-github-command)))
+      (setq agent-shell-github-command agent-shell-github-command)
+      (unwind-protect
+          (apply orig-fun args)
+        (setq agent-shell-github-command original-command))))
 
   :commands
   (agent-shell
