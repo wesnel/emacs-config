@@ -1397,7 +1397,7 @@
   (with-eval-after-load 'mcp-hub
     (add-to-list
      'mcp-hub-servers
-     `(("language-server" .
+     `("language-server" .
         (:command
          "@mcplsp@"
          :args
@@ -1405,7 +1405,7 @@
          :roots
          (,(project-root (project-current)))
          :env
-         (:LOG_LEVEL "info"))))))
+         (:LOG_LEVEL "info")))))
 
   ;; Configure dape for delve:
   (with-eval-after-load 'dape
