@@ -1392,8 +1392,11 @@
      'agent-shell-mcp-servers
      `((name . "language-server")
        (command . "@mcplsp@")
-       (args . ("--workspace" ,(project-root (project-current)) "--lsp" "gopls"))
-       (env . (((name . "LOG_LEVEL") (value . "debug")))))))
+       (args . ("--workspace" ,(directory-file-name
+                                (expand-file-name
+                                 (project-root (project-current))))
+                "--lsp" "gopls"))
+       (env . (((name . "LOG_LEVEL") (value . "info")))))))
   (with-eval-after-load 'mcp-hub
     (add-to-list
      'mcp-hub-servers
@@ -1401,9 +1404,12 @@
         (:command
          "@mcplsp@"
          :args
-         ("--workspace" ,(project-root (project-current)) "--lsp" "gopls")
+         ("--workspace" ,(directory-file-name
+                          (expand-file-name
+                           (project-root (project-current))))
+          "--lsp" "gopls")
          :env
-         (:LOG_LEVEL "debug")))))
+         (:LOG_LEVEL "info")))))
 
   ;; Configure dape for delve:
   (with-eval-after-load 'dape
