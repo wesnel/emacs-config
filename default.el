@@ -1245,6 +1245,9 @@
 (use-package agent-shell
   :ensure t
 
+  :hook
+  (agent-shell . agent-shell-completion-mode)
+
   :defines
   (agent-shell-mcp-servers)
 
@@ -1263,6 +1266,7 @@
 
   :commands
   (agent-shell
+   agent-shell-completion-mode
    agent-shell-github-start-copilot
    agent-shell-make-environment-variables
    agent-shell-github-make-copilot-config)
