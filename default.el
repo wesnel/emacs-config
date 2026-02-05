@@ -1936,29 +1936,38 @@
   (doom-themes-enable-italic t) ; if nil, italics is universally disabled
 
   :init
-  (load-theme 'doom-solarized-dark :no-confirm)
+  (if (memq system-type '(darwin))
+      (use-package auto-dark
+        :ensure t
+        :diminish auto-dark-mode
+
+        :commands
+        (auto-dark-mode)
+
+        :custom
+        (auto-dark-themes '((doom-solarized-dark) (doom-solarized-light)))
+        (auto-dark-dark-theme 'doom-solarized-dark)
+        (auto-dark-light-theme 'doom-solarized-light)
+
+        :preface
+        (defun wgn/enable-auto-dark ()
+          (auto-dark-mode)
+          ;; Only run it once.
+          (remove-hook 'server-after-make-frame-hook #'wgn/enable-auto-dark)
+          (remove-hook 'after-init-hook #'wgn/enable-auto-dark))
+
+        :init
+        (if (daemonp)
+            (add-hook 'server-after-make-frame-functions #'wgn/enable-auto-dark)
+          (add-hook 'after-init-hook #'wgn/enable-auto-dark)))
+    (load-theme 'doom-solarized-dark :no-confirm))
+
   (custom-set-faces
    ;; Fix annoyingly bright tab character:
    '(whitespace-tab ((t (:background unspecified)))))
 
   (doom-themes-visual-bell-config)
   (doom-themes-org-config))
-
-;;;; Use system dark mode settings for theme.
-(when (memq system-type '(darwin))
-  (use-package auto-dark
-    :ensure t
-    :diminish auto-dark-mode
-
-    :commands
-    (auto-dark-mode)
-
-    :custom
-    (auto-dark-dark-theme 'doom-solarized-dark)
-    (auto-dark-light-theme 'doom-solarized-light)
-
-    :init
-    (auto-dark-mode +1)))
 
 ;;;; Highlight the current line.
 (use-package hl-line
