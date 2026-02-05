@@ -102,12 +102,20 @@
   (display-time)
 
   ;; Change font.
+  ;; TODO: Make font configurable with nix.
   (add-to-list 'default-frame-alist
                '(font . "ComicShannsMono Nerd Font-12"))
 
   ;; Change startup frame size.
   (add-to-list 'default-frame-alist '(height . 40))
   (add-to-list 'default-frame-alist '(width . 120))
+
+  ;; Add transparency.
+  ;; TODO: Make a fork of the `auto-dark' package which toggles transparency
+  ;;       based on system transparency preference settings.
+  (when (display-graphic-p)
+    (add-to-list 'default-frame-alist '(alpha-background . 50))
+    (set-frame-parameter nil 'alpha-background 50))
 
   ;; Trust this file.
   ;; TODO: Make this configurable or automatic?
@@ -1946,7 +1954,6 @@
     (auto-dark-mode)
 
     :custom
-    (auto-dark-allow-osascript t)
     (auto-dark-dark-theme 'doom-solarized-dark)
     (auto-dark-light-theme 'doom-solarized-light)
 
