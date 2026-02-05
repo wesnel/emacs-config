@@ -868,6 +868,8 @@
 
 ;;;; Error checking.
 (use-package flymake
+  :ensure t
+
   :hook
   (prog-mode . flymake-mode)
 
