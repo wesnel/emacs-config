@@ -127,6 +127,13 @@
   (zone
    zone-when-idle)
 
+  :defines
+  (zone-programs)
+
+  :config
+  (setq zone-programs '[zone-pgm-rotate-LR-variable
+                        zone-pgm-rotate-RL-variable])
+
   :init
   (zone-when-idle 300))
 
