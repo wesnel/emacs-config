@@ -101,6 +101,7 @@ final: prev: let
 
       extraEmacsPackages = ePkgs:
         with ePkgs; [
+          tree-sitter-langs
           (treesit-grammars.with-grammars
             (grammars:
               with grammars; [
@@ -111,6 +112,7 @@ final: prev: let
                 tree-sitter-cmake
                 tree-sitter-commonlisp
                 tree-sitter-cpp
+                tree-sitter-c-sharp
                 tree-sitter-css
                 tree-sitter-dockerfile
                 tree-sitter-elisp
@@ -128,6 +130,7 @@ final: prev: let
                 tree-sitter-java
                 tree-sitter-javascript
                 tree-sitter-json
+                tree-sitter-kotlin
                 tree-sitter-latex
                 tree-sitter-make
                 tree-sitter-markdown
