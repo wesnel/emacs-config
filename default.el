@@ -1289,18 +1289,8 @@
   :defines
   (agent-shell-mcp-servers)
 
-  :preface
-  (defun wgn/agent-shell-command-with-local-mcp-config ()
-    (if-let* ((project (project-current))
-              (project-root (project-root project))
-              (mcp-config-file (expand-file-name "mcp-config.json" project-root))
-              ((file-exists-p mcp-config-file)))
-        `("@copilotcli@" "--acp" "--stdio" "--additional-mcp-config" ,(concat "@" mcp-config-file))
-      agent-shell-github-command))
-  (defun wgn/agent-shell-run-with-local-mcp-config (orig-fun &rest args)
-    ;; FIXME: This modifies a global variable.
-    (setq agent-shell-github-command (wgn/agent-shell-command-with-local-mcp-config))
-    (apply orig-fun args))
+  :functions
+  (agent-shell-cwd)
 
   :commands
   (agent-shell
@@ -1311,10 +1301,6 @@
 
   :custom
   (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
-
-  :init
-  ;; FIXME: This doesn't seem to work.
-  (advice-add #'agent-shell :around #'wgn/agent-shell-run-with-local-mcp-config)
 
   :config
   (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
@@ -1429,22 +1415,21 @@
 
   :config
   (with-eval-after-load 'agent-shell
-    ;; FIXME: This doesn't seem to work.
+    ;; FIXME: This doesn't seem to work (at least not with Copilot CLI).
     (add-to-list
      'agent-shell-mcp-servers
-     `((name . "gopls")
-       (command . "mcp-language-server")
-       (args . ("--workspace" ,(directory-file-name
-                                (expand-file-name
-                                 (project-root (project-current))))
-                "--lsp" "gopls"))
+     '((name . "gopls")
+       (command . "@mcplsp@")
+       (args . (lambda ()
+                 (list "--lsp" "gopls"
+                       "--workspace" (directory-file-name (agent-shell-cwd)))))
        (env . (((name . "LOG_LEVEL") (value . "info")))))))
   (with-eval-after-load 'mcp-hub
     (add-to-list
      'mcp-hub-servers
      `("gopls" .
        (:command
-        "mcp-language-server"
+        "@mcplsp@"
         :args
         ("--workspace" ,(directory-file-name
                          (expand-file-name

@@ -40,7 +40,6 @@
             gopls
             gotools
             go-tools
-            mcp-language-server
             nil
           ];
         };

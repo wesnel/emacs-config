@@ -8,6 +8,7 @@ final: prev: let
     direnv = "direnv";
     git = "git";
     hledger = "hledger";
+    mcplsp = "mcp-language-server";
     multimarkdown = "multimarkdown";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
     pass = "pass";
@@ -42,6 +43,10 @@ final: prev: let
     hledger = let
       pkg = pkgs.hledger;
     in "${pkg}/bin";
+
+    mcplsp = let
+      pkg = pkgs.mcp-language-server;
+    in "${pkg}/bin/mcp-language-server";
 
     multimarkdown = let
       pkg = pkgs.multimarkdown;
@@ -78,6 +83,7 @@ final: prev: let
         direnv
         git
         hledger
+        mcplsp
         multimarkdown
         parinfer
         pass
@@ -137,6 +143,22 @@ final: prev: let
         ];
 
       override = ePkgs: ePrev: {
+        agent-shell = let
+          rev = "e3fef57d048eb0395ad777350d5f5b6bfc5afb1a";
+          sha256 = "sha256-dM3s9r7Y1yVQdPFtbMxGRqXgo9vKv3XBTc+/TU9QDQg=";
+        in
+          ePrev.agent-shell.overrideAttrs (old: {
+            src = pkgs.fetchFromGitHub {
+              owner = "xenodium";
+              repo = "agent-shell";
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          });
+
         auctex = ePrev.auctex.overrideAttrs (old: {
           outputs =
             (old.outputs or [])
