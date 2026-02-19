@@ -10,6 +10,7 @@ final: prev: let
     hledger = "hledger";
     mcplsp = "mcp-language-server";
     multimarkdown = "multimarkdown";
+    npx = "npx";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
     pass = "pass";
     rg = "rg";
@@ -52,6 +53,10 @@ final: prev: let
       pkg = pkgs.multimarkdown;
     in "${pkg}/bin/multimarkdown";
 
+    npx = let
+      pkg = pkgs.nodejs_25;
+    in "${pkg}/bin/npx";
+
     parinfer = let
       pkg = pkgs.parinfer-rust-emacs;
     in ''
@@ -85,6 +90,7 @@ final: prev: let
         hledger
         mcplsp
         multimarkdown
+        npx
         parinfer
         pass
         rg

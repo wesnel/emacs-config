@@ -1227,7 +1227,19 @@
 
   :commands
   (mcp-hub
-   mcp-hub-start-all-server))
+   mcp-hub-start-all-server)
+
+  :config
+  (with-eval-after-load 'mcp-hub
+    (add-to-list
+     'mcp-hub-servers
+     '("docs-mcp-server" .
+       (:command
+        "@npx@"
+        :args
+        ("-y" "@arabold/docs-mcp-server@latest")
+        :env
+        (:DOCS_MCP_TELEMETRY "false"))))))
 
 ;;;; LLM integration.
 (use-package gptel
@@ -1296,7 +1308,15 @@
 
   :config
   (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
+        agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config))
+
+  ;; FIXME: This doesn't seem to work (at least not with Copilot CLI).
+  (add-to-list
+   'agent-shell-mcp-servers
+   '((name . "docs-mcp-server")
+     (command . "@npx@")
+     (args . ("-y" "@arabold/docs-mcp-server@latest"))
+     (env . (((name . "DOCS_MCP_TELEMETRY") (value . "false")))))))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
