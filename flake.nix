@@ -26,16 +26,6 @@
       (import ./overlays final prev)
       // (import emacs-overlay final prev)
       // {
-        github-copilot-cli = prev.github-copilot-cli.overrideAttrs (finalAttrs: previousAttrs: {
-          # HACK: Enable ACP support.
-          version = "0.0.400";
-
-          src = final.fetchzip {
-            url = "https://registry.npmjs.org/@github/copilot/-/copilot-${finalAttrs.version}.tgz";
-            hash = "sha256-TZDeDmN2GF0a4KFOHt+oXn4IXDRl+OwvlEkBefNR3io=";
-          };
-        });
-
         parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
           # HACK: On Mac, the file has the extension ".dylib",
           #       but it needs to be ".so":
