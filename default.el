@@ -1,9 +1,5 @@
 ;;; default.el --- Wesley's Emacs Config  -*- lexical-binding: t; -*-
 
-;; Copyright (C) 2024 Wesley Nelson
-
-;; Author: Wesley Nelson <wgn@wgn.dev>
-;; Maintainer: Wesley Nelson <wgn@wgn.dev>
 ;; URL: https://git.sr.ht/~wgn/emacs-config/
 
 ;; Package-Requires: ((emacs "29.1"))

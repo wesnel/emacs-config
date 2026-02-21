@@ -149,21 +149,14 @@
 
             sops = lib.mkIf cfg.gnus.enable {
               secrets = {
-                name = {};
-                email = {};
                 email-fastmail = {};
                 email-shipt = {};
               };
 
               # TODO: It would be nice to be able to edit this with syntax highlighting. Org tangle?
-              # TODO: It would be nice to be able to substitute email addresses in default.el too. Org tangle?
               templates.".gnus.el".content = ''
                 ;;; .gnus.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
 
-                ;; Copyright (C) 2024 ${config.sops.placeholder.name}
-
-                ;; Author: ${config.sops.placeholder.name} <${config.sops.placeholder.email}>
-                ;; Maintainer: ${config.sops.placeholder.name} <${config.sops.placeholder.email}>
                 ;; URL: https://git.sr.ht/~wgn/emacs-config
 
                 ;; Package-Requires: ((emacs "29.1"))
