@@ -133,7 +133,10 @@
               home = {
                 file = {
                   ".emacs.d/early-init.el".source = let
-                    gnus = "~/.emacs.d/etc/gnus/init.el";
+                    gnus =
+                      if cfg.gnus.enable
+                      then config.sops.templates.".gnus.el".path
+                      else "~/.emacs.d/etc/gnus/init.el";
                   in
                     lib.mkDefault pkgs.replaceVars ./early-init.el {
                       inherit
@@ -146,19 +149,6 @@
               };
             }
             // lib.mkIf cfg.gnus.enable {
-              home = {
-                file = {
-                  ".emacs.d/early-init.el".source = let
-                    gnus = config.sops.templates.".gnus.el".path;
-                  in
-                    pkgs.replaceVars ./early-init.el {
-                      inherit
-                        gnus
-                        ;
-                    };
-                };
-              };
-
               sops = {
                 secrets = {
                   name = {};

@@ -36,6 +36,8 @@
                   file-name-handler-alist temp--file-name-handler-alist
                   vc-handled-backends temp--vc-handled-backends)))
 
-(setq gnus-init-file "@gnus@")
+(add-hook 'after-init-hook
+          (lambda ()
+            (setq gnus-init-file "@gnus@")))
 
 ;;; early-init.el ends here
