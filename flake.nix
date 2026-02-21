@@ -132,12 +132,33 @@
 
               home = {
                 file = {
-                  ".emacs.d/early-init.el".source = ./early-init.el;
+                  ".emacs.d/early-init.el".source = let
+                    gnus = "~/.emacs.d/etc/gnus/init.el";
+                  in
+                    lib.mkDefault pkgs.replaceVars ./early-init.el {
+                      inherit
+                        gnus
+                        ;
+                    };
+
                   ".emacs.d/etc/eshell/login".source = ./login.el;
                 };
               };
             }
             // lib.mkIf cfg.gnus.enable {
+              home = {
+                file = {
+                  ".emacs.d/early-init.el".source = let
+                    gnus = config.sops.templates.".gnus.el".path;
+                  in
+                    pkgs.replaceVars ./early-init.el {
+                      inherit
+                        gnus
+                        ;
+                    };
+                };
+              };
+
               sops = {
                 secrets = {
                   name = {};
@@ -146,8 +167,8 @@
                   email-shipt = {};
                 };
 
-                templates."init.el".content = ''
-                  ;;; init.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
+                templates.".gnus.el".content = ''
+                  ;;; .gnus.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
 
                   ;; Copyright (C) 2024 ${config.sops.placeholder.name}
 
@@ -277,11 +298,9 @@
 
                   (provide 'init)
 
-                  ;;; init.el ends here
+                  ;;; .gnus.el ends here
                 '';
               };
-
-              home.file.".emacs.d/etc/gnus/init.el".source = config.sops.templates."init.el".path;
             };
         };
       };
