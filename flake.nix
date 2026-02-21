@@ -138,7 +138,7 @@
                       then config.sops.templates.".gnus.el".path
                       else "~/.emacs.d/etc/gnus/init.el";
                   in
-                    lib.mkDefault pkgs.replaceVars ./early-init.el {
+                    pkgs.replaceVars ./early-init.el {
                       inherit
                         gnus
                         ;
