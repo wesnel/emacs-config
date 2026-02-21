@@ -67,13 +67,6 @@
   ;; Enable mouse-based context menu.
   (context-menu-mode t)
   ;; Mail configuration.
-  ;; TODO: Make configurable via Nix.
-  (mail-sources `((imap :server "imap.fastmail.com"
-                        :user "wgn@wgn.dev"
-                        :port 993)
-                  (imap :server "imap.gmail.com"
-                        :user "wesley.nelson@shipt.com"
-                        :port 993)))
   (smtpmail-default-smtp-server "smtp.fastmail.com")
   (smtpmail-smtp-service 587)
   (message-send-mail-function #'message-use-send-mail-function)
@@ -81,6 +74,9 @@
   (mail-user-agent 'gnus-user-agent)
 
   :init
+  ;; NOTE: For development, you will want to trust this file, wherever it is.
+  ;; (add-to-list 'trusted-content "~/git/github.com/wesnel/emacs-config/default.el")
+
   ;; Remove some UI elements.
   (menu-bar-mode -1)
   (tool-bar-mode -1)
@@ -115,11 +111,7 @@
   ;;       based on system transparency preference settings.
   (when (display-graphic-p)
     (add-to-list 'default-frame-alist '(alpha-background . 50))
-    (set-frame-parameter nil 'alpha-background 50))
-
-  ;; Trust this file.
-  ;; TODO: Make this configurable or automatic?
-  (add-to-list 'trusted-content "~/git/github.com/wesnel/emacs-config/default.el"))
+    (set-frame-parameter nil 'alpha-background 50)))
 
 ;;;; Idle "screensavers".
 (use-package zone
