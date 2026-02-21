@@ -155,6 +155,8 @@
                 email-shipt = {};
               };
 
+              # TODO: It would be nice to be able to edit this with syntax highlighting. Org tangle?
+              # TODO: It would be nice to be able to substitute email addresses in default.el too. Org tangle?
               templates.".gnus.el".content = ''
                 ;;; .gnus.el --- Wesley's Gnus Config  -*- lexical-binding: t; -*-
 
