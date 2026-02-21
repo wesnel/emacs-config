@@ -14,11 +14,6 @@
     nixpkgs = {
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
-
-    sops-nix = {
-      url = "github:Mic92/sops-nix";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
   };
 
   outputs = {
@@ -26,7 +21,6 @@
     emacs-overlay,
     nixpkgs,
     flake-utils,
-    sops-nix,
   }: let
     default = final: prev:
       (import ./overlays final prev)
@@ -144,10 +138,6 @@
               };
             }
             // lib.mkIf cfg.gnus.enable {
-              imports = [
-                sops-nix.homeManagerModules.sops
-              ];
-
               sops = {
                 secrets = {
                   name = {};
