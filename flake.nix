@@ -148,7 +148,8 @@
                 };
               };
             }
-            // lib.mkIf cfg.gnus.enable {
+            // lib.mkIf cfg.enable
+            && cfg.gnus.enable {
               sops = {
                 secrets = {
                   name = {};
