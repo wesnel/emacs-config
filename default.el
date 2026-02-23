@@ -109,22 +109,6 @@
     (add-to-list 'default-frame-alist '(alpha-background . 50))
     (set-frame-parameter nil 'alpha-background 50)))
 
-;;;; Idle "screensavers".
-(use-package zone
-  :commands
-  (zone
-   zone-when-idle)
-
-  :defines
-  (zone-programs)
-
-  :config
-  (setq zone-programs '[zone-pgm-rotate-LR-variable
-                        zone-pgm-rotate-RL-variable])
-
-  :init
-  (zone-when-idle 300))
-
 (use-package server
   :commands
   (server-running-p
