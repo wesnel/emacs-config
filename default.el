@@ -95,8 +95,7 @@
 
   ;; Change font.
   ;; TODO: Make font configurable with nix.
-  (add-to-list 'default-frame-alist
-               '(font . "ComicShannsMono Nerd Font-12"))
+  (set-face-attribute 'default nil :family "Iosevka Nerd Font Mono")
 
   ;; Change startup frame size.
   (add-to-list 'default-frame-alist '(height . 40))
