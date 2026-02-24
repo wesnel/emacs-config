@@ -308,10 +308,6 @@
           };
 
           config = lib.mkIf cfg.enable {
-            fonts.packages = with pkgs.nerd-fonts; [
-              iosevka
-            ];
-
             environment = {
               pathsToLink = [
                 "/share/hunspell"
