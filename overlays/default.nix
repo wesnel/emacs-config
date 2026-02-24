@@ -176,13 +176,6 @@ final: prev: let
               "tex"
             ];
 
-          buildInputs =
-            (old.buildInputs or [])
-            ++ (with pkgs; [
-              ghostscript
-              texlive.combined.scheme-full
-            ]);
-
           preConfigure = ''
             ${old.preConfigure or ""}
 
