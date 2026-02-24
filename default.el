@@ -364,7 +364,7 @@
 
   :hook
   ((prog-mode . wgn/clean-up-whitespace)
-   ((prog-mode text-mode) . wgn/view-whitespace)))
+   (prog-mode . wgn/view-whitespace)))
 
 ;;;; Support for CamelCase.
 (use-package subword
