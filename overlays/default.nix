@@ -99,19 +99,10 @@ final: prev: let
 
   build-emacs = pkgs: build-deps: build-package: let
     config = build-emacs-config pkgs build-deps;
-    pkg = build-package pkgs;
   in
     pkgs.emacsWithPackagesFromUsePackage {
       config = config;
-
-      package = pkg.overrideAttrs (oldAttrs: {
-        FONTCONFIG_FILE = pkgs.makeFontsConf {
-          fontDirectories = with pkgs.nerd-fonts; [
-            iosevka
-          ];
-        };
-      });
-
+      package = build-package pkgs;
       defaultInitFile = config;
 
       extraEmacsPackages = ePkgs:
