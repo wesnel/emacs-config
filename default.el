@@ -244,6 +244,23 @@
      ("NOTE" . ?n)
      ("CANCELLED" . ?c))))
 
+(use-package org-modern
+  :ensure t
+
+  :hook
+  (org-mode . org-modern-mode)
+  (org-agenda-finalize . org-modern-agenda)
+
+  :config
+  ;; TODO: Make font configurable with nix.
+  (set-face-attribute 'org-modern-symbol nil :family "Iosevka Nerd Font Mono"))
+
+(use-package org-modern-indent
+  :ensure t
+
+  :hook
+  (org-mode . org-modern-indent-mode))
+
 ;;;; CSL citation processor.
 (use-package citeproc
   :ensure t)

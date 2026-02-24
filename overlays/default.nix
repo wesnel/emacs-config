@@ -308,6 +308,25 @@ final: prev: let
             };
           };
 
+        org-modern-indent = let
+          rev = "ebf9a8e571db523dc6e4cd9ed80d0e0626983ae4";
+          sha256 = "sha256-+q7KmbU8A+uR61BSa528vYbdFSj2WGsFWYW/5q7J9Kw=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "org-modern-indent";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "jdtsmith";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
         reader = let
           rev = "a76b1a0e13774be57bed186edf1e5bee8eeb0a56";
           sha256 = "sha256-pC51uw6xSB6ZuGyxAJAYUT3SInC4T3SDcb+haPy/b6o=";
