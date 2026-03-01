@@ -116,7 +116,7 @@
               };
 
               # TODO: Is there a way to just make a symlink instead?
-              "mcp/mcp_config.json" = lib.mkIf llm {
+              "mcp/mcp_servers.json" = lib.mkIf llm {
                 enable = true;
                 source = config.xdg.configFile."mcp/mcp.json".source;
               };
