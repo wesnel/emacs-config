@@ -21,6 +21,22 @@
         "type": "github"
       }
     },
+    "emacs-skills": {
+      "flake": false,
+      "locked": {
+        "lastModified": 1772216935,
+        "narHash": "sha256-V1vA/4v4xCZT/zApaF1fHDzHrX7G4E1Q4GsJRxzgZBU=",
+        "owner": "xenodium",
+        "repo": "emacs-skills",
+        "rev": "35741fd1bc0e6996f89533b6eee0515adf84d4db",
+        "type": "github"
+      },
+      "original": {
+        "owner": "xenodium",
+        "repo": "emacs-skills",
+        "type": "github"
+      }
+    },
     "flake-utils": {
       "inputs": {
         "systems": "systems"
@@ -74,6 +90,7 @@
     "root": {
       "inputs": {
         "emacs-overlay": "emacs-overlay",
+        "emacs-skills": "emacs-skills",
         "flake-utils": "flake-utils",
         "nixpkgs": "nixpkgs"
       }

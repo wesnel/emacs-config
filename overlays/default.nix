@@ -5,6 +5,7 @@ final: prev: let
     cssls = "vscode-css-language-server";
     delta = "delta";
     direnv = "direnv";
+    gopls = "gopls";
     hledger = "hledger";
     htmlls = "vscode-html-language-server";
     jsonls = "vscode-json-language-server";

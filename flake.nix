@@ -14,11 +14,17 @@
     nixpkgs = {
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
+
+    emacs-skills = {
+      url = "github:xenodium/emacs-skills";
+      flake = false;
+    };
   };
 
   outputs = {
     self,
     emacs-overlay,
+    emacs-skills,
     nixpkgs,
     flake-utils,
   }: let
@@ -133,12 +139,13 @@
 
                 skills = {
                   mcp-cli = ./skills/mcp-cli/SKILL.md;
-
-                  # TODO: Add additional skills.
-                  #
-                  # Examples:
-                  #
-                  # - https://github.com/xenodium/emacs-skills
+                  describe = "${emacs-skills}/skills/describe/SKILL.md";
+                  dired = "${emacs-skills}/skills/dired/SKILL.md";
+                  emacsclient = "${emacs-skills}/skills/emacsclient/SKILL.md";
+                  file-links = "${emacs-skills}/skills/file-links/SKILL.md";
+                  highlight = "${emacs-skills}/skills/highlight/SKILL.md";
+                  open = "${emacs-skills}/skills/open/SKILL.md";
+                  select = "${emacs-skills}/skills/select/SKILL.md";
                 };
               };
 
