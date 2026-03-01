@@ -1205,6 +1205,45 @@
   (gptel-agent-update))
 
 ;;;; Shell for interacting with LLM agents.
+;;
+;; TODO: Investigate the use of VMs to isolate the agent .
+;;
+;; One potential issue will be that I don't use API keys for billing,
+;; which means that authenticating from within the VM will be hard.
+;;
+;; Here are some VM runners to consider:
+;;
+;; - https://github.com/superhq-ai/shuru
+;; - https://github.com/lima-vm/lima
+;;
+;; Here are some things to try as I build out this VM idea:
+;;
+;; - The project files could be copied into a new VM using
+;;   `agent-shell-container-command-runner'.
+;;
+;; - MCP servers running in the host system could be made accessible
+;;   to the VM via their ports.
+;;
+;; - Tools and skills in the host system should be somehow copied or
+;;   otherwise made accessible to the VM.
+;;
+;; - The Emacs `agent-shell-to-go' package could be used by the host
+;;   Emacs process in order to enable mobile command of the agents.
+;;
+;; - If manual editing within the VM is needed, then the host Emacs
+;;   process could use `agent-shell-path-resolver-function' to access
+;;   the VM files via TRAMP.
+;;
+;; - `agent-shell-text-file-capabilities' should be set to nil in
+;;   order to prevent accidental modifications outside the VM.
+;;
+;; - For parallel work, "checkpoints" of multiple VM states could
+;;   await later manual review.
+;;
+;; - An agent "skill" could use emacsclient in the host system to open
+;;   ediff buffers between the state of the code in the host and the
+;;   modified version of the code in the VM.  The changes could then
+;;   be manually accepted into the host.
 (use-package agent-shell
   :ensure t
 
@@ -1225,51 +1264,7 @@
    agent-shell-github-make-copilot-config)
 
   :custom
-  (agent-shell-anthropic-claude-command '("claude-code-acp"))
-  ;; TODO: Investigate the use of VMs to isolate the agent even more.
-  ;;
-  ;; One potential issue will be that I don't use API keys for billing,
-  ;; which means that authenticating from within the VM will be hard.
-  ;;
-  ;; Here are some VM runners to consider:
-  ;;
-  ;; - https://github.com/superhq-ai/shuru
-  ;; - https://github.com/lima-vm/lima
-  ;;
-  ;; Here are some things to try as I build out this VM idea:
-  ;;
-  ;; - The project files could be copied into the VM upon its start.
-  ;;
-  ;; - MCP servers running in the host system could be made accessible
-  ;;   to the VM via their ports.
-  ;;
-  ;; - Tools and skills in the host system should be somehow copied or
-  ;;   otherwise made accessible to the VM.
-  ;;
-  ;; - The Emacs `agent-shell-to-go' package could be used by the host
-  ;;   Emacs process in order to enable mobile command of the agents.
-  ;;
-  ;; - If manual editing within the VM is needed, then the host Emacs
-  ;;   process could access the VM files via TRAMP.
-  ;;
-  ;; - For parallel work, "checkpoints" of multiple VM states could
-  ;;   await later manual review.
-  ;;
-  ;; - An agent "skill" could use emacsclient in the host system to
-  ;;   open ediff buffers between the state of the code in the host
-  ;;   and the modified version of the code in the VM.  The changes
-  ;;   could then be manually accepted into the host.
-  (agent-shell-text-file-capabilities nil)
-  (agent-shell-path-resolver-function #'agent-shell--resolve-devcontainer-path)
-  (agent-shell-container-command-runner
-   (lambda (buffer)
-     (if (file-exists-p
-          (file-name-concat
-           (directory-file-name (agent-shell-cwd))
-           ".devcontainer"
-           "devcontainer.json"))
-         '("@devcontainer@" "exec" ".")
-       '()))))
+  (agent-shell-anthropic-claude-command '("claude-code-acp")))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
