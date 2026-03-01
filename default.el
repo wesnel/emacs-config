@@ -73,10 +73,22 @@
   ;; NOTE: For development, you will want to trust this file, wherever it is.
   ;; (add-to-list 'trusted-content "~/git/github.com/wesnel/emacs-config/default.el")
 
-  ;; Remove some UI elements.
+  ;; Use MacOS Trash for deleting files.
+  (when (memq system-type '(darwin))
+    (setq trash-directory "~/.Trash")
+
+    ;; See `trash-directory' as it requires defining `system-move-file-to-trash'.
+    (defun system-move-file-to-trash (file)
+      "Use \"trash\" to move FILE to the system trash."
+      (call-process "trash" nil 0 nil "-F"  file)))
+
+      ;; Remove some UI elements.
   (menu-bar-mode -1)
   (tool-bar-mode -1)
   (scroll-bar-mode -1)
+  (when (memq window-system '(mac ns x))
+    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
+    (add-to-list 'default-frame-alist '(ns-appearance . dark)))
 
   ;; Show line numbers at the beginning of each line.
   (global-display-line-numbers-mode +1)
@@ -96,6 +108,9 @@
   ;; Change font.
   ;; TODO: Make font configurable with nix.
   (set-face-attribute 'default nil :family "Iosevka Nerd Font Mono")
+  ;; Enable rendering SF symbols on macOS.
+  (when (memq system-type '(darwin))
+    (set-fontset-font t nil "SF Pro Display" nil 'append))
 
   ;; Change startup frame size.
   (add-to-list 'default-frame-alist '(height . 40))
