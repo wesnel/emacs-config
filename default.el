@@ -1225,7 +1225,7 @@
    agent-shell-github-make-copilot-config)
 
   :custom
-  (agent-shell-anthropic-claude-command "claude-code-acp")
+  (agent-shell-anthropic-claude-command '("claude-code-acp"))
   ;; TODO: Investigate the use of VMs to isolate the agent even more.
   ;;
   ;; One potential issue will be that I don't use API keys for billing,
