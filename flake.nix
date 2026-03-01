@@ -139,13 +139,13 @@
 
                 skills = {
                   mcp-cli = ./skills/mcp-cli/SKILL.md;
-                  describe = "${emacs-skills}/skills/describe/SKILL.md";
-                  dired = "${emacs-skills}/skills/dired/SKILL.md";
-                  emacsclient = "${emacs-skills}/skills/emacsclient/SKILL.md";
-                  file-links = "${emacs-skills}/skills/file-links/SKILL.md";
-                  highlight = "${emacs-skills}/skills/highlight/SKILL.md";
-                  open = "${emacs-skills}/skills/open/SKILL.md";
-                  select = "${emacs-skills}/skills/select/SKILL.md";
+                  describe = builtins.readFile "${emacs-skills}/skills/describe/SKILL.md";
+                  dired = builtins.readFile "${emacs-skills}/skills/dired/SKILL.md";
+                  emacsclient = builtins.readFile "${emacs-skills}/skills/emacsclient/SKILL.md";
+                  file-links = builtins.readFile "${emacs-skills}/skills/file-links/SKILL.md";
+                  highlight = builtins.readFile "${emacs-skills}/skills/highlight/SKILL.md";
+                  open = builtins.readFile "${emacs-skills}/skills/open/SKILL.md";
+                  select = builtins.readFile "${emacs-skills}/skills/select/SKILL.md";
                 };
               };
 
