@@ -472,10 +472,6 @@ final: prev: let
       installShellFiles
     ];
 
-    propagatedBuildInputs = with final; [
-      nodejs
-    ];
-
     preBuild = ''
       export BUN_CACHE_DIR=$TMPDIR/bun-cache
       mkdir -p $BUN_CACHE_DIR
