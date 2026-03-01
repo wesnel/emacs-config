@@ -1227,6 +1227,9 @@
   :custom
   ;; TODO: Investigate the use of VMs to isolate the agent even more.
   ;;
+  ;; One potential issue will be that I don't use API keys for billing,
+  ;; which means that authenticating from within the VM will be hard.
+  ;;
   ;; Here are some VM runners to consider:
   ;;
   ;; - https://github.com/superhq-ai/shuru
@@ -1265,22 +1268,7 @@
            ".devcontainer"
            "devcontainer.json"))
          '("@devcontainer@" "exec" ".")
-       '())))
-
-  :config
-  (when (executable-find "copilot")
-    (setq agent-shell-github-environment (agent-shell-make-environment-variables)
-          agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
-  (when (executable-find "claude-code-acp")
-    (setq agent-shell-anthropic-authentication
-          (agent-shell-anthropic-make-authentication
-           :api-key
-           (lambda ()
-             ;; HACK: Expects to find a claude.com entry in the auth source.
-             (let* ((spec '(:host "claude.com"))
-                    (entry (apply #'auth-source-search spec)))
-               (auth-info-password
-                (nth 0 entry))))))))
+       '()))))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
