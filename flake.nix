@@ -142,7 +142,7 @@
                 servers = {
                   docs-mcp-server = {
                     type = "stdio";
-                    command = "${pkgs.npx}/bin/npx";
+                    command = "${pkgs.nodejs}/bin/npx";
                     args = [
                       "-y"
                       "@arabold/docs-mcp-server@latest"
@@ -153,7 +153,7 @@
                   };
 
                   filesystem = {
-                    command = "${pkgs.npx}/bin/npx";
+                    command = "${pkgs.nodejs}/bin/npx";
                     args = [
                       "-y"
                       "@modelcontextprotocol/server-filesystem"
