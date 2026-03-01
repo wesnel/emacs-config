@@ -176,12 +176,12 @@
             };
 
             home = {
-              packages =
+              packages = with pkgs;
                 []
-                ++ (lib.optional llm pkgs.mcp-cli)
-                ++ (lib.optional cfg.claude.enable pkgs.claude-code-acp)
-                ++ (lib.optional cfg.copilot.enable pkgs.copilot-language-server)
-                ++ (lib.optional cfg.copilot.enable pkgs.github-copilot-cli);
+                ++ (lib.optional llm mcp-cli)
+                ++ (lib.optional cfg.claude.enable claude-code-acp)
+                ++ (lib.optional cfg.copilot.enable copilot-language-server)
+                ++ (lib.optional cfg.copilot.enable github-copilot-cli);
 
               file = {
                 ".emacs.d/early-init.el".source = let
