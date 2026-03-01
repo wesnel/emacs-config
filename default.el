@@ -244,6 +244,7 @@
      ("NOTE" . ?n)
      ("CANCELLED" . ?c))))
 
+;;;; Better styling for `org-mode' buffers.
 (use-package org-modern
   :ensure t
 
@@ -255,6 +256,7 @@
   ;; TODO: Make font configurable with nix.
   (set-face-attribute 'org-modern-symbol nil :family "Iosevka Nerd Font Mono"))
 
+;;;; Better indenting behavior for `org-modern'.
 (use-package org-modern-indent
   :ensure t
 
