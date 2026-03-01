@@ -114,6 +114,12 @@
                 enable = true;
                 source = "${pkgs.emacsPackages.vterm}/share/emacs/site-lisp/elpa/vterm-${pkgs.emacsPackages.vterm.version}/etc/emacs-vterm.fish";
               };
+
+              # TODO: Is there a way to just make a symlink instead?
+              "mcp/mcp_config.json" = lib.mkIf llm {
+                enable = true;
+                source = config.xdg.configFile."mcp/mcp.json".source;
+              };
             };
 
             programs = {
