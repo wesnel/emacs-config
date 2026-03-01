@@ -158,14 +158,6 @@
                     };
                   };
 
-                  filesystem = {
-                    command = "${pkgs.nodejs}/bin/npx";
-                    args = [
-                      "-y"
-                      "@modelcontextprotocol/server-filesystem"
-                    ];
-                  };
-
                   # TODO: Add additional MCP servers.
                   #
                   # Examples:
