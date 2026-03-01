@@ -4,7 +4,6 @@ final: prev: let
   build-deps-dynamic = pkgs: {
     cssls = "vscode-css-language-server";
     delta = "delta";
-    devcontainer = "devcontainer";
     direnv = "direnv";
     hledger = "hledger";
     htmlls = "vscode-html-language-server";
@@ -36,10 +35,6 @@ final: prev: let
     delta = let
       pkg = pkgs.delta;
     in "${pkg}/bin/delta";
-
-    devcontainer = let
-      pkg = pkgs.devcontainer;
-    in "${pkg}/bin/devcontainer";
 
     direnv = let
       pkg = pkgs.direnv;
@@ -128,7 +123,6 @@ final: prev: let
         (deps)
         cssls
         delta
-        devcontainer
         direnv
         gopls
         hledger

@@ -1251,8 +1251,7 @@
   (agent-shell . agent-shell-completion-mode)
 
   :functions
-  (agent-shell-cwd
-   agent-shell--resolve-devcontainer-path)
+  (agent-shell-cwd)
 
   :commands
   (agent-shell
