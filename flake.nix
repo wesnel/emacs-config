@@ -24,20 +24,7 @@
   }: let
     default = final: prev:
       (import ./overlays final prev)
-      // (import emacs-overlay final prev)
-      // {
-        parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
-          # HACK: On Mac, the file has the extension ".dylib",
-          #       but it needs to be ".so":
-          postInstall = ''
-            ${old.postInstall or ""}
-
-            if [ -e $out/lib/libparinfer_rust.dylib ]
-              then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
-            fi
-          '';
-        });
-      };
+      // (import emacs-overlay final prev);
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {
@@ -107,29 +94,95 @@
                 enable = lib.mkEnableOption "Enable Wesley's Emacs Gnus Configuration with Home Manager";
               };
 
-              llm = {
-                enable = lib.mkEnableOption "Enable LLM integration for Emacs";
+              copilot = {
+                enable = lib.mkEnableOption "Enable Copilot integration for Emacs";
               };
+
+              claude = {
+                enable = lib.mkEnableOption "Enable Claude integration for Emacs";
+              };
+
+              llm.enable =
+                cfg.claude.enable
+                || cfg.copilot.enable;
             };
           };
 
           config = lib.mkIf cfg.enable {
             xdg.configFile = {
-              "fish/conf.d/emacs-vterm.fish" = {
-                enable = config.programs.fish.enable;
+              "fish/conf.d/emacs-vterm.fish" = lib.mkIf config.programs.fish.enable {
+                enable = true;
                 source = "${pkgs.emacsPackages.vterm}/share/emacs/site-lisp/elpa/vterm-${pkgs.emacsPackages.vterm.version}/etc/emacs-vterm.fish";
               };
             };
 
-            services = lib.mkIf cfg.llm.enable {
-              ollama = {
+            programs = {
+              claude-code = lib.mkIf cfg.claude.enable {
                 enable = true;
-                # TODO: Substitute the port into the Emacs configuration.
-                port = 11434;
+                enableMcpIntegration = true;
+
+                settings = {
+                  includeCoAuthoredBy = false;
+                };
+
+                skills = {
+                  mcp-cli = ./skills/mcp-cli/SKILL.md;
+
+                  # TODO: Add additional skills.
+                  #
+                  # Examples:
+                  #
+                  # - https://github.com/xenodium/emacs-skills
+                };
+              };
+
+              mcp = lib.mkIf cfg.llm.enable {
+                enable = true;
+
+                servers = {
+                  docs-mcp-server = {
+                    type = "stdio";
+                    command = "${pkgs.npx}/bin/npx";
+                    args = [
+                      "-y"
+                      "@arabold/docs-mcp-server@latest"
+                    ];
+                    env = {
+                      DOCS_MCP_TELEMETRY = "false";
+                    };
+                  };
+
+                  filesystem = {
+                    command = "${pkgs.npx}/bin/npx";
+                    args = [
+                      "-y"
+                      "@modelcontextprotocol/server-filesystem"
+                    ];
+                  };
+
+                  # TODO: Add additional MCP servers.
+                  #
+                  # Examples:
+                  #
+                  # - https://github.com/ProfessioneIT/lsp-mcp-server
+                };
               };
             };
 
             home = {
+              packages =
+                []
+                ++ (lib.optional cfg.llm.enable (with pkgs; [
+                  mcp-cli
+                ]))
+                ++ (lib.optional cfg.claude.enable (with pkgs; [
+                  claude-code-acp
+                ]))
+                ++ (lib.optional cfg.copilot.enable (with pkgs; [
+                  copilot-language-server
+                  github-copilot-cli
+                ]));
+
               file = {
                 ".emacs.d/early-init.el".source = let
                   gnus =

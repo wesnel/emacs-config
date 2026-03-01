@@ -2,15 +2,11 @@ final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
-    copilotcli = "copilot";
-    copilotlsp = "copilot-language-server";
     delta = "delta";
+    devcontainer = "devcontainer";
     direnv = "direnv";
-    git = "git";
     hledger = "hledger";
-    mcplsp = "mcp-language-server";
     multimarkdown = "multimarkdown";
-    npx = "npx";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
     pass = "pass";
     rg = "rg";
@@ -21,41 +17,28 @@ final: prev: let
   # configuration, and their Nix store paths will be statically
   # linked in the built Emacs configuration.
   build-deps-static = pkgs: {
-    copilotcli = let
-      pkg = pkgs.github-copilot-cli;
-    in "${pkg}/bin/copilot";
-
-    copilotlsp = let
-      pkg = pkgs.copilot-language-server;
-    in "${pkg}/bin/copilot-language-server";
 
     delta = let
       pkg = pkgs.delta;
     in "${pkg}/bin/delta";
 
+    devcontainer = let
+      pkg = pkgs.devcontainer;
+    in "${pkg}/bin/devcontainer";
     direnv = let
       pkg = pkgs.direnv;
     in "${pkg}/bin/direnv";
 
-    git = let
-      pkg = pkgs.git;
-    in "${pkg}/bin/git";
 
     hledger = let
       pkg = pkgs.hledger;
     in "${pkg}/bin";
 
-    mcplsp = let
-      pkg = pkgs.mcp-language-server;
-    in "${pkg}/bin/mcp-language-server";
 
     multimarkdown = let
       pkg = pkgs.multimarkdown;
     in "${pkg}/bin/multimarkdown";
 
-    npx = let
-      pkg = pkgs.nodejs_25;
-    in "${pkg}/bin/npx";
 
     parinfer = let
       pkg = pkgs.parinfer-rust-emacs;
@@ -82,15 +65,11 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
-        copilotcli
-        copilotlsp
         delta
+        devcontainer
         direnv
-        git
         hledger
-        mcplsp
         multimarkdown
-        npx
         parinfer
         pass
         rg
@@ -409,6 +388,58 @@ final: prev: let
   emacs-config = build-emacs-config final build-deps-static;
   emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
 
+  mcp-cli = final.stdenv.mkDerivation rec {
+    pname = "mcp-cli";
+    version = "0.3.0";
+
+    src = final.fetchFromGitHub {
+      owner = "philschmid";
+      repo = "mcp-cli";
+      rev = "v${version}";
+      hash = "";
+    };
+
+    nativeBuildInputs = with final; [
+      bun
+      nodejs
+      installShellFiles
+    ];
+
+    preBuild = ''
+      export BUN_CACHE_DIR=$TMPDIR/bun-cache
+      mkdir -p $BUN_CACHE_DIR
+    '';
+
+    buildPhase = ''
+      runHook preBuild
+
+      bun install --frozen-lockfile
+      bun build --compile --minify src/index.ts --outfile dist/mcp-cli
+
+      runHook postBuild
+    '';
+
+    installPhase = ''
+      runHook preInstall
+
+      install -Dm755 dist/mcp-cli $out/bin/mcp-cli
+
+      runHook postInstall
+    '';
+  };
+
+  parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
+    # HACK: On Mac, the file has the extension ".dylib",
+    #       but it needs to be ".so":
+    postInstall = ''
+      ${old.postInstall or ""}
+
+      if [ -e $out/lib/libparinfer_rust.dylib ]
+        then cp $out/lib/libparinfer_rust.dylib $out/lib/libparinfer_rust.so
+      fi
+    '';
+  });
+
   wgn-emacs =
     build-emacs
     final
@@ -471,6 +502,8 @@ in {
   inherit
     emacs-config
     emacs-config-dynamic
+    mcp-cli
+    parinfer-rust-emacs
     wgn-emacs
     wgn-emacs-pgtk
     wgn-emacs-nox

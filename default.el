@@ -309,6 +309,7 @@
                    "PASSWORD_STORE_DIR"
                    "PASSWORD_STORE_KEY"
                    "PASSWORD_STORE_SIGNING_KEY"
+                   ;; TODO: Remove Shipt-specific config.
                    "POETRY_HTTP_BASIC_SHIPT_RESOLVE_PASSWORD"
                    "POETRY_HTTP_BASIC_SHIPT_RESOLVE_USERNAME"
                    "SSH_AGENT_PID"
@@ -1166,69 +1167,6 @@
   (setq embark-indicators '(embark-highlight-indicator
                             embark-isearch-highlight-indicator)))
 
-;;;; GitHub Copilot.
-(use-package copilot
-  :ensure t
-
-  :preface
-  (defun wgn/is-in-org (org-name)
-    (when-let* ((project (project-current))
-                (project-root (project-root project)))
-     (let ((default-directory project-root)
-           (remote-url nil))
-       (with-temp-buffer
-         (when (= 0 (call-process "@git@" nil t nil "config" "--get" "remote.origin.url"))
-           (setq remote-url (string-trim (buffer-string)))))
-       (when remote-url
-         (string-match-p (concat "github\\.com[:/]" (regexp-quote org-name) "/") remote-url)))))
-
-  :hook
-  (prog-mode
-   . (lambda ()
-       ;; Only use Copilot on Shipt repositories.
-       (when (wgn/is-in-org "shipt")
-         (copilot-mode))))
-
-  :commands
-  (copilot-mode
-   copilot-login
-   copilot-accept-completion)
-
-  :defines
-  (copilot-completion-map)
-
-  :custom
-  (copilot-server-executable "@copilotlsp@")
-  (copilot-indent-offset-warning-disable t)
-
-  :bind
-  (:map copilot-completion-map
-   ("M-RET" . #'copilot-accept-completion)
-   ("M-<return>" . #'copilot-accept-completion)))
-
-;;;; MCP integration.
-(use-package mcp
-  :ensure t
-
-  :defines
-  (mcp-hub-servers)
-
-  :commands
-  (mcp-hub
-   mcp-hub-start-all-server)
-
-  :config
-  (with-eval-after-load 'mcp-hub
-    (add-to-list
-     'mcp-hub-servers
-     '("docs-mcp-server" .
-       (:command
-        "@npx@"
-        :args
-        ("-y" "@arabold/docs-mcp-server@latest")
-        :env
-        (:DOCS_MCP_TELEMETRY "false"))))))
-
 ;;;; LLM integration.
 (use-package gptel
   :ensure t
@@ -1242,6 +1180,7 @@
    gptel-add-file
    gptel-org-set-topic
    gptel-org-set-properties
+   gptel-make-anthropic
    gptel-make-ollama
    gptel-make-gh-copilot
    gptel-tools)
@@ -1251,14 +1190,8 @@
    ("C-c <return>" . #'gptel-send))
 
   :config
-  (require 'gptel-integrations)
-
-  (gptel-make-ollama "Ollama"
-    :host "localhost:11434"
-    :stream t
-    :models '(mistral:latest))
-  (setq gptel-model 'gemini-2.5-pro
-        gptel-backend (gptel-make-gh-copilot "Copilot")))
+  ;; TODO: Configure `gptel' backends based on Nix config.
+  (require 'gptel-integrations))
 
 ;;;; Agent integration for `gptel'.
 (use-package gptel-agent
@@ -1278,33 +1211,76 @@
   :hook
   (agent-shell . agent-shell-completion-mode)
 
-  :defines
-  (agent-shell-mcp-servers)
-
   :functions
-  (agent-shell-cwd)
+  (agent-shell-cwd
+   agent-shell--resolve-devcontainer-path)
 
   :commands
   (agent-shell
+   agent-shell-anthropic-start-claude
+   agent-shell-anthropic-make-claude-config
    agent-shell-completion-mode
    agent-shell-github-start-copilot
    agent-shell-make-environment-variables
    agent-shell-github-make-copilot-config)
 
   :custom
-  (agent-shell-github-command '("@copilotcli@" "--acp" "--stdio"))
+  ;; TODO: Investigate the use of VMs to isolate the agent even more.
+  ;;
+  ;; Here are some VM runners to consider:
+  ;;
+  ;; - https://github.com/superhq-ai/shuru
+  ;; - https://github.com/lima-vm/lima
+  ;;
+  ;; Here are some things to try as I build out this VM idea:
+  ;;
+  ;; - The project files could be copied into the VM upon its start.
+  ;;
+  ;; - MCP servers running in the host system could be made accessible
+  ;;   to the VM via their ports.
+  ;;
+  ;; - Tools and skills in the host system should be somehow copied or
+  ;;   otherwise made accessible to the VM.
+  ;;
+  ;; - The Emacs `agent-shell-to-go' package could be used by the host
+  ;;   Emacs process in order to enable mobile command of the agents.
+  ;;
+  ;; - If manual editing within the VM is needed, then the host Emacs
+  ;;   process could access the VM files via TRAMP.
+  ;;
+  ;; - For parallel work, "checkpoints" of multiple VM states could
+  ;;   await later manual review.
+  ;;
+  ;; - An agent "skill" could use emacsclient in the host system to
+  ;;   open ediff buffers between the state of the code in the host
+  ;;   and the modified version of the code in the VM.  The changes
+  ;;   could then be manually accepted into the host.
+  (agent-shell-text-file-capabilities nil)
+  (agent-shell-path-resolver-function #'agent-shell--resolve-devcontainer-path)
+  (agent-shell-container-command-runner
+   (lambda (buffer)
+     (if (file-exists-p
+          (file-name-concat
+           (directory-file-name (agent-shell-cwd))
+           ".devcontainer"
+           "devcontainer.json"))
+         '("@devcontainer@" "exec" ".")
+       '())))
 
   :config
-  (setq agent-shell-github-environment (agent-shell-make-environment-variables :inherit-env t)
-        agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config))
-
-  ;; FIXME: This doesn't seem to work (at least not with Copilot CLI).
-  (add-to-list
-   'agent-shell-mcp-servers
-   '((name . "docs-mcp-server")
-     (command . "@npx@")
-     (args . ("-y" "@arabold/docs-mcp-server@latest"))
-     (env . (((name . "DOCS_MCP_TELEMETRY") (value . "false")))))))
+  (when (executable-find "copilot")
+    (setq agent-shell-github-environment (agent-shell-make-environment-variables)
+          agent-shell-preferred-agent-config (agent-shell-github-make-copilot-config)))
+  (when (executable-find "claude-code-acp")
+    (setq agent-shell-anthropic-authentication
+          (agent-shell-anthropic-make-authentication
+           :api-key
+           (lambda ()
+             ;; HACK: Expects to find a claude.com entry in the auth source.
+             (let* ((spec '(:host "claude.com"))
+                    (entry (apply #'auth-source-search spec)))
+               (auth-info-password
+                (nth 0 entry))))))))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
@@ -1408,29 +1384,6 @@
   (add-hook 'go-ts-mode-hook #'subword-mode)
 
   :config
-  (with-eval-after-load 'agent-shell
-    ;; FIXME: This doesn't seem to work (at least not with Copilot CLI).
-    (add-to-list
-     'agent-shell-mcp-servers
-     '((name . "gopls")
-       (command . "@mcplsp@")
-       (args . (lambda ()
-                 (list "--lsp" "gopls"
-                       "--workspace" (directory-file-name (agent-shell-cwd)))))
-       (env . (((name . "LOG_LEVEL") (value . "info")))))))
-  (with-eval-after-load 'mcp-hub
-    (add-to-list
-     'mcp-hub-servers
-     `("gopls" .
-       (:command
-        "@mcplsp@"
-        :args
-        ("--workspace" ,(directory-file-name
-                         (expand-file-name
-                          (project-root (project-current))))
-         "--lsp" "gopls")
-        :env
-        (:LOG_LEVEL "info")))))
   (with-eval-after-load 'dape
     (add-to-list
      'dape-configs
