@@ -1226,6 +1226,28 @@
   :config
   (gptel-agent-update))
 
+;;;; Shell for interacting with LLMs.
+(use-package chatgpt-shell
+  :ensure t
+
+  :commands
+  (chatgpt-shell
+   chatgpt-shell-describe-code
+   chatgpt-shell-describe-image
+   chatgpt-shell-eshell-summarize-last-command-output
+   chatgpt-shell-eshell-whats-wrong-with-last-command
+   chatgpt-shell-fix-error-at-point
+   chatgpt-shell-generate-unit-test
+   chatgpt-shell-prompt
+   chatgpt-shell-prompt-appending-kill-ring
+   chatgpt-shell-prompt-compose
+   chatgpt-shell-proofread-paragraph-or-region
+   chatgpt-shell-quick-insert
+   chatgpt-shell-refactor-code
+   chatgpt-shell-send-and-review-region
+   chatgpt-shell-send-region
+   chatgpt-shell-write-git-commit))
+
 ;;;; Shell for interacting with LLM agents.
 ;;
 ;; TODO: Investigate the use of VMs to isolate the agent .
