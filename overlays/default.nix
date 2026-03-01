@@ -469,7 +469,7 @@ final: prev: let
       owner = "philschmid";
       repo = "mcp-cli";
       rev = "v${version}";
-      hash = "";
+      hash = "sha256-S924rqlVKzUFD63NDyK5bbXnonra+/UoH6j78AAj3d0=";
     };
 
     nativeBuildInputs = with final; [
