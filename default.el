@@ -73,14 +73,10 @@
   ;; NOTE: For development, you will want to trust this file, wherever it is.
   ;; (add-to-list 'trusted-content "~/git/github.com/wesnel/emacs-config/default.el")
 
-  ;; Use MacOS Trash for deleting files.
+  ;; Use Trash for deleting files.
+  (setq delete-by-moving-to-trash t)
   (when (memq system-type '(darwin))
-    (setq trash-directory "~/.Trash")
-
-    ;; See `trash-directory' as it requires defining `system-move-file-to-trash'.
-    (defun system-move-file-to-trash (file)
-      "Use \"trash\" to move FILE to the system trash."
-      (call-process "trash" nil 0 nil "-F"  file)))
+    (setq trash-directory "~/.Trash"))
 
       ;; Remove some UI elements.
   (menu-bar-mode -1)
