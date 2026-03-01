@@ -172,16 +172,10 @@
             home = {
               packages =
                 []
-                ++ (lib.optional llm (with pkgs; [
-                  mcp-cli
-                ]))
-                ++ (lib.optional cfg.claude.enable (with pkgs; [
-                  claude-code-acp
-                ]))
-                ++ (lib.optional cfg.copilot.enable (with pkgs; [
-                  copilot-language-server
-                  github-copilot-cli
-                ]));
+                ++ (lib.optional llm pkgs.mcp-cli)
+                ++ (lib.optional cfg.claude.enable pkgs.claude-code-acp)
+                ++ (lib.optional cfg.copilot.enable pkgs.copilot-language-server)
+                ++ (lib.optional cfg.copilot.enable pkgs.github-copilot-cli);
 
               file = {
                 ".emacs.d/early-init.el".source = let
