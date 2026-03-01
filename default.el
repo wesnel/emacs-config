@@ -424,12 +424,32 @@
   (ls-lisp-use-insert-directory-program nil)
   (dired-kill-when-opening-new-dired-buffer t)
 
+  :defines
+  (dired-mode-map)
+
   :preface
   (defun wgn/fix-dired-ls ()
     (require 'ls-lisp))
 
   :init
   (add-hook 'dired-mode-hook #'wgn/fix-dired-ls))
+
+;;;; Apply shell functions to current buffer or files marked in `dired'.
+(use-package dwim-shell-command
+  :ensure t
+
+  :commands
+  (dwim-shell-command)
+
+  :bind
+  (([remap shell-command] . #'dwim-shell-command)
+   :map dired-mode-map
+   ([remap dired-do-async-shell-command] . #'dwim-shell-command)
+   ([remap dired-do-shell-command] . #'dwim-shell-command)
+   ([remap dired-smart-shell-command] . #'dwim-shell-command))
+
+  :config
+  (require 'dwim-shell-commands))
 
 ;;;; Easily mark and kill regions.
 (use-package easy-kill
