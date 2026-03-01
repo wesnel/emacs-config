@@ -85,6 +85,10 @@
           ...
         }: let
           cfg = config.home.programs.wgn.emacs;
+
+          llm =
+            cfg.claude.enable
+            || cfg.copilot.enable;
         in {
           options = {
             home.programs.wgn.emacs = {
@@ -101,10 +105,6 @@
               claude = {
                 enable = lib.mkEnableOption "Enable Claude integration for Emacs";
               };
-
-              llm.enable =
-                cfg.claude.enable
-                || cfg.copilot.enable;
             };
           };
 
@@ -136,7 +136,7 @@
                 };
               };
 
-              mcp = lib.mkIf cfg.llm.enable {
+              mcp = lib.mkIf llm {
                 enable = true;
 
                 servers = {
@@ -172,7 +172,7 @@
             home = {
               packages =
                 []
-                ++ (lib.optional cfg.llm.enable (with pkgs; [
+                ++ (lib.optional llm (with pkgs; [
                   mcp-cli
                 ]))
                 ++ (lib.optional cfg.claude.enable (with pkgs; [
