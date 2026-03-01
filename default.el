@@ -350,12 +350,11 @@
 ;;;; Avoid putting files in weird places.
 (use-package no-littering
   :ensure t
-  :demand t
 
   :functions
   (no-littering-theme-backups)
 
-  :config
+  :init
   (no-littering-theme-backups))
 
 ;;;; Required for :bind in use-package.
