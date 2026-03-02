@@ -1319,6 +1319,25 @@
   :custom
   (agent-shell-anthropic-claude-command '("claude-code-acp")))
 
+;;;; Notifications for `agent-shell'.
+(use-package agent-shell-attention
+  :ensure t
+
+  :hook
+  (agent-shell . agent-shell-attention-mode)
+
+  :commands
+  (agent-shell-attention-mode)
+
+  :functions
+  (agent-shell-attention-render-active
+   agent-shell-attention-notify-default)
+
+  :custom
+  (agent-shell-attention-notify-function #'agent-shell-attention-notify-default)
+  (agent-shell-attention-render-function #'agent-shell-attention-render-active)
+  (agent-shell-attention-show-zeros t))
+
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
   :ensure t

@@ -215,6 +215,25 @@ final: prev: let
             };
           });
 
+        agent-shell-attention = let
+          rev = "db89dc71e6e2ca5f0a6859ea9e9b183391614cea";
+          sha256 = "sha256-bc5DjvGJnFBlsLtyYlN1hJQrcvK9khGaywtT37ACn+s=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "agent-shell-attention";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "ultronozm";
+              repo = "${pname}.el";
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
         auctex = ePrev.auctex.overrideAttrs (old: {
           outputs =
             (old.outputs or [])
