@@ -494,15 +494,21 @@ final: prev: let
   emacs-config = build-emacs-config final build-deps-static;
   emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
 
-  claude-agent-acp = final.claude-code-acp.overrideAttrs (old: rec {
+  claude-agent-acp = final.buildNpmPackage (finalAttrs: {
     pname = "claude-agent-acp";
     version = "0.19.2";
 
     src = final.fetchFromGitHub {
       owner = "zed-industries";
       repo = "claude-agent-acp";
-      tag = "v${version}";
+      tag = "v${finalAttrs.version}";
       hash = "sha256-MGy6hdOwIASh4qirCaQBF2czVWEkYiRzqXMm9qun5Tk=";
+    };
+
+    npmDepsHash = "sha256-UZJZfGmmbHKSlRXmIC5hqZNTJ5k3EQO79mGjWaKtgDE=";
+
+    meta = {
+      mainProgram = "claude-agent-acp";
     };
   });
 
