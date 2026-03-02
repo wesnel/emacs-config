@@ -502,7 +502,7 @@ final: prev: let
       owner = "zed-industries";
       repo = "claude-agent-acp";
       tag = "v${version}";
-      hash = "";
+      hash = "sha256-MGy6hdOwIASh4qirCaQBF2czVWEkYiRzqXMm9qun5Tk=";
     };
   });
 
