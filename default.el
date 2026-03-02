@@ -1707,6 +1707,7 @@
 
   :preface
   (defun wgn/yaml-ts-mode-eglot-setup ()
+    (setq-local tab-width 2)
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    `((yaml-mode yaml-ts-mode) .
