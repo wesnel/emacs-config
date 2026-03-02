@@ -1323,9 +1323,6 @@
 (use-package agent-shell-attention
   :ensure t
 
-  :hook
-  (agent-shell . agent-shell-attention-mode)
-
   :commands
   (agent-shell-attention-mode)
 
@@ -1336,7 +1333,10 @@
   :custom
   (agent-shell-attention-notify-function #'agent-shell-attention-notify-default)
   (agent-shell-attention-render-function #'agent-shell-attention-render-active)
-  (agent-shell-attention-show-zeros t))
+  (agent-shell-attention-show-zeros t)
+
+  :init
+  (agent-shell-attention-mode +1))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
