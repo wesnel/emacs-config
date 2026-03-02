@@ -199,9 +199,28 @@ final: prev: let
         ];
 
       override = ePkgs: ePrev: {
+        acp = let
+          rev = "784b00017262260c2c718c98af98f16a2cc7bfdd";
+          sha256 = "sha256-66ZB7GlLO8TDnbeZ4KN/zOT8QKzfoYAPRLeXYHksNdA=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "acp";
+            version = rev;
+
+            src = pkgs.fetchFromGitHub {
+              owner = "xenodium";
+              repo = "${pname}.el";
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
         agent-shell = let
-          rev = "e3fef57d048eb0395ad777350d5f5b6bfc5afb1a";
-          sha256 = "sha256-dM3s9r7Y1yVQdPFtbMxGRqXgo9vKv3XBTc+/TU9QDQg=";
+          rev = "17d8009f5c09c14a0f11f4267f6dc081ae161b6d";
+          sha256 = "sha256-iZZG7GBkP12A0MUnLBlj4scT6dWCSS1Xmd314Gz6qTI=";
         in
           ePrev.agent-shell.overrideAttrs (old: {
             src = pkgs.fetchFromGitHub {
@@ -475,6 +494,18 @@ final: prev: let
   emacs-config = build-emacs-config final build-deps-static;
   emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
 
+  claude-agent-acp = final.claude-code-acp.overrideAttrs (old: rec {
+    pname = "claude-agent-acp";
+    version = "0.19.2";
+
+    src = final.fetchFromGitHub {
+      owner = "zed-industries";
+      repo = "claude-agent-acp";
+      tag = "v${version}";
+      hash = "";
+    };
+  });
+
   mcp-cli = final.stdenv.mkDerivation rec {
     pname = "mcp-cli";
     version = "0.3.0";
@@ -589,6 +620,7 @@ in {
   inherit
     emacs-config
     emacs-config-dynamic
+    claude-agent-acp
     mcp-cli
     parinfer-rust-emacs
     wgn-emacs

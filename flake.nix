@@ -180,7 +180,7 @@
                 ++ (lib.optional llm mcp-cli)
                 # TODO: Can nodejs instead be made implicitly available to mcp-cli at runtime?
                 ++ (lib.optional llm nodejs)
-                ++ (lib.optional cfg.claude.enable claude-code-acp)
+                ++ (lib.optional cfg.claude.enable claude-agent-acp)
                 ++ (lib.optional cfg.copilot.enable copilot-language-server)
                 ++ (lib.optional cfg.copilot.enable github-copilot-cli);
 

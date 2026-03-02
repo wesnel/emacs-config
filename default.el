@@ -1236,6 +1236,13 @@
   :config
   (gptel-agent-update))
 
+;;;; Wrapper around `comint-mode'.
+(use-package shell-maker
+  :ensure t
+
+  :functions
+  (shell-maker-submit))
+
 ;;;; Shell for interacting with LLMs.
 (use-package chatgpt-shell
   :ensure t
@@ -1257,6 +1264,13 @@
    chatgpt-shell-send-and-review-region
    chatgpt-shell-send-region
    chatgpt-shell-write-git-commit))
+
+;;;; Support for ACP.
+(use-package acp
+  :ensure t
+
+  :functions
+  (acp-make-client))
 
 ;;;; Shell for interacting with LLM agents.
 ;;
@@ -1301,23 +1315,21 @@
 (use-package agent-shell
   :ensure t
 
-  :hook
-  (agent-shell . agent-shell-completion-mode)
-
   :functions
-  (agent-shell-cwd)
+  (agent-shell-cwd
+   agent-shell-interrupt)
+
+  :defines
+  (agent-shell-mode-map)
 
   :commands
-  (agent-shell
-   agent-shell-anthropic-start-claude
-   agent-shell-anthropic-make-claude-config
-   agent-shell-completion-mode
-   agent-shell-github-start-copilot
-   agent-shell-make-environment-variables
-   agent-shell-github-make-copilot-config)
+  (agent-shell)
 
-  :custom
-  (agent-shell-anthropic-claude-command '("claude-code-acp")))
+  :bind
+  (:map agent-shell-mode-map
+   ("RET" . #'newline)
+   ("C-c C-c" . #'shell-maker-submit)
+   ("C-c C-k" . #'agent-shell-interrupt)))
 
 ;;;; Notifications for `agent-shell'.
 (use-package agent-shell-attention
