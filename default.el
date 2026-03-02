@@ -82,9 +82,6 @@
   (menu-bar-mode -1)
   (tool-bar-mode -1)
   (scroll-bar-mode -1)
-  (when (memq window-system '(mac ns x))
-    (add-to-list 'default-frame-alist '(ns-transparent-titlebar . t))
-    (add-to-list 'default-frame-alist '(ns-appearance . dark)))
 
   ;; Show line numbers at the beginning of each line.
   (global-display-line-numbers-mode +1)
