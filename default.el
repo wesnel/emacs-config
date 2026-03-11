@@ -1337,7 +1337,13 @@
 
   :functions
   (agent-shell-attention-render-active
-   agent-shell-attention-notify-default)
+   agent-shell-attention-notify-default
+   agent-shell-attention--clear-busy
+   agent-shell-attention--handle-success
+   agent-shell-attention--handle-failure
+   agent-shell-attention--mark-busy
+   agent-shell-attention--clear-buffer
+   agent-shell-attention--around-send-command)
 
   :custom
   (agent-shell-attention-notify-function #'agent-shell-attention-notify-default)
@@ -1345,7 +1351,77 @@
   (agent-shell-attention-show-zeros t)
 
   :init
-  (agent-shell-attention-mode +1))
+  (agent-shell-attention-mode +1)
+
+  :config
+  ;; The upstream `agent-shell-attention--around-send-command' uses
+  ;; `cl-letf*' to temporarily monkey-patch `acp-send-request' so
+  ;; that the request callbacks can be decorated with attention
+  ;; tracking.  This mechanism is fragile and can silently fail under
+  ;; native compilation or deferred compilation, causing the pending
+  ;; count to stay at zero.
+  ;;
+  ;; Replace it with a more robust approach: use a dynamic variable
+  ;; to communicate the buffer context, and permanently advise
+  ;; `acp-send-request' to decorate callbacks when the variable is
+  ;; bound.
+  (defvar wgn/agent-shell-attention--requesting-buffer nil
+    "Buffer that initiated the current `acp-send-request' call.
+Bound dynamically by the around-advice on `agent-shell--send-command'.")
+
+  (advice-remove #'agent-shell--send-command
+                 #'agent-shell-attention--around-send-command)
+
+  (defun wgn/agent-shell-attention--around-send-command (orig-fn &rest args)
+    "Advice around `agent-shell--send-command'.
+Marks the buffer as busy and sets a dynamic variable so the
+`acp-send-request' advice can decorate the callbacks."
+    (let* ((shell-buffer (plist-get args :shell-buffer))
+           (buffer (and (bufferp shell-buffer) shell-buffer)))
+      (if (not (buffer-live-p buffer))
+          (apply orig-fn args)
+        (agent-shell-attention--clear-buffer buffer)
+        (agent-shell-attention--mark-busy buffer)
+        (condition-case err
+            (let ((wgn/agent-shell-attention--requesting-buffer buffer))
+              (apply orig-fn args))
+          (error
+           (agent-shell-attention--clear-busy buffer)
+           (signal (car err) (cdr err)))))))
+
+  (advice-add #'agent-shell--send-command :around
+              #'wgn/agent-shell-attention--around-send-command)
+
+  (defun wgn/agent-shell-attention--around-acp-send (orig-fn &rest args)
+    "Advice around `acp-send-request'.
+When called in the context of an agent-shell command (indicated by
+`wgn/agent-shell-attention--requesting-buffer'), wrap the :on-success
+and :on-failure callbacks with attention tracking."
+    (let ((buffer wgn/agent-shell-attention--requesting-buffer))
+      (if (not (buffer-live-p buffer))
+          (apply orig-fn args)
+        (let* ((on-success (plist-get args :on-success))
+               (on-failure (plist-get args :on-failure)))
+          (setq args
+                (plist-put args :on-success
+                           (lambda (response)
+                             (agent-shell-attention--clear-busy buffer)
+                             (agent-shell-attention--handle-success
+                              buffer response)
+                             (when on-success
+                               (funcall on-success response)))))
+          (setq args
+                (plist-put args :on-failure
+                           (lambda (error raw-message)
+                             (agent-shell-attention--clear-busy buffer)
+                             (agent-shell-attention--handle-failure
+                              buffer error raw-message)
+                             (when on-failure
+                               (funcall on-failure error raw-message)))))
+          (apply orig-fn args)))))
+
+  (advice-add #'acp-send-request :around
+              #'wgn/agent-shell-attention--around-acp-send))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
