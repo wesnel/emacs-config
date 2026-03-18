@@ -143,6 +143,7 @@
                 skills = {
                   mcp-cli = ./skills/mcp-cli/SKILL.md;
                   trash = lib.mkIf pkgs.stdenv.isDarwin ./skills/trash/SKILL.md;
+                  agent-shell-memory = ./skills/agent-shell-memory/SKILL.md;
                   describe = builtins.readFile "${emacs-skills}/skills/describe/SKILL.md";
                   dired = builtins.readFile "${emacs-skills}/skills/dired/SKILL.md";
                   emacsclient = builtins.readFile "${emacs-skills}/skills/emacsclient/SKILL.md";
