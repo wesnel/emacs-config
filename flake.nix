@@ -197,26 +197,29 @@
               file =
                 {
                   ".emacs.d/early-init.el".source = let
-                  gnus =
-                    if cfg.gnus.enable
-                    then config.sops.templates.".gnus.el".path
-                    else "~/.emacs.d/etc/gnus/init.el";
-                in
-                  pkgs.replaceVars ./early-init.el {
-                    inherit
-                      gnus
-                      ;
-                  };
+                    gnus =
+                      if cfg.gnus.enable
+                      then config.sops.templates.".gnus.el".path
+                      else "~/.emacs.d/etc/gnus/init.el";
+                  in
+                    pkgs.replaceVars ./early-init.el {
+                      inherit
+                        gnus
+                        ;
+                    };
 
-                ".emacs.d/etc/eshell/login".source = ./login.el;
+                  ".emacs.d/etc/eshell/login".source = ./login.el;
                 }
                 // lib.optionalAttrs cfg.copilot.enable (
                   lib.mapAttrs' (
                     name: content:
-                    lib.nameValuePair ".github/copilot/skills/${name}.md" (
-                      if lib.isPath content then {source = content;} else {text = content;}
-                    )
-                  ) skills
+                      lib.nameValuePair ".copilot/skills/${name}.md" (
+                        if lib.isPath content
+                        then {source = content;}
+                        else {text = content;}
+                      )
+                  )
+                  skills
                 );
             };
 
