@@ -199,25 +199,6 @@ final: prev: let
         ];
 
       override = ePkgs: ePrev: {
-        acp = let
-          rev = "7b2b3809f34a7c73f05c02ceee47bf4cb17302c6";
-          sha256 = "sha256-lbYYzt6eypO5gSiEoPciCGFwGH/P+5LwkM9/PR1gEo0=";
-        in
-          ePkgs.trivialBuild rec {
-            pname = "acp";
-            version = rev;
-
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "${pname}.el";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          };
-
         agent-shell = let
           rev = "520cad3b60017af0992a97ec4871b6a6af73a16a";
           sha256 = "sha256-T9JLhmZdK9zS2V2sc5V39CNi0p1vWL+ydYNcIodTGLY=";
@@ -232,7 +213,34 @@ final: prev: let
                 sha256
                 ;
             };
+
+            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ePrev.acp];
           });
+
+        agent-shell-knockknock = let
+          rev = "56732434067fe1874dcda62c491f7800bdc0a2f3";
+          sha256 = "sha256-R7bvk2v9togbPiGKOXDAKCMStrL1bbRJoTdBtj0PdlU=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "agent-shell-knockknock";
+            version = rev;
+
+            packageRequires = with ePkgs; [
+              ePrev.acp
+              agent-shell
+              knockknock
+            ];
+
+            src = pkgs.fetchFromGitHub {
+              owner = "xenodium";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
 
         auctex = ePrev.auctex.overrideAttrs (old: {
           outputs =
@@ -365,6 +373,30 @@ final: prev: let
 
             src = pkgs.fetchFromGitHub {
               owner = "SerialDev";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
+        knockknock = let
+          rev = "7a6ab46503554317b639a7333ec8046d7d181520";
+          sha256 = "sha256-hkvEuad3Gh++PMeaMJHd2j//ho+FA59QGxCex3NVi98=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "knockknock";
+            version = rev;
+
+            propagatedBuildInputs = with ePkgs; [
+              nerd-icons
+              posframe
+            ];
+
+            src = pkgs.fetchFromGitHub {
+              owner = "konrad1977";
               repo = pname;
 
               inherit
