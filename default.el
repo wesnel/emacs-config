@@ -1328,6 +1328,27 @@
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
+;;;; Lightweight notifications.
+(use-package knockknock
+  :ensure t
+
+  :commands
+  (knockknock-notify
+   knockknock-init)
+
+  :init
+  (knockknock-init))
+
+;;;; Notify when `agent-shell' needs attention.
+(use-package agent-shell-knockknock
+  :ensure t
+
+  :commands
+  (agent-shell-knockknock-mode)
+
+  :hook
+  (agent-shell-mode . agent-shell-knockknock-mode))
+
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
   :ensure t
