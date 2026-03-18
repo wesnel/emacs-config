@@ -154,6 +154,13 @@ final: prev: let
 
       extraEmacsPackages = ePkgs:
         with ePkgs; [
+          # TODO: posframe and nerd-icons are required by knockknock,
+          # but for some reason the propagatedBuildInputs in the
+          # knockknock derivation doesn't make these dependencies
+          # available at runtime on its own.
+          nerd-icons
+          posframe
+
           tree-sitter-langs
           (treesit-grammars.with-grammars
             (grammars:
@@ -214,7 +221,7 @@ final: prev: let
                 ;
             };
 
-            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ePrev.acp];
+            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ePkgs.acp];
           });
 
         agent-shell-knockknock = let
@@ -226,7 +233,7 @@ final: prev: let
             version = rev;
 
             packageRequires = with ePkgs; [
-              ePrev.acp
+              acp
               agent-shell
               knockknock
             ];
@@ -498,6 +505,24 @@ final: prev: let
               url = "https://codeberg.org/wgn/scratch/archive/${rev}.tar.gz";
 
               inherit
+                sha256
+                ;
+            };
+          });
+
+        shell-maker = let
+          rev = "55f829d179608a3c4b11e86427713d5be7c4bb58";
+          sha256 = "sha256-tFzyVXxgrR6LOPUhX4MgJNLy3PX+pwprjdYi+IZXr+E=";
+        in
+          ePrev.shell-maker.overrideAttrs (old: {
+            version = "0.90.1";
+
+            src = pkgs.fetchFromGitHub {
+              owner = "xenodium";
+              repo = "shell-maker";
+
+              inherit
+                rev
                 sha256
                 ;
             };
