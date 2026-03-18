@@ -98,6 +98,22 @@
           llm =
             cfg.claude.enable
             || cfg.copilot.enable;
+
+          skills =
+            {
+              mcp-cli = ./skills/mcp-cli/SKILL.md;
+              agent-shell-memory = ./skills/agent-shell-memory/SKILL.md;
+              describe = builtins.readFile "${emacs-skills}/skills/describe/SKILL.md";
+              dired = builtins.readFile "${emacs-skills}/skills/dired/SKILL.md";
+              emacsclient = builtins.readFile "${emacs-skills}/skills/emacsclient/SKILL.md";
+              file-links = builtins.readFile "${emacs-skills}/skills/file-links/SKILL.md";
+              highlight = builtins.readFile "${emacs-skills}/skills/highlight/SKILL.md";
+              open = builtins.readFile "${emacs-skills}/skills/open/SKILL.md";
+              select = builtins.readFile "${emacs-skills}/skills/select/SKILL.md";
+            }
+            // lib.optionalAttrs pkgs.stdenv.isDarwin {
+              trash = ./skills/trash/SKILL.md;
+            };
         in {
           options = {
             home.programs.wgn.emacs = {
@@ -140,18 +156,7 @@
                   includeCoAuthoredBy = false;
                 };
 
-                skills = {
-                  mcp-cli = ./skills/mcp-cli/SKILL.md;
-                  trash = lib.mkIf pkgs.stdenv.isDarwin ./skills/trash/SKILL.md;
-                  agent-shell-memory = ./skills/agent-shell-memory/SKILL.md;
-                  describe = builtins.readFile "${emacs-skills}/skills/describe/SKILL.md";
-                  dired = builtins.readFile "${emacs-skills}/skills/dired/SKILL.md";
-                  emacsclient = builtins.readFile "${emacs-skills}/skills/emacsclient/SKILL.md";
-                  file-links = builtins.readFile "${emacs-skills}/skills/file-links/SKILL.md";
-                  highlight = builtins.readFile "${emacs-skills}/skills/highlight/SKILL.md";
-                  open = builtins.readFile "${emacs-skills}/skills/open/SKILL.md";
-                  select = builtins.readFile "${emacs-skills}/skills/select/SKILL.md";
-                };
+                inherit skills;
               };
 
               mcp = lib.mkIf llm {
@@ -189,8 +194,9 @@
                 ++ (lib.optional cfg.copilot.enable copilot-language-server)
                 ++ (lib.optional cfg.copilot.enable github-copilot-cli);
 
-              file = {
-                ".emacs.d/early-init.el".source = let
+              file =
+                {
+                  ".emacs.d/early-init.el".source = let
                   gnus =
                     if cfg.gnus.enable
                     then config.sops.templates.".gnus.el".path
@@ -203,7 +209,15 @@
                   };
 
                 ".emacs.d/etc/eshell/login".source = ./login.el;
-              };
+                }
+                // lib.optionalAttrs cfg.copilot.enable (
+                  lib.mapAttrs' (
+                    name: content:
+                    lib.nameValuePair ".github/copilot/skills/${name}/SKILL.md" (
+                      if lib.isPath content then {source = content;} else {text = content;}
+                    )
+                  ) skills
+                );
             };
 
             sops = lib.mkIf cfg.gnus.enable {
