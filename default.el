@@ -1328,25 +1328,6 @@
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
-;;;; Notifications for `agent-shell'.
-(use-package agent-shell-attention
-  :ensure t
-
-  :commands
-  (agent-shell-attention-mode)
-
-  :functions
-  (agent-shell-attention-render-active
-   agent-shell-attention-notify-default)
-
-  :custom
-  (agent-shell-attention-notify-function #'agent-shell-attention-notify-default)
-  (agent-shell-attention-render-function #'agent-shell-attention-render-active)
-  (agent-shell-attention-show-zeros t)
-
-  :init
-  (agent-shell-attention-mode +1))
-
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
   :ensure t
