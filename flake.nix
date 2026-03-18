@@ -47,9 +47,12 @@
         inherit
           emacs-config
           emacs-config-dynamic
+          claude-agent-acp
+          mcp-cli
+          parinfer-rust-emacs
           wgn-emacs
-          wgn-emacs-nox
           wgn-emacs-pgtk
+          wgn-emacs-nox
           wgn-emacs-macport
           wgn-emacs-macport-cross
           wgn-emacs-unstable

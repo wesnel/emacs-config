@@ -200,8 +200,8 @@ final: prev: let
 
       override = ePkgs: ePrev: {
         acp = let
-          rev = "784b00017262260c2c718c98af98f16a2cc7bfdd";
-          sha256 = "sha256-66ZB7GlLO8TDnbeZ4KN/zOT8QKzfoYAPRLeXYHksNdA=";
+          rev = "7b2b3809f34a7c73f05c02ceee47bf4cb17302c6";
+          sha256 = "sha256-lbYYzt6eypO5gSiEoPciCGFwGH/P+5LwkM9/PR1gEo0=";
         in
           ePkgs.trivialBuild rec {
             pname = "acp";
@@ -219,8 +219,8 @@ final: prev: let
           };
 
         agent-shell = let
-          rev = "17d8009f5c09c14a0f11f4267f6dc081ae161b6d";
-          sha256 = "sha256-iZZG7GBkP12A0MUnLBlj4scT6dWCSS1Xmd314Gz6qTI=";
+          rev = "520cad3b60017af0992a97ec4871b6a6af73a16a";
+          sha256 = "sha256-T9JLhmZdK9zS2V2sc5V39CNi0p1vWL+ydYNcIodTGLY=";
         in
           ePrev.agent-shell.overrideAttrs (old: {
             src = pkgs.fetchFromGitHub {
@@ -257,8 +257,8 @@ final: prev: let
         });
 
         combobulate = let
-          rev = "e9c5be84062e8183f556d7133d5a477a57e37e51";
-          sha256 = "sha256-r6jObsYx7RRTJUmrCN5h3+0WcHqJA67emhr4/W3rBrM=";
+          rev = "38773810b5e532f25d11c6d1af02c3a8dffeacd7";
+          sha256 = "sha256-gW0j0asfH4My+mBSt8pj3d51PigGWzFUhETydUI9xEg=";
         in
           ePkgs.trivialBuild rec {
             pname = "combobulate";
@@ -295,8 +295,8 @@ final: prev: let
           };
 
         flymake-golangci = let
-          rev = "5495d7f5a00b171358cc0f2501ba64b79a240ce5";
-          sha256 = "sha256-FZ7IfGsR4qGg2GIc7s7UVlNfHoI9cwE/KjX1UJXpRVk=";
+          rev = "2cf8f3a55c64b52d6eab4aa13cb95b37442d33d5";
+          sha256 = "sha256-gnIDlF706f4FlgeTjIeMRx04eYFwvdgkZHv31qfYJ/Y=";
         in
           ePkgs.trivialBuild rec {
             pname = "flymake-golangci";
@@ -314,8 +314,8 @@ final: prev: let
           };
 
         flymake-hledger = let
-          rev = "80cffbc70aa72dc9de311e5cf172664f76b4b7e0";
-          sha256 = "sha256-ZcSKhdPe643uzwRA5IjdLcDSU1Gd0hEL8CXSVB5/gys=";
+          rev = "3dd9d58ccd8e4c22c14553ebfac0ca1be3efebc5";
+          sha256 = "sha256-XKkvkteyaYlADX1dpMpsJiAG00pJQw1Z2Oy1Mg122jc=";
         in
           ePkgs.trivialBuild rec {
             pname = "flymake-hledger";
@@ -394,15 +394,15 @@ final: prev: let
           };
 
         reader = let
-          rev = "a76b1a0e13774be57bed186edf1e5bee8eeb0a56";
-          sha256 = "sha256-pC51uw6xSB6ZuGyxAJAYUT3SInC4T3SDcb+haPy/b6o=";
+          rev = "98c5046683e997902a83092b65cdb70ab120e000";
+          sha256 = "sha256-Jo8ZecM4Y22T5kc5zJzCvSywkxwcpNEtQ3HHMJNesac=";
 
           # HACK: It seems that this must be manually updated to an arbitrary date.
-          version = "20251209";
+          version = "20260318";
 
           src = final.fetchFromGitea {
             domain = "codeberg.org";
-            owner = "divyaranjan";
+            owner = "MonadicSheep";
             repo = "emacs-reader";
             hash = sha256;
 
@@ -423,6 +423,7 @@ final: prev: let
 
             nativeBuildInputs = with final; [
               pkg-config
+              emacs
             ];
 
             buildInputs = with final; [
@@ -477,16 +478,16 @@ final: prev: let
 
   claude-agent-acp = final.buildNpmPackage (finalAttrs: {
     pname = "claude-agent-acp";
-    version = "0.19.2";
+    version = "0.22.2";
 
     src = final.fetchFromGitHub {
       owner = "zed-industries";
       repo = "claude-agent-acp";
       tag = "v${finalAttrs.version}";
-      hash = "sha256-MGy6hdOwIASh4qirCaQBF2czVWEkYiRzqXMm9qun5Tk=";
+      hash = "sha256-JkSE6fwtM1btfuxbwX7b04cbTDr5SdYEb7qwlZK9JYo=";
     };
 
-    npmDepsHash = "sha256-UZJZfGmmbHKSlRXmIC5hqZNTJ5k3EQO79mGjWaKtgDE=";
+    npmDepsHash = "sha256-9OhdDRQuekmt3JMs0oGVbvqWcQFoyk4ZZlm6DZCNazU=";
 
     meta = {
       mainProgram = "claude-agent-acp";
