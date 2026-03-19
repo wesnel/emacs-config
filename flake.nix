@@ -213,7 +213,7 @@
                 // lib.optionalAttrs cfg.copilot.enable (
                   lib.mapAttrs' (
                     name: content:
-                      lib.nameValuePair ".copilot/skills/${name}.md" (
+                      lib.nameValuePair ".copilot/skills/${name}/SKILL.md" (
                         if lib.isPath content
                         then {source = content;}
                         else {text = content;}
