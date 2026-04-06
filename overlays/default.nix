@@ -104,7 +104,7 @@ final: prev: let
     in "${pkg}/bin/texlab";
 
     tsxls = let
-      pkg = pkgs.nodePackages.typescript-language-server;
+      pkg = pkgs.typescript-language-server;
     in "${pkg}/bin/typescript-language-server";
 
     yamlls = let
