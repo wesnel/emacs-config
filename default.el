@@ -303,9 +303,7 @@
     (exec-path-from-shell-arguments nil)
 
     :config
-    (dolist (var '("ARTIFACTORY_PYPI_PASSWORD"
-                   "ARTIFACTORY_PYPI_USERNAME"
-                   "EDITOR"
+    (dolist (var '("EDITOR"
                    "GITHUB_TOKEN"
                    "GPG_AGENT_INFO"
                    "GPG_TTY"
@@ -319,11 +317,10 @@
                    "PASSWORD_STORE_DIR"
                    "PASSWORD_STORE_KEY"
                    "PASSWORD_STORE_SIGNING_KEY"
-                   ;; TODO: Remove Shipt-specific config.
-                   "POETRY_HTTP_BASIC_SHIPT_RESOLVE_PASSWORD"
-                   "POETRY_HTTP_BASIC_SHIPT_RESOLVE_USERNAME"
+                   "SHELL"
                    "SSH_AGENT_PID"
-                   "SSH_AUTH_SOCK"))
+                   "SSH_AUTH_SOCK"
+                   "VISUAL"))
           (add-to-list 'exec-path-from-shell-variables var)
 
         (exec-path-from-shell-initialize))))
