@@ -312,7 +312,7 @@
                       gnus-posting-styles '((".*"
                                              (signature-file "~/.signature"))
                                             ("fastmail"
-                                             (address "${config.sops.placeholder.email-fastmail}")
+                                             (address "${config.sops.placeholder.email-personal}")
                                              ("X-Message-SMTP-Method" "smtp smtp.fastmail.com 587"))
                                             ("gmail"
                                              (address "${config.sops.placeholder.email-work}")
