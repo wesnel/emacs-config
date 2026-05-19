@@ -25,7 +25,4 @@
           (:enable t)
           :validate t
           :hover t
-          :completion t
-          :schemas
-          (https://infraspec-json-schema.gcp.shipttech.com/spec
-           ["infraspec.yml" "infraspec.yaml"])))))))
+          :completion t))))))

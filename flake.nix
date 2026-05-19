@@ -81,8 +81,8 @@
       };
 
       templates = {
-        shipt = {
-          path = ./templates/shipt;
+        go = {
+          path = ./templates/go;
         };
       };
 
@@ -225,8 +225,8 @@
 
             sops = lib.mkIf cfg.gnus.enable {
               secrets = {
-                email-fastmail = {};
-                email-shipt = {};
+                email-personal = {};
+                email-work = {};
               };
 
               # TODO: It would be nice to be able to edit this with syntax highlighting. Org tangle?
@@ -276,10 +276,10 @@
                 (require 'gnus-msg)
 
                 (setq mail-sources `((imap :server "imap.fastmail.com"
-                                           :user "${config.sops.placeholder.email-fastmail}"
+                                           :user "${config.sops.placeholder.email-personal}"
                                            :port 993)
                                      (imap :server "imap.gmail.com"
-                                           :user "${config.sops.placeholder.email-shipt}"
+                                           :user "${config.sops.placeholder.email-work}"
                                            :port 993)))
 
                 ;;;; Gnus source configuration:
@@ -315,7 +315,7 @@
                                              (address "${config.sops.placeholder.email-fastmail}")
                                              ("X-Message-SMTP-Method" "smtp smtp.fastmail.com 587"))
                                             ("gmail"
-                                             (address "${config.sops.placeholder.email-shipt}")
+                                             (address "${config.sops.placeholder.email-work}")
                                              ("X-Message-SMTP-Method" "smtp smtp.gmail.com 587"))))
 
                 ;;;; Gnus general configuration:
