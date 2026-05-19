@@ -551,6 +551,27 @@ final: prev: let
     };
   });
 
+  emacs30-macport = prev.emacs30-macport.overrideAttrs (old: {
+    postInstall = let
+      icons = final.fetchFromGitHub {
+        owner = "jimeh";
+        repo = "emacs-liquid-glass-icons";
+        tag = "v1.1.0";
+        hash = "sha256-8U5V1YQymoSLK32NrIGGg6M4l2bIT4L8RvuC+EUO2Bc=";
+      };
+    in
+      (old.postInstall or "")
+      + ''
+        cp ${icons}/Resources/Assets.car $out/Applications/Emacs.app/Contents/Resources
+        cp ${icons}/Resources/EmacsLG1-Default.icns $out/Applications/Emacs.app/Contents/Resources/Emacs.icns
+
+        ICON_NAME="EmacsLG1"
+        PLIST="$out/Applications/Emacs.app/Contents/Info.plist"
+        /usr/libexec/PlistBuddy -c "Set :CFBundleIconName $ICON_NAME" "$PLIST" 2>/dev/null \
+            || /usr/libexec/PlistBuddy -c "Add :CFBundleIconName string $ICON_NAME" "$PLIST"
+      '';
+  });
+
   mcp-cli = final.stdenv.mkDerivation rec {
     pname = "mcp-cli";
     version = "0.3.0";
@@ -645,7 +666,6 @@ final: prev: let
     build-deps-static
     (pkgs: pkgs.emacs-git-nox);
 
-  # TODO: Configurable app icon on MacOS.
   wgn-emacs-macport =
     build-emacs
     final
@@ -663,6 +683,7 @@ final: prev: let
     (pkgs: pkgs.emacs30-macport);
 in {
   inherit
+    emacs30-macport
     emacs-config
     emacs-config-dynamic
     claude-agent-acp
