@@ -1437,6 +1437,8 @@
                                             ("nix-shell"
                                              "-p"
                                              "gopls"
+                                             "-p"
+                                             "go"
                                              "--run"
                                              "gopls")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
