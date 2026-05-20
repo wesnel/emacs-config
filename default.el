@@ -554,7 +554,7 @@
   (defun wgn/patch-ripgrep-in-xref-search ()
     (setq xref-search-program-alist
           (add-to-list 'xref-search-program-alist
-                       '(ripgrep . "xargs -0 @rg@ <C> --null -nH --no-heading --no-messages -g '!*/' -e <R>"))
+                       '(ripgrep . "xargs -0 rg <C> --null -nH --no-heading --no-messages -g '!*/' -e <R>"))
           xref-search-program 'ripgrep))
 
   :init
@@ -605,10 +605,7 @@
   :ensure t
 
   :hook
-  (magit-mode . magit-delta-mode)
-
-  :custom
-  (magit-delta-delta-executable "@delta@"))
+  (magit-mode . magit-delta-mode))
 
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos
@@ -1413,10 +1410,7 @@
   :ensure t
 
   :hook
-  (after-init . envrc-global-mode)
-
-  :custom
-  (envrc-direnv-executable "@direnv@"))
+  (after-init . envrc-global-mode))
 
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
@@ -1468,7 +1462,12 @@
       (add-to-list 'eglot-server-programs
                    `((go-mode go-ts-mode) .
                      ,(eglot-alternatives '("gopls"
-                                            "@gopls@"))))
+                                            "@gopls@"
+                                            ("nix-shell"
+                                             "-p"
+                                             "gopls"
+                                             "--run"
+                                             "gopls")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
@@ -1580,7 +1579,12 @@
       (add-to-list 'eglot-server-programs
                    `((rust-mode rust-ts-mode) .
                      ,(eglot-alternatives '("rust-analyzer"
-                                            "@rustanalyzer@"))))
+                                            "@rustanalyzer@"
+                                            ("nix-shell"
+                                             "-p"
+                                             "rust-analyzer"
+                                             "--run"
+                                             "rust-analyzer")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1618,9 +1622,13 @@
     (with-eval-after-load 'eglot
       (add-to-list 'eglot-server-programs
                    `((python-mode python-ts-mode) .
-                     ,(eglot-alternatives '(("poetry" "run" "pylsp")
-                                            "pylsp"
-                                            "@pylsp@"))))
+                     ,(eglot-alternatives '("pylsp"
+                                            "@pylsp@"
+                                            ("nix-shell"
+                                             "-p"
+                                             "'pkgs.python3.withPackages (p: with p; [ python-lsp-server python-lsp-ruff ])'"
+                                             "--run"
+                                             "pylsp")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1669,7 +1677,12 @@
                    `((kotlin-mode kotlin-ts-mode) .
                      ,(eglot-alternatives
                        '("kotlin-language-server"
-                         "@kotlinlsp@"))))
+                         "@kotlinlsp@"
+                         ("nix-shell"
+                          "-p"
+                          "kotlin-language-server"
+                          "--run"
+                          "kotlin-language-server")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1707,7 +1720,12 @@
                    `((nix-mode) .
                      ,(eglot-alternatives
                        '("nil"
-                         "@nil@"))))
+                         "@nil@"
+                         ("nix-shell"
+                          "-p"
+                          "nil"
+                          "--run"
+                          "nil")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1742,7 +1760,12 @@
                    `((yaml-mode yaml-ts-mode) .
                      ,(eglot-alternatives
                        '(("yaml-language-server" "--stdio")
-                         ("@yamlls@" "--stdio")))))
+                         ("@yamlls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "yaml-language-server"
+                          "--run"
+                          "'yaml-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1762,7 +1785,12 @@
                    `((terraform-mode) .
                      ,(eglot-alternatives
                        '(("terraform-ls" "serve")
-                         ("@terraformls@" "serve")))))
+                         ("@terraformls@" "serve")
+                         ("nix-shell"
+                          "-p"
+                          "terraform-ls"
+                          "--run"
+                          "'terraform-ls serve'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1785,7 +1813,12 @@
                      ,(eglot-alternatives
                        '(("vscode-html-language-server" "--stdio")
                          ("html-languageserver" "--stdio")
-                         ("@htmlls@" "--stdio")))))
+                         ("@htmlls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "vscode-langservers-extracted"
+                          "--run"
+                          "'vscode-html-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1809,7 +1842,12 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio"))))))
+                         ("@tsxls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "typescript-language-server"
+                          "--run"
+                          "'typescript-language-server --stdio'"))))))
     (eglot-ensure))
 
   :init
@@ -1834,7 +1872,12 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio"))))))
+                         ("@tsxls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "typescript-language-server"
+                          "--run"
+                          "'typescript-language-server --stdio'"))))))
     (eglot-ensure))
 
   (defun wgn/js-ts-mode-fix-auto-mode-alist ()
@@ -1877,7 +1920,12 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio"))))))
+                         ("@tsxls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "typescript-language-server"
+                          "--run"
+                          "'typescript-language-server --stdio'"))))))
     (eglot-ensure))
 
   :init
@@ -1897,7 +1945,12 @@
                        '(("vscode-json-language-server" "--stdio")
                          ("vscode-json-languageserver" "--stdio")
                          ("json-languageserver" "--stdio")
-                         ("@jsonls@" "--stdio"))))))
+                         ("@jsonls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "vscode-langservers-extracted"
+                          "--run"
+                          "'vscode-json-language-server --stdio'"))))))
     (eglot-ensure))
 
   :init
@@ -1920,7 +1973,12 @@
                      ,(eglot-alternatives
                        '(("vscode-css-language-server" "--stdio")
                          ("css-languageserver" "--stdio")
-                         ("@cssls@" "--stdio")))))
+                         ("@cssls@" "--stdio")
+                         ("nix-shell"
+                          "-p"
+                          "vscode-langservers-extracted"
+                          "--run"
+                          "'vscode-css-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1947,7 +2005,12 @@
                      ,(eglot-alternatives
                        '("digestif"
                          "texlab"
-                         "@texlab@"))))
+                         "@texlab@"
+                         ("nix-shell"
+                          "-p"
+                          "texlab"
+                          "--run"
+                          "texlab")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1987,7 +2050,7 @@
    ("C-c C-e" . #'markdown-do))
 
   :custom
-  (markdown-command "@multimarkdown@")
+  (markdown-command "multimarkdown")
   (markdown-fontify-code-blocks-natively t))
 
 ;;;; Generate table of contents in markdown files.
@@ -2103,9 +2166,6 @@
 (use-package password-store
   :ensure t
 
-  :custom
-  (password-store-executable "@pass@")
-
   :commands
   (password-store-edit
    password-store-get
@@ -2156,10 +2216,7 @@
    :map hledger-mode-map
    ("C-c e" . #'hledger-jentry)
    ("M-p" . #'hledger-backward-entry)
-   ("M-n" . #'hledger-next-or-new-entry))
-
-  :init
-  (add-to-list 'exec-path "@hledger@"))
+   ("M-n" . #'hledger-next-or-new-entry)))
 
 (use-package flymake-hledger
   :ensure t

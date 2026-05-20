@@ -186,7 +186,13 @@
 
             home = {
               packages = with pkgs;
-                []
+                [
+                  delta
+                  direnv
+                  multimarkdown
+                  pass
+                  rg
+                ]
                 ++ (lib.optional llm mcp-cli)
                 # TODO: Can nodejs instead be made implicitly available to mcp-cli at runtime?
                 ++ (lib.optional llm nodejs)
@@ -397,9 +403,14 @@
                 pkg = cfg.package;
               in
                 (with pkgs; [
-                  pkg
+                  delta
+                  direnv
                   enchant_2
+                  multimarkdown
                   nuspell
+                  pass
+                  pkg
+                  rg
                 ])
                 ++ (with pkgs.hunspellDicts; [
                   en-us-large

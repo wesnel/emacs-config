@@ -3,20 +3,14 @@ final: prev: let
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
     cssls = "vscode-css-language-server";
-    delta = "delta";
-    direnv = "direnv";
     gopls = "gopls";
-    hledger = "hledger";
     htmlls = "vscode-html-language-server";
     jsonls = "vscode-json-language-server";
     kotlinlsp = "kotlin-language-server";
-    multimarkdown = "multimarkdown";
     nil = "nil";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
-    pass = "pass";
     poetry = "poetry";
     pylsp = "pylsp";
-    rg = "rg";
     rustanalyzer = "rust-analyzer";
     terraformls = "terraform-ls";
     texlab = "texlab";
@@ -32,14 +26,6 @@ final: prev: let
     cssls = let
       pkg = pkgs.vscode-langservers-extracted;
     in "${pkg}/bin/vscode-css-language-server";
-
-    delta = let
-      pkg = pkgs.delta;
-    in "${pkg}/bin/delta";
-
-    direnv = let
-      pkg = pkgs.direnv;
-    in "${pkg}/bin/direnv";
 
     gopls = let
       pkg = pkgs.gopls;
@@ -61,10 +47,6 @@ final: prev: let
       pkg = pkgs.kotlin-language-server;
     in "${pkg}/bin/kotlin-language-server";
 
-    multimarkdown = let
-      pkg = pkgs.multimarkdown;
-    in "${pkg}/bin/multimarkdown";
-
     nil = let
       pkg = pkgs.nil;
     in "${pkg}/bin/nil";
@@ -75,10 +57,6 @@ final: prev: let
       "${pkg}/lib/libparinfer_rust.so"
     '';
 
-    pass = let
-      pkg = pkgs.pass;
-    in "${pkg}/bin/pass";
-
     pylsp = let
       pkg = pkgs.python3.withPackages (p:
         with p; [
@@ -86,10 +64,6 @@ final: prev: let
           python-lsp-ruff
         ]);
     in "${pkg}/bin/pylsp";
-
-    rg = let
-      pkg = pkgs.ripgrep;
-    in "${pkg}/bin/rg";
 
     rustanalyzer = let
       pkg = pkgs.rust-analyzer;
@@ -123,19 +97,13 @@ final: prev: let
       inherit
         (deps)
         cssls
-        delta
-        direnv
         gopls
-        hledger
         htmlls
         jsonls
         kotlinlsp
-        multimarkdown
         nil
         parinfer
-        pass
         pylsp
-        rg
         rustanalyzer
         terraformls
         texlab
