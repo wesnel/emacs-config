@@ -187,10 +187,8 @@
             home = {
               packages = with pkgs;
                 [
-                  delta
                   direnv
                   multimarkdown
-                  pass
                   ripgrep
                 ]
                 ++ (lib.optional llm mcp-cli)
