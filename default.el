@@ -413,7 +413,6 @@
 (use-package tramp
   :custom
   (tramp-use-connection-share nil)
-  (tramp-default-method "ssh")
 
   :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
