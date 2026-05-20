@@ -1431,16 +1431,6 @@
   :preface
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((go-mode go-ts-mode) .
-                     ,(eglot-alternatives '("gopls"
-                                            ("nix-shell"
-                                             "-p"
-                                             "gopls"
-                                             "-p"
-                                             "go"
-                                             "--run"
-                                             "gopls")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
@@ -1549,14 +1539,6 @@
   :preface
   (defun wgn/rust-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((rust-mode rust-ts-mode) .
-                     ,(eglot-alternatives '("rust-analyzer"
-                                            ("nix-shell"
-                                             "-p"
-                                             "rust-analyzer"
-                                             "--run"
-                                             "rust-analyzer")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1592,14 +1574,6 @@
   :preface
   (defun wgn/python-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((python-mode python-ts-mode) .
-                     ,(eglot-alternatives '("pylsp"
-                                            ("nix-shell"
-                                             "-p"
-                                             "'pkgs.python3.withPackages (p: with p; [ python-lsp-server python-lsp-ruff ])'"
-                                             "--run"
-                                             "pylsp")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1644,15 +1618,6 @@
   :preface
   (defun wgn/kotlin-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((kotlin-mode kotlin-ts-mode) .
-                     ,(eglot-alternatives
-                       '("kotlin-language-server"
-                         ("nix-shell"
-                          "-p"
-                          "kotlin-language-server"
-                          "--run"
-                          "kotlin-language-server")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1686,15 +1651,6 @@
   :preface
   (defun wgn/nix-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((nix-mode) .
-                     ,(eglot-alternatives
-                       '("nil"
-                         ("nix-shell"
-                          "-p"
-                          "nil"
-                          "--run"
-                          "nil")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1725,15 +1681,6 @@
   (defun wgn/yaml-ts-mode-eglot-setup ()
     (setq-local tab-width 2)
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((yaml-mode yaml-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("yaml-language-server" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "yaml-language-server"
-                          "--run"
-                          "'yaml-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1749,15 +1696,6 @@
   :preface
   (defun wgn/terraform-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((terraform-mode) .
-                     ,(eglot-alternatives
-                       '(("terraform-ls" "serve")
-                         ("nix-shell"
-                          "-p"
-                          "terraform-ls"
-                          "--run"
-                          "'terraform-ls serve'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1775,16 +1713,6 @@
   :preface
   (defun wgn/mhtml-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((mhtml-mode) .
-                     ,(eglot-alternatives
-                       '(("vscode-html-language-server" "--stdio")
-                         ("html-languageserver" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "vscode-langservers-extracted"
-                          "--run"
-                          "'vscode-html-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1800,19 +1728,9 @@
 
   :preface
   (defun wgn/tsx-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ;; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   `((tsx-mode tsx-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("rass ts")
-                         ("typescript-language-server" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "typescript-language-server"
-                          "--run"
-                          "'typescript-language-server --stdio'"))))))
+    ;; (with-eval-after-load 'eglot
+    ;;   FIXME: Need to figure out how to change indent size.
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1829,19 +1747,9 @@
 
   :preface
   (defun wgn/js-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ;; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   `((js-mode js-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("rass ts")
-                         ("typescript-language-server" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "typescript-language-server"
-                          "--run"
-                          "'typescript-language-server --stdio'"))))))
+    ;; (with-eval-after-load 'eglot
+    ;;   FIXME: Need to figure out how to change indent size.
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   (defun wgn/js-ts-mode-fix-auto-mode-alist ()
@@ -1876,19 +1784,9 @@
 
   :preface
   (defun wgn/typescript-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      ;; FIXME: Need to figure out how to change indent size.
-      ;; (add-hook 'before-save-hook #'wgn/apply-eglot-format t t)
-      (add-to-list 'eglot-server-programs
-                   `((typescript-mode typescript-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("rass ts")
-                         ("typescript-language-server" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "typescript-language-server"
-                          "--run"
-                          "'typescript-language-server --stdio'"))))))
+    ;; (with-eval-after-load 'eglot
+    ;;   FIXME: Need to figure out how to change indent size.
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1901,18 +1799,9 @@
 
   :preface
   (defun wgn/json-ts-mode-eglot-setup ()
-    (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((json-mode json-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("vscode-json-language-server" "--stdio")
-                         ("vscode-json-languageserver" "--stdio")
-                         ("json-languageserver" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "vscode-langservers-extracted"
-                          "--run"
-                          "'vscode-json-language-server --stdio'"))))))
+    ;; (with-eval-after-load 'eglot
+    ;;   FIXME: Need to figure out how to change indent size.
+    ;;   (add-hook 'before-save-hook #'wgn/apply-eglot-format t t))
     (eglot-ensure))
 
   :init
@@ -1930,16 +1819,6 @@
   :preface
   (defun wgn/css-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((css-mode css-ts-mode) .
-                     ,(eglot-alternatives
-                       '(("vscode-css-language-server" "--stdio")
-                         ("css-languageserver" "--stdio")
-                         ("nix-shell"
-                          "-p"
-                          "vscode-langservers-extracted"
-                          "--run"
-                          "'vscode-css-language-server --stdio'")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
@@ -1961,16 +1840,6 @@
   :preface
   (defun wgn/latex-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((LaTeX-mode tex-mode context-mode texinfo-mode bibtex-mode) .
-                     ,(eglot-alternatives
-                       '("digestif"
-                         "texlab"
-                         ("nix-shell"
-                          "-p"
-                          "texlab"
-                          "--run"
-                          "texlab")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
