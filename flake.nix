@@ -403,14 +403,9 @@
                 pkg = cfg.package;
               in
                 (with pkgs; [
-                  delta
-                  direnv
-                  enchant_2
-                  multimarkdown
-                  nuspell
-                  pass
                   pkg
-                  ripgrep
+                  enchant_2
+                  nuspell
                 ])
                 ++ (with pkgs.hunspellDicts; [
                   en-us-large
