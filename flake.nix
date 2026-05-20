@@ -191,7 +191,7 @@
                   direnv
                   multimarkdown
                   pass
-                  rg
+                  ripgrep
                 ]
                 ++ (lib.optional llm mcp-cli)
                 # TODO: Can nodejs instead be made implicitly available to mcp-cli at runtime?
@@ -410,7 +410,7 @@
                   nuspell
                   pass
                   pkg
-                  rg
+                  ripgrep
                 ])
                 ++ (with pkgs.hunspellDicts; [
                   en-us-large
