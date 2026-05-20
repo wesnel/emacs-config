@@ -409,6 +409,36 @@
   :init
   (global-hl-todo-mode +1))
 
+;;;; Remote editing.
+(use-package tramp
+  :custom
+  (remote-file-name-inhibit-locks t)
+  (tramp-use-scp-direct-remote-copying t)
+  (remote-file-name-inhibit-auto-save-visited t)
+  (tramp-copy-size-limit (* 1024 1024))
+  (tramp-verbose 2)
+  (tramp-default-method "rsync")
+
+  :config
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+  (connection-local-set-profile-variables
+   'remote-direct-async-process
+   '((tramp-direct-async-process . t)))
+  (connection-local-set-profiles
+   '(:application tramp :protocol "scp")
+   'remote-direct-async-process)
+  (add-to-list 'tramp-connection-properties (list "/scp:" "direct-async" t))
+  (connection-local-set-profiles
+   '(:application tramp :protocol "ssh")
+   'remote-direct-async-process)
+  (add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
+  (connection-local-set-profiles
+   '(:application tramp :protocol "rsync")
+   'remote-direct-async-process)
+
+  (with-eval-after-load 'compile
+    (remove-hook 'compilation-mode-hook #'tramp-compile-disable-ssh-controlmaster-options)))
+
 ;;;; Completion style that allows for multiple regular expressions.
 (use-package orderless
   :ensure t
@@ -547,6 +577,9 @@
   :preface
   (defun wgn/add-clone-to-project-list ()
     (project-remember-project (project-current)))
+
+  :custom
+  (magit-tramp-pipe-stty-settings 'pty)
 
   :commands
   (magit
