@@ -1437,7 +1437,6 @@
       (add-to-list 'eglot-server-programs
                    `((go-mode go-ts-mode) .
                      ,(eglot-alternatives '("gopls"
-                                            "@gopls@"
                                             ("nix-shell"
                                              "-p"
                                              "gopls"
@@ -1554,7 +1553,6 @@
       (add-to-list 'eglot-server-programs
                    `((rust-mode rust-ts-mode) .
                      ,(eglot-alternatives '("rust-analyzer"
-                                            "@rustanalyzer@"
                                             ("nix-shell"
                                              "-p"
                                              "rust-analyzer"
@@ -1598,7 +1596,6 @@
       (add-to-list 'eglot-server-programs
                    `((python-mode python-ts-mode) .
                      ,(eglot-alternatives '("pylsp"
-                                            "@pylsp@"
                                             ("nix-shell"
                                              "-p"
                                              "'pkgs.python3.withPackages (p: with p; [ python-lsp-server python-lsp-ruff ])'"
@@ -1652,7 +1649,6 @@
                    `((kotlin-mode kotlin-ts-mode) .
                      ,(eglot-alternatives
                        '("kotlin-language-server"
-                         "@kotlinlsp@"
                          ("nix-shell"
                           "-p"
                           "kotlin-language-server"
@@ -1695,7 +1691,6 @@
                    `((nix-mode) .
                      ,(eglot-alternatives
                        '("nil"
-                         "@nil@"
                          ("nix-shell"
                           "-p"
                           "nil"
@@ -1735,7 +1730,6 @@
                    `((yaml-mode yaml-ts-mode) .
                      ,(eglot-alternatives
                        '(("yaml-language-server" "--stdio")
-                         ("@yamlls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "yaml-language-server"
@@ -1760,7 +1754,6 @@
                    `((terraform-mode) .
                      ,(eglot-alternatives
                        '(("terraform-ls" "serve")
-                         ("@terraformls@" "serve")
                          ("nix-shell"
                           "-p"
                           "terraform-ls"
@@ -1788,7 +1781,6 @@
                      ,(eglot-alternatives
                        '(("vscode-html-language-server" "--stdio")
                          ("html-languageserver" "--stdio")
-                         ("@htmlls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "vscode-langservers-extracted"
@@ -1817,7 +1809,6 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "typescript-language-server"
@@ -1847,7 +1838,6 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "typescript-language-server"
@@ -1895,7 +1885,6 @@
                      ,(eglot-alternatives
                        '(("rass ts")
                          ("typescript-language-server" "--stdio")
-                         ("@tsxls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "typescript-language-server"
@@ -1920,7 +1909,6 @@
                        '(("vscode-json-language-server" "--stdio")
                          ("vscode-json-languageserver" "--stdio")
                          ("json-languageserver" "--stdio")
-                         ("@jsonls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "vscode-langservers-extracted"
@@ -1948,7 +1936,6 @@
                      ,(eglot-alternatives
                        '(("vscode-css-language-server" "--stdio")
                          ("css-languageserver" "--stdio")
-                         ("@cssls@" "--stdio")
                          ("nix-shell"
                           "-p"
                           "vscode-langservers-extracted"
@@ -1980,7 +1967,6 @@
                      ,(eglot-alternatives
                        '("digestif"
                          "texlab"
-                         "@texlab@"
                          ("nix-shell"
                           "-p"
                           "texlab"

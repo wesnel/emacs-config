@@ -2,20 +2,7 @@ final: prev: let
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
-    cssls = "vscode-css-language-server";
-    gopls = "gopls";
-    htmlls = "vscode-html-language-server";
-    jsonls = "vscode-json-language-server";
-    kotlinlsp = "kotlin-language-server";
-    nil = "nil";
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
-    poetry = "poetry";
-    pylsp = "pylsp";
-    rustanalyzer = "rust-analyzer";
-    terraformls = "terraform-ls";
-    texlab = "texlab";
-    tsxls = "typescript-language-server";
-    yamlls = "yaml-language-server";
   };
 
   # For building an Emacs configuration for Nix systems.  These
@@ -23,67 +10,11 @@ final: prev: let
   # configuration, and their Nix store paths will be statically
   # linked in the built Emacs configuration.
   build-deps-static = pkgs: {
-    cssls = let
-      pkg = pkgs.vscode-langservers-extracted;
-    in "${pkg}/bin/vscode-css-language-server";
-
-    gopls = let
-      pkg = pkgs.gopls;
-    in "${pkg}/bin/gopls";
-
-    hledger = let
-      pkg = pkgs.hledger;
-    in "${pkg}/bin";
-
-    htmlls = let
-      pkg = pkgs.vscode-langservers-extracted;
-    in "${pkg}/bin/vscode-html-language-server";
-
-    jsonls = let
-      pkg = pkgs.vscode-langservers-extracted;
-    in "${pkg}/bin/vscode-json-language-server";
-
-    kotlinlsp = let
-      pkg = pkgs.kotlin-language-server;
-    in "${pkg}/bin/kotlin-language-server";
-
-    nil = let
-      pkg = pkgs.nil;
-    in "${pkg}/bin/nil";
-
     parinfer = let
       pkg = pkgs.parinfer-rust-emacs;
     in ''
       "${pkg}/lib/libparinfer_rust.so"
     '';
-
-    pylsp = let
-      pkg = pkgs.python3.withPackages (p:
-        with p; [
-          python-lsp-server
-          python-lsp-ruff
-        ]);
-    in "${pkg}/bin/pylsp";
-
-    rustanalyzer = let
-      pkg = pkgs.rust-analyzer;
-    in "${pkg}/bin/rust-analyzer";
-
-    terraformls = let
-      pkg = pkgs.terraform-ls;
-    in "${pkg}/bin/terraform-ls";
-
-    texlab = let
-      pkg = pkgs.texlab;
-    in "${pkg}/bin/texlab";
-
-    tsxls = let
-      pkg = pkgs.typescript-language-server;
-    in "${pkg}/bin/typescript-language-server";
-
-    yamlls = let
-      pkg = pkgs.yaml-language-server;
-    in "${pkg}/bin/yaml-language-server";
   };
 
   build-emacs-config = pkgs: build-deps: let
@@ -96,19 +27,7 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
-        cssls
-        gopls
-        htmlls
-        jsonls
-        kotlinlsp
-        nil
         parinfer
-        pylsp
-        rustanalyzer
-        terraformls
-        texlab
-        tsxls
-        yamlls
         ;
     };
 
