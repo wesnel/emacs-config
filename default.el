@@ -411,9 +411,6 @@
 
 ;;;; Remote editing.
 (use-package tramp
-  :custom
-  (tramp-use-connection-share nil)
-
   :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
