@@ -563,9 +563,6 @@
   :bind
   (("C-x g" . #'magit))
 
-  :config
-  (setq magit-tramp-pipe-stty-settings 'pty)
-
   :init
   (with-eval-after-load 'project
     ;; Add newly-cloned repositories to the project list.
