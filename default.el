@@ -1431,6 +1431,17 @@
   :preface
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
+      (add-to-list
+       'eglot-server-programs
+       `((go-mode go-ts-mode)
+         . ,(lambda (_interactive)
+              (if (executable-find "direnv" t)
+                  (list "direnv" "exec"
+                        (file-local-name
+                         (or (project-root (project-current))
+                             default-directory))
+                        "gopls")
+                (list "gopls")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
