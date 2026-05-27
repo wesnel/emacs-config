@@ -1429,6 +1429,13 @@
   ("go\\.mod\\'" . go-mod-ts-mode)
 
   :preface
+  (defun wgn/project-find-go-module (dir)
+    (when-let ((root (locate-dominating-file dir "go.mod")))
+      (cons 'go-module root)))
+
+  (cl-defmethod project-root ((project (head go-module)))
+    (cdr project))
+
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
       (add-to-list
@@ -1447,6 +1454,8 @@
     (eglot-ensure))
 
   :init
+  (add-hook 'project-find-functions #'wgn/project-find-go-module)
+
   ;; Open go files with tree-sitter support.
   (add-to-list 'major-mode-remap-alist
                '(go-mode . go-ts-mode))
