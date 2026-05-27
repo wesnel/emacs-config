@@ -19,6 +19,11 @@
       url = "github:xenodium/emacs-skills";
       flake = false;
     };
+
+    emacs-tramp-rpc = {
+      url = "github:ArthurHeymans/emacs-tramp-rpc";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
@@ -27,10 +32,12 @@
     emacs-skills,
     nixpkgs,
     flake-utils,
+    emacs-tramp-rpc,
   }: let
     default = final: prev:
       (import ./overlays final prev)
-      // (import emacs-overlay final prev);
+      // (import emacs-overlay final prev)
+      // (emacs-tramp-rpc.overlays.default final prev);
   in
     flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {

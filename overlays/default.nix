@@ -93,9 +93,27 @@ final: prev: let
         ];
 
       override = ePkgs: ePrev: {
+        acp = let
+          rev = "661af51569acef7384a2801f07a582da5142a6d9";
+          sha256 = "sha256-x6KVBM1iEW24fkRVwM9ALRqd6EzBkjJDt3cnyykL4z4=";
+        in
+          ePrev.acp.overrideAttrs (old: {
+            version = "0.12.1";
+
+            src = pkgs.fetchFromGitHub {
+              owner = "xenodium";
+              repo = "acp.el";
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          });
+
         agent-shell = let
-          rev = "520cad3b60017af0992a97ec4871b6a6af73a16a";
-          sha256 = "sha256-T9JLhmZdK9zS2V2sc5V39CNi0p1vWL+ydYNcIodTGLY=";
+          rev = "89bd6e136a08e1527dd630e4573639c838fd7e22";
+          sha256 = "sha256-ZSxCxiA+DH0tvIrGVhOUGOgrn1k0ilNr9WL4n3Aox+8=";
         in
           ePrev.agent-shell.overrideAttrs (old: {
             src = pkgs.fetchFromGitHub {
@@ -127,6 +145,30 @@ final: prev: let
 
             src = pkgs.fetchFromGitHub {
               owner = "xenodium";
+              repo = pname;
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          };
+
+        agent-shell-tramp = let
+          rev = "ebdeb204973beb116017a977bee52cdced78e447";
+          sha256 = "sha256-G1Q+hvwZ3iBax0f3/7tM1/7geYayEH6QzkQcz32+J0w=";
+        in
+          ePkgs.trivialBuild rec {
+            pname = "agent-shell-tramp";
+            version = rev;
+
+            packageRequires = with ePkgs; [
+              acp
+              agent-shell
+            ];
+
+            src = pkgs.fetchFromGitHub {
+              owner = "junyi-hou";
               repo = pname;
 
               inherit
@@ -398,11 +440,11 @@ final: prev: let
           });
 
         shell-maker = let
-          rev = "55f829d179608a3c4b11e86427713d5be7c4bb58";
-          sha256 = "sha256-tFzyVXxgrR6LOPUhX4MgJNLy3PX+pwprjdYi+IZXr+E=";
+          rev = "e8bdf6dca18f39d592728e8440118d9f57092e65";
+          sha256 = "sha256-tmhZ9WApwSjzAlXUcZy+aMpW/07bTpIaaDMCALXtyzI=";
         in
           ePrev.shell-maker.overrideAttrs (old: {
-            version = "0.90.1";
+            version = "0.91.2";
 
             src = pkgs.fetchFromGitHub {
               owner = "xenodium";
@@ -410,6 +452,22 @@ final: prev: let
 
               inherit
                 rev
+                sha256
+                ;
+            };
+          });
+
+        tramp = let
+          rev = "2.8.1.4";
+          sha256 = "sha256-PMofWpP8ag0/9z0yuFiz2P379zhKHcDGpw1UAJD8XI4=";
+        in
+          ePrev.tramp.overrideAttrs (old: {
+            version = "2.8.1.4";
+
+            src = pkgs.fetchurl {
+              url = "https://elpa.gnu.org/packages/tramp-${rev}.tar";
+
+              inherit
                 sha256
                 ;
             };

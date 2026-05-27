@@ -411,6 +411,8 @@
 
 ;;;; Remote editing.
 (use-package tramp
+  :ensure t
+
   :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
@@ -1326,6 +1328,12 @@
    ("RET" . #'newline)
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
+
+(use-package agent-shell-tramp
+  :ensure t
+
+  :config
+  (agent-shell-tramp-mode +1))
 
 ;;;; Lightweight notifications.
 (use-package knockknock
