@@ -78,7 +78,7 @@
   (when (memq system-type '(darwin))
     (setq trash-directory "~/.Trash"))
 
-      ;; Remove some UI elements.
+  ;; Remove some UI elements.
   (menu-bar-mode -1)
   (tool-bar-mode -1)
   (scroll-bar-mode -1)
@@ -321,9 +321,8 @@
                    "SSH_AGENT_PID"
                    "SSH_AUTH_SOCK"
                    "VISUAL"))
-          (add-to-list 'exec-path-from-shell-variables var)
-
-        (exec-path-from-shell-initialize))))
+      (add-to-list 'exec-path-from-shell-variables var)
+      (exec-path-from-shell-initialize))))
 
 ;;;; Store secrets in Emacs.
 (use-package auth-source
@@ -414,7 +413,12 @@
   :ensure t
 
   :config
-  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+  ;; HACK: Find a way to remove this.
+  (add-to-list 'tramp-remote-process-environment "_NGROK_SHELLHOOK_LOADED=1"))
+
+(use-package tramp-rpc
+  :ensure t)
 
 ;;;; Completion style that allows for multiple regular expressions.
 (use-package orderless
@@ -950,6 +954,24 @@
                      (magit-merge-in-progress-p)))
       (eglot-format-buffer)))
 
+  ;; HACK: Why is `tramp-remote-process-environment' not sufficient?
+  (defun wgn/eglot-prepend-env (orig-fn &rest args)
+    (if (file-remote-p default-directory)
+        (cl-letf* ((orig-make-process (symbol-function 'make-process))
+                   ((symbol-function 'make-process)
+                    (lambda (&rest mp-args)
+                      (let ((cmd (plist-get mp-args :command)))
+                        (when cmd
+                          (setq mp-args
+                                (plist-put mp-args :command
+                                           (append '("env" "_NGROK_SHELLHOOK_LOADED=1") cmd)))))
+                      (apply orig-make-process mp-args))))
+          (apply orig-fn args))
+      (apply orig-fn args)))
+
+  :config
+  (advice-add 'eglot--connect :around #'wgn/eglot-prepend-env)
+
   :defines
   (eglot-server-programs
    eglot-workspace-configuration)
@@ -1329,11 +1351,11 @@
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
-(use-package agent-shell-tramp
+(use-package agent-shell-tramp-rpc
   :ensure t
 
   :config
-  (agent-shell-tramp-mode +1))
+  (agent-shell-tramp-rpc-mode +1))
 
 ;;;; Lightweight notifications.
 (use-package knockknock
@@ -1388,6 +1410,25 @@
 ;;;; Use project-local dependencies
 (use-package envrc
   :ensure t
+
+  :preface
+  ;; HACK: Why is `tramp-remote-process-environment' not sufficient?
+  (defun wgn/direnv-prepend-env (orig-fn &rest args)
+    (cl-letf* ((orig-pf (symbol-function 'process-file))
+               ((symbol-function 'process-file)
+                (lambda (program &optional infile buffer display &rest pf-args)
+                  (if (string-match-p "direnv" (or program ""))
+                      (apply orig-pf "env" infile buffer display
+                             "_NGROK_SHELLHOOK_LOADED=1" program pf-args)
+                    (apply orig-pf program infile buffer display pf-args)))))
+      (apply orig-fn args)))
+
+  :config
+  (add-to-list 'envrc-supported-tramp-methods "rpc")
+  (advice-add 'envrc--export :around #'wgn/direnv-prepend-env)
+
+  :custom
+  (envrc-remote t)
 
   :hook
   (after-init . envrc-global-mode))
@@ -1450,13 +1491,11 @@
        'eglot-server-programs
        `((go-mode go-ts-mode)
          . ,(lambda (_interactive)
-              (if (executable-find "direnv" t)
-                  (list "direnv" "exec"
-                        (file-local-name
-                         (or (project-root (project-current))
-                             default-directory))
-                        "gopls")
-                (list "gopls")))))
+              (list "direnv" "exec"
+                    (file-local-name
+                     (or (project-root (project-current))
+                         default-directory))
+                    "gopls"))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
@@ -1620,10 +1659,6 @@
   :preface
   (defun wgn/csharp-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list 'eglot-server-programs
-                   `((csharp-mode csharp-ts-mode) .
-                     ,(eglot-alternatives '(("OmniSharp" "--languageserver")
-                                            ("OmniSharp" "--languageserver")))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (eglot-ensure))
 
