@@ -887,7 +887,10 @@
 
   (with-eval-after-load 'project
     (define-key project-prefix-map "t" #'wgn/project-vterm)
-    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t)))
+    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t))
+
+  :config
+  (add-to-list 'vterm-tramp-shells '("rpc" login-shell)))
 
 ;;;; Error checking.
 (use-package flymake
@@ -948,6 +951,20 @@
   :ensure t
 
   :preface
+  ;; HACK: This is necessary because of some incompatibility with `tramp-rpc' and `envrc'.
+  ;; The symptom is that `eglot' is not invoked with the correct PATH that `envrc' picks
+  ;; up on the remote host.
+  (defun wgn/eglot--connect-with-envrc-remote-path (orig &rest args)
+    (if (and (file-remote-p default-directory)
+             (bound-and-true-p envrc--remote-path))
+        (let* ((path-str (mapconcat #'identity envrc--remote-path ":"))
+               (process-environment
+                (cons (concat "PATH=" path-str) process-environment))
+               (exec-path (append envrc--remote-path exec-path)))
+          (apply orig args))
+      (apply orig args)))
+
+
   (defun wgn/apply-eglot-format ()
     (unless (or (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
@@ -955,9 +972,15 @@
                      (magit-merge-in-progress-p)))
       (eglot-format-buffer)))
 
+  :config
+  (advice-add 'eglot--connect :around #'wgn/eglot--connect-with-envrc-remote-path)
+
   :defines
   (eglot-server-programs
    eglot-workspace-configuration)
+
+  :functions
+  (eglot--connect)
 
   :commands
   (eglot
@@ -1397,12 +1420,25 @@
   :config
   (add-to-list 'envrc-supported-tramp-methods "rpc")
 
+  (define-globalized-minor-mode envrc-global-mode-with-exclusions envrc-mode
+    (lambda ()
+      (when (and
+             (not (derived-mode-p 'magit-mode 'comint-mode 'eat-mode))
+             (cond
+              ((minibufferp) nil)
+              ((file-remote-p default-directory)
+               (and envrc-remote
+                    (seq-contains-p
+                     envrc-supported-tramp-methods
+                     (with-parsed-tramp-file-name default-directory vec vec-method))))
+              (t (executable-find envrc-direnv-executable))))
+        (envrc-mode +1))))
+
   :custom
-  ;; FIXME: This causes `magit' to hang.
-  ;; (envrc-remote t)
+  (envrc-remote t)
 
   :hook
-  (after-init . envrc-global-mode))
+  (after-init . envrc-global-mode-with-exclusions))
 
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
@@ -1458,15 +1494,6 @@
 
   (defun wgn/go-ts-mode-eglot-setup ()
     (with-eval-after-load 'eglot
-      (add-to-list
-       'eglot-server-programs
-       `((go-mode go-ts-mode)
-         . ,(lambda (_interactive)
-              (list "direnv" "exec"
-                    (file-local-name
-                     (or (project-root (project-current))
-                         default-directory))
-                    "gopls"))))
       (add-hook 'before-save-hook #'wgn/apply-eglot-format nil t))
     (add-hook 'eglot-managed-mode-hook #'flymake-golangci-load-backend nil t)
     (eglot-ensure))
