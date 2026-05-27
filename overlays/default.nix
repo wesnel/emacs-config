@@ -276,6 +276,22 @@ final: prev: let
             };
           };
 
+        gptel = let
+          rev = "5c82ff85be0beed57a923935e18b9c4d1a8d0858";
+          sha256 = "sha256-4L6D2QOl/qUNWfPEv9nbZGGuFU14kebXrOU1LoJWeG8=";
+        in
+          ePrev.gptel.overrideAttrs (old: {
+            src = pkgs.fetchFromGitHub {
+              owner = "karthink";
+              repo = "gptel";
+
+              inherit
+                rev
+                sha256
+                ;
+            };
+          });
+
         gptel-quick = let
           rev = "018ff2be8f860a1e8fe3966eec418ad635620c38";
           sha256 = "sha256-7a5+YQifwtVYHP6qQXS1yxA42bVGXmErirra0TrSSQ0=";

@@ -1240,7 +1240,9 @@
    gptel-org-set-properties
    gptel-make-anthropic
    gptel-make-ollama
+   gptel-make-openai-oauth
    gptel-make-gh-copilot
+   gptel-openai-oauth-login
    gptel-tools)
 
   :bind
@@ -1249,7 +1251,10 @@
 
   :config
   ;; TODO: Configure `gptel' backends based on Nix config.
-  (require 'gptel-integrations))
+  (require 'gptel-integrations)
+
+  (setq gptel-model 'gpt-5.3-codex
+        gptel-backend (gptel-make-openai-oauth "OpenAI-sub")))
 
 ;;;; Agent integration for `gptel'.
 (use-package gptel-agent
