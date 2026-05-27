@@ -416,7 +416,10 @@
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
 (use-package tramp-rpc
-  :ensure t)
+  :ensure t
+
+  :custom
+  (tramp-rpc-deploy-auto-deploy nil))
 
 ;;;; Completion style that allows for multiple regular expressions.
 (use-package orderless
@@ -1395,7 +1398,8 @@
   (add-to-list 'envrc-supported-tramp-methods "rpc")
 
   :custom
-  (envrc-remote t)
+  ;; FIXME: This causes `magit' to hang.
+  ;; (envrc-remote t)
 
   :hook
   (after-init . envrc-global-mode))
