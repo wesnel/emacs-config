@@ -1428,7 +1428,7 @@
   (define-globalized-minor-mode envrc-global-mode-with-exclusions envrc-mode
     (lambda ()
       (when (and
-             (not (derived-mode-p 'magit-mode 'comint-mode 'eat-mode))
+             (not (derived-mode-p 'magit-mode 'vterm-mode))
              (cond
               ((minibufferp) nil)
               ((file-remote-p default-directory)
