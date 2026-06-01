@@ -446,7 +446,8 @@
 (use-package vc-hooks
   :config
   ;; HACK: Avoid slow search on a particular project via TRAMP.
-  (add-to-list 'vc-directory-exclusion-list ".cache"))
+  (add-to-list 'vc-directory-exclusion-list ".cache")
+  (add-to-list 'vc-directory-exclusion-list "flink/project/project/target"))
 
 (use-package tramp-rpc
   :ensure t
