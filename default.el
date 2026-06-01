@@ -416,9 +416,11 @@
   (remote-file-name-inhibit-locks t)
   (tramp-use-scp-direct-remote-copying t)
   (remote-file-name-inhibit-auto-save-visited t)
+  (tramp-verbose 0)
 
   :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+  (add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
 
   (connection-local-set-profile-variables
    'remote-direct-async-process
@@ -426,6 +428,10 @@
 
   (connection-local-set-profiles
    '(:application tramp :protocol "scp")
+   'remote-direct-async-process)
+
+  (connection-local-set-profiles
+   '(:application tramp :protocol "ssh")
    'remote-direct-async-process))
 
 (use-package vc
