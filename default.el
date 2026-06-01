@@ -525,6 +525,11 @@
   (xref-search-program-alist
    xref-search-program))
 
+(use-package vc-hooks
+  :config
+  ;; HACK: Avoid slow search on a particular project via TRAMP.
+  (add-to-list 'vc-directory-exclusion-list ".cache"))
+
 ;;;; Project management.
 (use-package project
   :commands
@@ -540,11 +545,7 @@
           xref-search-program 'ripgrep))
 
   :init
-  (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search)
-
-  ;; HACK: Avoid slow search on a particular project via TRAMP.
-  (with-eval-after-load 'vc-hooks
-    (add-to-list 'vc-directory-exclusion-list ".cache")))
+  (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search))
 
 ;;;; Show hint of full path in headerline.
 (use-package breadcrumb
