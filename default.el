@@ -412,6 +412,24 @@
 (use-package tramp
   :ensure t
 
+  :preface
+  (defun wgn/tramp-handle-make-process-with-exclusions (orig-fun &rest args)
+    "Call ORIG-FUN with certain variables removed from `tramp-remote-process-environment'.
+The goal is to prevent the command from being too long when using direct-async."
+    (let* ((vars '("DIRENV_DIFF"
+                   "DIRENV_WATCHES"
+                   "HOST_PATH"
+                   "buildPhase"
+                   "shellHook"))
+           (tramp-remote-process-environment
+            (let ((regexp (concat "\\`" (regexp-opt vars) "=")))
+              (mapcar (lambda (entry)
+                        (if (string-match regexp entry)
+                            (match-string 0 entry)
+                          entry))
+                      tramp-remote-process-environment))))
+      (apply orig-fun args)))
+
   :custom
   (remote-file-name-inhibit-locks t)
   (tramp-use-scp-direct-remote-copying t)
@@ -419,6 +437,9 @@
   (tramp-verbose 0)
 
   :config
+  (advice-add 'tramp-handle-make-process
+              :around #'wgn/tramp-handle-make-process-with-exclusions)
+
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
   (add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
 
