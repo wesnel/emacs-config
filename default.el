@@ -413,22 +413,21 @@
   :ensure t
 
   :preface
-  (defun wgn/tramp-handle-make-process-with-exclusions (orig-fun &rest args)
-    "Call ORIG-FUN with certain variables removed from `tramp-remote-process-environment'.
-The goal is to prevent the command from being too long when using direct-async."
-    (let* ((vars '("DIRENV_DIFF"
-                   "DIRENV_WATCHES"
-                   "HOST_PATH"
-                   "buildPhase"
-                   "shellHook"))
-           (tramp-remote-process-environment
-            (let ((regexp (concat "\\`" (regexp-opt vars) "=")))
-              (mapcar (lambda (entry)
-                        (if (string-match regexp entry)
-                            (match-string 0 entry)
-                          entry))
-                      tramp-remote-process-environment))))
-      (apply orig-fun args)))
+  (defun wgn/tramp-remote-process-environment-with-inclusions (inclusions)
+    (lambda (orig-fun &rest args)
+      (let ((tramp-remote-process-environment inclusions))
+        (apply orig-fun args))))
+
+  (defun wgn/tramp-remote-process-environment-with-exclusions (exclusions)
+    (lambda (orig-fun &rest args)
+      (let ((tramp-remote-process-environment
+             (let ((regexp (concat "\\`" (regexp-opt exclusions) "=")))
+               (mapcar (lambda (entry)
+                         (if (string-match regexp entry)
+                             (match-string 0 entry)
+                           entry))
+                       tramp-remote-process-environment))))
+        (apply orig-fun args))))
 
   :custom
   (remote-file-name-inhibit-locks t)
@@ -438,7 +437,8 @@ The goal is to prevent the command from being too long when using direct-async."
 
   :config
   (advice-add 'tramp-handle-make-process
-              :around #'wgn/tramp-handle-make-process-with-exclusions)
+              :around (wgn/tramp-remote-process-environment-with-inclusions
+                       '("INSIDE_EMACS")))
 
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
   (add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
