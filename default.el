@@ -418,7 +418,15 @@
   (remote-file-name-inhibit-auto-save-visited t)
 
   :config
-  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+
+  (connection-local-set-profile-variables
+   'remote-direct-async-process
+   '((tramp-direct-async-process . t)))
+
+  (connection-local-set-profiles
+   '(:application tramp :protocol "scp")
+   'remote-direct-async-process))
 
 (use-package vc
   :after tramp
@@ -596,7 +604,10 @@
 
     ;; Add the ability to open magit in a project.
     (define-key project-prefix-map "m" #'magit-project-status)
-    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
+    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t))
+
+  :config
+  (setq magit-tramp-pipe-stty-settings 'pty))
 
 ;;;; Support for git-delta in magit.
 (use-package magit-delta
