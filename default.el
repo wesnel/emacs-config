@@ -540,7 +540,12 @@
           xref-search-program 'ripgrep))
 
   :init
-  (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search))
+  (add-hook 'emacs-startup-hook #'wgn/patch-ripgrep-in-xref-search)
+
+  ;; HACK: Avoid slow search on a particular project via TRAMP.
+  (with-eval-after-load 'vc
+    (when (file-remote-p default-directory)
+      (add-to-list 'vc-directory-exclusion-list ".cache"))))
 
 ;;;; Show hint of full path in headerline.
 (use-package breadcrumb
