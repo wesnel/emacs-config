@@ -429,6 +429,11 @@
                 vc-ignore-dir-regexp
                 tramp-file-name-regexp)))
 
+(use-package vc-hooks
+  :config
+  ;; HACK: Avoid slow search on a particular project via TRAMP.
+  (add-to-list 'vc-directory-exclusion-list ".cache"))
+
 (use-package tramp-rpc
   :ensure t
 
