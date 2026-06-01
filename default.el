@@ -1986,17 +1986,6 @@
    htmlize-many-files
    htmlize-many-files-dired))
 
-;;;; Indicate the git diff in the margin.
-(use-package git-gutter
-  :ensure t
-  :diminish git-gutter-mode
-
-  :commands
-  (global-git-gutter-mode)
-
-  :init
-  (global-git-gutter-mode +1))
-
 ;;;; Color scheme.
 (use-package doom-themes
   :ensure t
