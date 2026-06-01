@@ -412,8 +412,22 @@
 (use-package tramp
   :ensure t
 
+  :custom
+  (remote-file-name-inhibit-locks t)
+  (tramp-use-scp-direct-remote-copying t)
+  (remote-file-name-inhibit-auto-save-visited t)
+
   :config
   (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+
+(use-package vc
+  :after tramp
+
+  :config
+  (setq vc-ignore-dir-regexp
+        (format "\\(%s\\)\\|\\(%s\\)"
+                vc-ignore-dir-regexp
+                tramp-file-name-regexp)))
 
 (use-package tramp-rpc
   :ensure t
@@ -524,11 +538,6 @@
   :defines
   (xref-search-program-alist
    xref-search-program))
-
-(use-package vc-hooks
-  :config
-  ;; HACK: Avoid slow search on a particular project via TRAMP.
-  (add-to-list 'vc-directory-exclusion-list ".cache"))
 
 ;;;; Project management.
 (use-package project
