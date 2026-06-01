@@ -544,8 +544,7 @@
 
   ;; HACK: Avoid slow search on a particular project via TRAMP.
   (with-eval-after-load 'vc
-    (when (file-remote-p default-directory)
-      (add-to-list 'vc-directory-exclusion-list ".cache"))))
+    (add-to-list 'vc-directory-exclusion-list ".cache")))
 
 ;;;; Show hint of full path in headerline.
 (use-package breadcrumb
@@ -880,15 +879,16 @@
   (defun wgn/project-vterm ()
     (interactive)
     (defvar vterm-buffer-name)
-    (let* ((default-directory (project-root (project-current t)))
-           (mode (if-let (method (file-rmeote-p default-directory 'method))
-                     (concat "vterm-" method)
-                   "vterm"))
-           (vterm-buffer-name (project-prefixed-buffer-name mode))
-           (vterm-buffer (get-buffer vterm-buffer-name)))
-      (if (and vterm-buffer (not current-prefix-arg))
-          (pop-to-buffer vterm-buffer)
-        (vterm t))))
+    (with-eval-after-load 'files
+      (let* ((default-directory (project-root (project-current t)))
+             (mode (if-let (method (file-rmeote-p default-directory 'method))
+                       (concat "vterm-" method)
+                     "vterm"))
+             (vterm-buffer-name (project-prefixed-buffer-name mode))
+             (vterm-buffer (get-buffer vterm-buffer-name)))
+        (if (and vterm-buffer (not current-prefix-arg))
+            (pop-to-buffer vterm-buffer)
+          (vterm t)))))
 
   :init
   (add-hook 'vterm-mode-hook #'wgn/disable-line-numbers)
