@@ -412,23 +412,6 @@
 (use-package tramp
   :ensure t
 
-  :preface
-  (defun wgn/tramp-remote-process-environment-with-inclusions (inclusions)
-    (lambda (orig-fun &rest args)
-      (let ((tramp-remote-process-environment inclusions))
-        (apply orig-fun args))))
-
-  (defun wgn/tramp-remote-process-environment-with-exclusions (exclusions)
-    (lambda (orig-fun &rest args)
-      (let ((tramp-remote-process-environment
-             (let ((regexp (concat "\\`" (regexp-opt exclusions) "=")))
-               (mapcar (lambda (entry)
-                         (if (string-match regexp entry)
-                             (match-string 0 entry)
-                           entry))
-                       tramp-remote-process-environment))))
-        (apply orig-fun args))))
-
   :custom
   (remote-file-name-inhibit-locks t)
   (tramp-use-scp-direct-remote-copying t)
@@ -436,24 +419,7 @@
   (tramp-verbose 0)
 
   :config
-  (advice-add 'tramp-handle-make-process
-              :around (wgn/tramp-remote-process-environment-with-inclusions
-                       '("INSIDE_EMACS")))
-
-  (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
-  (add-to-list 'tramp-connection-properties (list "/ssh:" "direct-async" t))
-
-  (connection-local-set-profile-variables
-   'remote-direct-async-process
-   '((tramp-direct-async-process . t)))
-
-  (connection-local-set-profiles
-   '(:application tramp :protocol "scp")
-   'remote-direct-async-process)
-
-  (connection-local-set-profiles
-   '(:application tramp :protocol "ssh")
-   'remote-direct-async-process))
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
 
 (use-package vc
   :after tramp
@@ -628,10 +594,7 @@
 
     ;; Add the ability to open magit in a project.
     (define-key project-prefix-map "m" #'magit-project-status)
-    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t))
-
-  :config
-  (setq magit-tramp-pipe-stty-settings 'pty))
+    (add-to-list 'project-switch-commands '(magit-project-status "Magit") t)))
 
 ;;;; Support for git-delta in magit.
 (use-package magit-delta
@@ -999,6 +962,36 @@
 
   :config
   (setq eldoc-documentation-strategy #'eldoc-documentation-compose-eagerly))
+
+;;;; Use project-local dependencies
+(use-package envrc
+  :ensure t
+
+  :commands
+  (envrc-mode)
+
+  :config
+  (with-no-warnings
+    (define-globalized-minor-mode wgn/envrc-mode envrc-mode
+      (lambda ()
+        (when (and
+               (derived-mode-p 'prog-mode)
+               (cond
+                ((minibufferp) nil)
+                ((file-remote-p default-directory)
+                 (and envrc-remote
+                      (seq-contains-p
+                       envrc-supported-tramp-methods
+                       (with-parsed-tramp-file-name default-directory vec vec-method))))
+                (t (executable-find envrc-direnv-executable))))
+          (envrc-mode +1)))
+      :group 'envrc))
+
+  :custom
+  (envrc-remote t)
+
+  :hook
+  (prog-mode . wgn/envrc-mode))
 
 ;;;; Language server integration.
 (use-package eglot
@@ -1448,16 +1441,6 @@
    ("C-h k" . #'helpful-key)
    ("C-h x" . #'helpful-command)
    ("C-c C-d" . #'helpful-at-point)))
-
-;;;; Use project-local dependencies
-(use-package envrc
-  :ensure t
-
-  :custom
-  (envrc-remote t)
-
-  :hook
-  (after-init . envrc-global-mode))
 
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
