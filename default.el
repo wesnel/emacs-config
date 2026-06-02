@@ -472,12 +472,6 @@
   (add-to-list 'vc-directory-exclusion-list "js/node_modules")
   (add-to-list 'vc-directory-exclusion-list "config/node_modules"))
 
-(use-package tramp-rpc
-  :ensure t
-
-  :custom
-  (tramp-rpc-deploy-auto-deploy nil))
-
 ;;;; Completion style that allows for multiple regular expressions.
 (use-package orderless
   :ensure t
@@ -922,6 +916,10 @@
   :defines
   (vterm-mode-map)
 
+  :functions
+  (vterm-send-string
+   vterm-send-return)
+
   :custom
   (vterm-max-scrollback 100000)
 
@@ -932,18 +930,81 @@
    ([return] . nil))
 
   :preface
+  (defun wgn/project-vterm-local-directory ()
+    (file-name-as-directory
+     (expand-file-name (or (getenv "HOME") temporary-file-directory))))
+
+  (defun wgn/tramp-ssh-target (remote-directory)
+    (with-parsed-tramp-file-name remote-directory vec
+      (concat (when vec-user
+                (concat vec-user
+                        (when vec-domain
+                          (concat "%" vec-domain))
+                        "@"))
+              vec-host)))
+
+  (defun wgn/tramp-ssh-command (remote-directory)
+    (with-parsed-tramp-file-name remote-directory vec
+      (when vec-host
+        (let* ((port (when vec-port
+                       (format "%s" vec-port)))
+               (target (wgn/tramp-ssh-target remote-directory))
+               (remote-cd (format "cd -- %s && exec \"$SHELL\" -l"
+                                  (shell-quote-argument vec-localname)))
+               (remote-command (format "exec \"$SHELL\" -l -c %s"
+                                       (shell-quote-argument remote-cd))))
+          (mapconcat #'identity
+                     (append '("ssh" "-t")
+                             (when port
+                               (list "-p" (shell-quote-argument port)))
+                             (list "--"
+                                   (shell-quote-argument target)
+                                   (shell-quote-argument remote-command)))
+                     " ")))))
+
+  (defun wgn/vterm-remote-directory ()
+    (when (file-remote-p default-directory)
+      (let ((project (ignore-errors
+                       (project-current nil))))
+        (if project
+            (project-root project)
+          default-directory))))
+
+  (defun wgn/vterm-local-remote-advice (orig-fun &rest args)
+    (let ((remote-directory (wgn/vterm-remote-directory)))
+      (if remote-directory
+          (let ((default-directory (wgn/project-vterm-local-directory))
+                (ssh-command (wgn/tramp-ssh-command remote-directory)))
+            (let ((buffer (apply orig-fun args)))
+              (when ssh-command
+                (with-current-buffer buffer
+                  (vterm-send-string ssh-command)
+                  (vterm-send-return)))
+              buffer))
+        (apply orig-fun args))))
+
   (defun wgn/project-vterm ()
     (interactive)
     (defvar vterm-buffer-name)
-    (let* ((default-directory (project-root (project-current t)))
-           (mode (if-let (method (file-remote-p default-directory 'method))
-                     (concat "vterm-" method)
-                   "vterm"))
-           (vterm-buffer-name (project-prefixed-buffer-name mode))
+    (let* ((project-root (project-root (project-current t)))
+           (remote-method (file-remote-p project-root 'method))
+           (ssh-command (when (member remote-method '("ssh"))
+                          (wgn/tramp-ssh-command project-root)))
+           (suffix (if-let (method remote-method)
+                       (concat "vterm-" method)
+                     "vterm"))
+           (vterm-buffer-name (let ((default-directory project-root))
+                                (project-prefixed-buffer-name suffix)))
            (vterm-buffer (get-buffer vterm-buffer-name)))
       (if (and vterm-buffer (not current-prefix-arg))
           (pop-to-buffer vterm-buffer)
-        (vterm t))))
+        (let ((default-directory (if remote-method
+                                     (wgn/project-vterm-local-directory)
+                                   project-root)))
+          (vterm t)
+          (when ssh-command
+            (vterm-send-string ssh-command)
+            (vterm-send-return))))))
 
   :init
   (add-hook 'vterm-mode-hook #'wgn/disable-line-numbers)
@@ -953,7 +1014,8 @@
     (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t))
 
   :config
-  (add-to-list 'vterm-tramp-shells '("rpc" login-shell)))
+  (advice-add 'vterm :around #'wgn/vterm-local-remote-advice)
+  (advice-add 'vterm-other-window :around #'wgn/vterm-local-remote-advice))
 
 ;;;; Error checking.
 (use-package flymake
@@ -1014,29 +1076,12 @@
   :ensure t
 
   :preface
-  ;; HACK: This is necessary because of some incompatibility with `tramp-rpc' and `envrc'.
-  ;; The symptom is that `eglot' is not invoked with the correct PATH that `envrc' picks
-  ;; up on the remote host.
-  (defun wgn/eglot--connect-with-envrc-remote-path (orig &rest args)
-    (if (and (file-remote-p default-directory)
-             (bound-and-true-p envrc--remote-path))
-        (let* ((path-str (mapconcat #'identity envrc--remote-path ":"))
-               (process-environment
-                (cons (concat "PATH=" path-str) process-environment))
-               (exec-path (append envrc--remote-path exec-path)))
-          (apply orig args))
-      (apply orig args)))
-
-
   (defun wgn/apply-eglot-format ()
     (unless (or (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
                 (and (fboundp 'magit-merge-in-progress-p)
                      (magit-merge-in-progress-p)))
       (eglot-format-buffer)))
-
-  :config
-  (advice-add 'eglot--connect :around #'wgn/eglot--connect-with-envrc-remote-path)
 
   :defines
   (eglot-server-programs
@@ -1425,12 +1470,6 @@
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
-(use-package agent-shell-tramp-rpc
-  :ensure t
-
-  :config
-  (agent-shell-tramp-rpc-mode +1))
-
 ;;;; Lightweight notifications.
 (use-package knockknock
   :ensure t
@@ -1485,28 +1524,11 @@
 (use-package envrc
   :ensure t
 
-  :config
-  (add-to-list 'envrc-supported-tramp-methods "rpc")
-
-  (define-globalized-minor-mode envrc-global-mode-with-exclusions envrc-mode
-    (lambda ()
-      (when (and
-             (not (derived-mode-p 'magit-mode 'vterm-mode))
-             (cond
-              ((minibufferp) nil)
-              ((file-remote-p default-directory)
-               (and envrc-remote
-                    (seq-contains-p
-                     envrc-supported-tramp-methods
-                     (with-parsed-tramp-file-name default-directory vec vec-method))))
-              (t (executable-find envrc-direnv-executable))))
-        (envrc-mode +1))))
-
   :custom
   (envrc-remote t)
 
   :hook
-  (after-init . envrc-global-mode-with-exclusions))
+  (after-init . envrc-global-mode))
 
 ;;;; Open code from Emacs in the web browser.
 (use-package elsewhere
