@@ -916,10 +916,6 @@
   :defines
   (vterm-mode-map)
 
-  :functions
-  (vterm-send-string
-   vterm-send-return)
-
   :custom
   (vterm-max-scrollback 100000)
 
@@ -930,92 +926,25 @@
    ([return] . nil))
 
   :preface
-  (defun wgn/project-vterm-local-directory ()
-    (file-name-as-directory
-     (expand-file-name (or (getenv "HOME") temporary-file-directory))))
-
-  (defun wgn/tramp-ssh-target (remote-directory)
-    (with-parsed-tramp-file-name remote-directory vec
-      (concat (when vec-user
-                (concat vec-user
-                        (when vec-domain
-                          (concat "%" vec-domain))
-                        "@"))
-              vec-host)))
-
-  (defun wgn/tramp-ssh-command (remote-directory)
-    (with-parsed-tramp-file-name remote-directory vec
-      (when vec-host
-        (let* ((port (when vec-port
-                       (format "%s" vec-port)))
-               (target (wgn/tramp-ssh-target remote-directory))
-               (remote-cd (format "cd -- %s && exec \"$SHELL\" -l"
-                                  (shell-quote-argument vec-localname)))
-               (remote-command (format "exec \"$SHELL\" -l -c %s"
-                                       (shell-quote-argument remote-cd))))
-          (mapconcat #'identity
-                     (append '("ssh" "-t")
-                             (when port
-                               (list "-p" (shell-quote-argument port)))
-                             (list "--"
-                                   (shell-quote-argument target)
-                                   (shell-quote-argument remote-command)))
-                     " ")))))
-
-  (defun wgn/vterm-remote-directory ()
-    (when (file-remote-p default-directory)
-      (let ((project (ignore-errors
-                       (project-current nil))))
-        (if project
-            (project-root project)
-          default-directory))))
-
-  (defun wgn/vterm-local-remote-advice (orig-fun &rest args)
-    (let ((remote-directory (wgn/vterm-remote-directory)))
-      (if remote-directory
-          (let ((default-directory (wgn/project-vterm-local-directory))
-                (ssh-command (wgn/tramp-ssh-command remote-directory)))
-            (let ((buffer (apply orig-fun args)))
-              (when ssh-command
-                (with-current-buffer buffer
-                  (vterm-send-string ssh-command)
-                  (vterm-send-return)))
-              buffer))
-        (apply orig-fun args))))
-
   (defun wgn/project-vterm ()
     (interactive)
     (defvar vterm-buffer-name)
-    (let* ((project-root (project-root (project-current t)))
-           (remote-method (file-remote-p project-root 'method))
-           (ssh-command (when (member remote-method '("ssh"))
-                          (wgn/tramp-ssh-command project-root)))
-           (suffix (if-let (method remote-method)
-                       (concat "vterm-" method)
-                     "vterm"))
-           (vterm-buffer-name (let ((default-directory project-root))
-                                (project-prefixed-buffer-name suffix)))
+    (let* ((default-directory (project-root (project-current t)))
+           (mode (if-let (method (file-remote-p default-directory 'method))
+                     (concat "vterm-" method)
+                   "vterm"))
+           (vterm-buffer-name (project-prefixed-buffer-name mode))
            (vterm-buffer (get-buffer vterm-buffer-name)))
       (if (and vterm-buffer (not current-prefix-arg))
           (pop-to-buffer vterm-buffer)
-        (let ((default-directory (if remote-method
-                                     (wgn/project-vterm-local-directory)
-                                   project-root)))
-          (vterm t)
-          (when ssh-command
-            (vterm-send-string ssh-command)
-            (vterm-send-return))))))
+        (vterm t))))
 
   :init
   (add-hook 'vterm-mode-hook #'wgn/disable-line-numbers)
 
   (with-eval-after-load 'project
     (define-key project-prefix-map "t" #'wgn/project-vterm)
-    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t))
-
-  :config
-  (advice-add 'vterm :around #'wgn/vterm-local-remote-advice)
-  (advice-add 'vterm-other-window :around #'wgn/vterm-local-remote-advice))
+    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t)))
 
 ;;;; Error checking.
 (use-package flymake
