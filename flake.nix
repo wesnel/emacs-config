@@ -104,6 +104,7 @@
 
           llm =
             cfg.claude.enable
+            || cfg.codex.enable
             || cfg.copilot.enable;
 
           skills =
@@ -137,6 +138,10 @@
               claude = {
                 enable = lib.mkEnableOption "Enable Claude integration for Emacs";
               };
+
+              codex = {
+                enable = lib.mkEnableOption "Enable Codex integration for Emacs";
+              };
             };
           };
 
@@ -161,6 +166,19 @@
 
                 settings = {
                   includeCoAuthoredBy = false;
+                };
+
+                inherit skills;
+              };
+
+              codex = lib.mkIf cfg.codex.enable {
+                enable = true;
+                enableMcpIntegration = true;
+
+                settings = {
+                  features = {
+                    codex_git_commit = false;
+                  };
                 };
 
                 inherit skills;
@@ -202,6 +220,7 @@
                 # TODO: Can nodejs instead be made implicitly available to mcp-cli at runtime?
                 ++ (lib.optional llm nodejs)
                 ++ (lib.optional cfg.claude.enable claude-agent-acp)
+                ++ (lib.optional cfg.codex.enable codex-acp)
                 ++ (lib.optional cfg.copilot.enable copilot-language-server)
                 ++ (lib.optional cfg.copilot.enable github-copilot-cli);
 
