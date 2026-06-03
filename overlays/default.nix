@@ -154,12 +154,12 @@ final: prev: let
             };
           };
 
-        agent-shell-tramp-rpc = let
-          rev = "ccb0133312d5d6b8c7518e3903b64c4e0af12d6e";
-          sha256 = "sha256-7MIMozisvTKxyJQ7nCAqewdOiqxoYCsmysiIsLp0ajw=";
+        agent-shell-tramp = let
+          rev = "ebdeb204973beb116017a977bee52cdced78e447";
+          sha256 = "sha256-G1Q+hvwZ3iBax0f3/7tM1/7geYayEH6QzkQcz32+J0w=";
         in
           ePkgs.trivialBuild rec {
-            pname = "agent-shell-tramp-rpc";
+            pname = "agent-shell-tramp";
             version = rev;
 
             packageRequires = with ePkgs; [
@@ -168,7 +168,7 @@ final: prev: let
             ];
 
             src = pkgs.fetchFromGitHub {
-              owner = "csheaff";
+              owner = "junyi-hou";
               repo = pname;
 
               inherit

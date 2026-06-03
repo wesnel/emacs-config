@@ -1392,6 +1392,16 @@
    ("C-c C-c" . #'shell-maker-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
+;;;; Tramp support for `agent-shell'.
+(use-package agent-shell-tramp
+  :ensure t
+
+  :commands
+  (agent-shell-tramp-mode)
+
+  :config
+  (agent-shell-tramp-mode +1))
+
 ;;;; Lightweight notifications.
 (use-package knockknock
   :ensure t
