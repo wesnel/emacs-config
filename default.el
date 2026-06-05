@@ -117,12 +117,20 @@
     (set-frame-parameter nil 'alpha-background 50)))
 
 (use-package server
-  :commands
+  :functions
   (server-running-p
    server-start)
 
   :init
-  ;; Start server.
+  (setq server-use-tcp nil
+        server-socket-dir (expand-file-name
+                           "var/server/socket/"
+                           user-emacs-directory))
+
+  (make-directory server-socket-dir t)
+  (set-file-modes server-socket-dir #o700)
+
+  :config
   (unless (server-running-p)
     (server-start)))
 
