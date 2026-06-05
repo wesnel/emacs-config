@@ -419,7 +419,13 @@
   (tramp-verbose 0)
 
   :config
-  (add-to-list 'tramp-remote-path 'tramp-own-remote-path))
+  (add-to-list 'tramp-remote-path 'tramp-own-remote-path)
+  ;; HACK: Since `magit' and `envrc' are incompatible, I manually add the paths needed for pre-commit hooks.
+  (add-to-list 'tramp-remote-path "/opt/ngrok/scripts/tasks")
+  (add-to-list 'tramp-remote-path "/opt/ngrok/scripts")
+  (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/go/bin")
+  (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/home/bin")
+  (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/ngrok-devenv-home/bin"))
 
 (use-package vc
   :after tramp
