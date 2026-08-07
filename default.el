@@ -1417,6 +1417,17 @@
   (agent-shell-tramp-mode +1))
 
 ;;;; Lightweight notifications.
+;;
+;; `wgn/notify' prefers OSC 777 escape sequences whenever any TTY
+;; frame exists (e.g. `emacsclient -t' over SSH from Ghostty), so the
+;; notification is delivered by the client terminal rather than the
+;; machine hosting the Emacs daemon.  When no TTY frame is present
+;; (local GUI Emacs), it falls back to `knockknock-notify' for a
+;; native notification.
+;;
+;; Invoke from a shell:
+;;
+;;   emacsclient -e '(wgn/notify "title" "message")'
 (use-package knockknock
   :ensure t
 
@@ -1424,8 +1435,63 @@
   (knockknock-notify
    knockknock-init)
 
+  :preface
+  (defun wgn/notify--tty-terminals ()
+    "Return the deduplicated list of live TTY terminals across all frames.
+Excludes the daemon's `initial_terminal', which has no attached client."
+    (delete-dups
+     (mapcar #'frame-terminal
+             (seq-filter
+              (lambda (f)
+                (and (eq (framep f) t)
+                     (not (equal (terminal-name (frame-terminal f))
+                                 "initial_terminal"))))
+              (frame-list)))))
+
+  (defun wgn/notify--sanitize (s)
+    "Strip characters that would break the OSC 777 escape sequence."
+    (replace-regexp-in-string
+     "[\a\e]" ""
+     (replace-regexp-in-string ";" "," (or s ""))))
+
+  (defun wgn/notify--send-osc (title message)
+    "Emit an OSC 777 notification with TITLE and MESSAGE to every TTY terminal."
+    (let ((seq (format "\e]777;notify;%s;%s\a"
+                       (wgn/notify--sanitize title)
+                       (wgn/notify--sanitize message))))
+      (dolist (term (wgn/notify--tty-terminals))
+        (send-string-to-terminal seq term))))
+
+  (defun wgn/notify (title &optional message)
+    "Send a desktop notification with TITLE and optional MESSAGE.
+When any TTY frame is live, emit OSC 777 to each terminal so the
+notification is rendered by the client (e.g. Ghostty over SSH).
+Otherwise fall back to `knockknock-notify' for a native GUI
+notification on the local machine."
+    (interactive "sTitle: \nsMessage: ")
+    (let ((title (or title ""))
+          (message (or message "")))
+      (if (wgn/notify--tty-terminals)
+          (wgn/notify--send-osc title message)
+        (when (fboundp 'knockknock-notify)
+          (knockknock-notify :title title :message message)))))
+
+  (defun wgn/knockknock-notify--osc-advice (orig-fn &rest args)
+    "Route `knockknock-notify' through OSC 777 when TTY frames exist.
+Extracts `:title' and `:message' from ARGS for the OSC path.  When
+no TTY frame is present, forwards all ARGS to ORIG-FN so the native
+GUI notification retains its icon and duration."
+    (if (wgn/notify--tty-terminals)
+        (wgn/notify--send-osc
+         (or (plist-get args :title) "")
+         (or (plist-get args :message) ""))
+      (apply orig-fn args)))
+
   :init
-  (knockknock-init))
+  (knockknock-init)
+
+  :config
+  (advice-add 'knockknock-notify :around #'wgn/knockknock-notify--osc-advice))
 
 ;;;; Notify when `agent-shell' needs attention.
 (use-package agent-shell-knockknock
