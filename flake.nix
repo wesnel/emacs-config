@@ -162,6 +162,23 @@
 
                 settings = {
                   includeCoAuthoredBy = false;
+
+                  # Fire an OSC 777 desktop notification when Claude Code
+                  # is blocked waiting for input.  Ghostty and other
+                  # OSC-777-aware terminals render this as a native
+                  # notification on the machine displaying the terminal.
+                  hooks = {
+                    Notification = [
+                      {
+                        hooks = [
+                          {
+                            type = "command";
+                            command = ''printf '\033]777;notify;Claude Code;%s\a' "$(${pkgs.jq}/bin/jq -r '.message // "Waiting for input"')"'';
+                          }
+                        ];
+                      }
+                    ];
+                  };
                 };
 
                 inherit skills;
