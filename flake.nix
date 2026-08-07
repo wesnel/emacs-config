@@ -148,11 +148,6 @@
 
           config = lib.mkIf cfg.enable {
             xdg.configFile = {
-              "fish/conf.d/emacs-vterm.fish" = lib.mkIf config.programs.fish.enable {
-                enable = true;
-                source = "${pkgs.emacsPackages.vterm}/share/emacs/site-lisp/elpa/vterm-${pkgs.emacsPackages.vterm.version}/etc/emacs-vterm.fish";
-              };
-
               # TODO: Is there a way to just make a symlink instead?
               "mcp/mcp_servers.json" = lib.mkIf llm {
                 enable = true;

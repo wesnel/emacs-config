@@ -883,45 +883,23 @@
   (add-hook 'eshell-mode-hook #'wgn/disable-line-numbers))
 
 ;;;; Terminal emulator.
-(use-package vterm
+(use-package ghostel
   :ensure t
 
   :commands
-  (vterm
-   vterm-other-window)
-
-  :defines
-  (vterm-mode-map)
+  (ghostel
+   ghostel-other
+   ghostel-project)
 
   :custom
-  (vterm-max-scrollback 100000)
-
-  :bind
-  (:map vterm-mode-map
-   ([return] . nil)
-   :map vterm-copy-mode-map
-   ([return] . nil))
-
-  :preface
-  (defun wgn/project-vterm ()
-    (interactive)
-    (defvar vterm-buffer-name)
-    (let* ((default-directory (project-root (project-current t)))
-           (mode (if-let (method (file-remote-p default-directory 'method))
-                     (concat "vterm-" method)
-                   "vterm"))
-           (vterm-buffer-name (project-prefixed-buffer-name mode))
-           (vterm-buffer (get-buffer vterm-buffer-name)))
-      (if (and vterm-buffer (not current-prefix-arg))
-          (pop-to-buffer vterm-buffer)
-        (vterm t))))
+  (ghostel-max-scrollback 100000)
 
   :init
-  (add-hook 'vterm-mode-hook #'wgn/disable-line-numbers)
+  (add-hook 'ghostel-mode-hook #'wgn/disable-line-numbers)
 
   (with-eval-after-load 'project
-    (define-key project-prefix-map "t" #'wgn/project-vterm)
-    (add-to-list 'project-switch-commands '(wgn/project-vterm "Vterm") t)))
+    (define-key project-prefix-map "t" #'ghostel-project)
+    (add-to-list 'project-switch-commands '(ghostel-project "Ghostel") t)))
 
 ;;;; Error checking.
 (use-package flymake
