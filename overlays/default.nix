@@ -533,7 +533,7 @@ final: prev: let
       '';
   });
 
-  mcp-cli = final.stdenv.mkDerivation rec {
+  mcp-cli = let
     pname = "mcp-cli";
     version = "0.3.0";
 
@@ -544,34 +544,97 @@ final: prev: let
       hash = "sha256-S924rqlVKzUFD63NDyK5bbXnonra+/UoH6j78AAj3d0=";
     };
 
-    nativeBuildInputs = with final; [
-      bun
-      nodejs
-      installShellFiles
-    ];
+    # Prefetch the bun dependency tree into its own derivation whose
+    # output is pinned by `outputHash`, so Nix grants the build
+    # network access.  A plain derivation has no network in a
+    # sandboxed build (the default on Linux), which is why
+    # `bun install` inside the main `buildPhase` used to fail there
+    # while silently succeeding on Darwin, where Nix leaves the
+    # sandbox off by default.  With the dependencies staged into the
+    # Nix store this way, the main build below can run offline.
+    #
+    # Only production dependencies are fetched: `bun build --compile`
+    # bundles from `node_modules`, and the Biome devDependency drags
+    # in platform-specific binaries that would give this output a
+    # different hash on each system.
+    node-modules = final.stdenvNoCC.mkDerivation {
+      pname = "${pname}-node-modules";
 
-    preBuild = ''
-      export BUN_CACHE_DIR=$TMPDIR/bun-cache
-      mkdir -p $BUN_CACHE_DIR
-    '';
+      dontConfigure = true;
+      dontFixup = true;
 
-    buildPhase = ''
-      runHook preBuild
+      nativeBuildInputs = [final.bun];
 
-      bun install --frozen-lockfile
-      bun build --compile --minify src/index.ts --outfile dist/mcp-cli
+      buildPhase = ''
+        runHook preBuild
 
-      runHook postBuild
-    '';
+        export HOME=$TMPDIR
+        bun install \
+          --frozen-lockfile \
+          --production \
+          --ignore-scripts \
+          --no-progress
 
-    installPhase = ''
-      runHook preInstall
+        runHook postBuild
+      '';
 
-      install -Dm755 dist/mcp-cli $out/bin/mcp-cli
+      installPhase = ''
+        runHook preInstall
 
-      runHook postInstall
-    '';
-  };
+        mkdir -p $out
+        cp -R node_modules $out/
+
+        runHook postInstall
+      '';
+
+      outputHashMode = "recursive";
+      outputHashAlgo = "sha256";
+      outputHash = "sha256-yDqCHnjmkz8dotufExIb5qRE04fLDWlEy+1u1YzFBqs=";
+
+      inherit
+        src
+        version
+        ;
+    };
+  in
+    final.stdenv.mkDerivation {
+      nativeBuildInputs = [final.bun];
+
+      configurePhase = ''
+        runHook preConfigure
+
+        cp -R ${node-modules}/node_modules ./node_modules
+        chmod -R u+w node_modules
+
+        runHook postConfigure
+      '';
+
+      buildPhase = ''
+        runHook preBuild
+
+        bun build \
+          --compile \
+          --minify \
+          src/index.ts \
+          --outfile dist/mcp-cli
+
+        runHook postBuild
+      '';
+
+      installPhase = ''
+        runHook preInstall
+
+        install -Dm755 dist/mcp-cli $out/bin/mcp-cli
+
+        runHook postInstall
+      '';
+
+      inherit
+        pname
+        src
+        version
+        ;
+    };
 
   parinfer-rust-emacs = prev.parinfer-rust-emacs.overrideAttrs (old: {
     # HACK: On Mac, the file has the extension ".dylib",
