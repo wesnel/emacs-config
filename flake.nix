@@ -163,6 +163,10 @@
                 settings = {
                   includeCoAuthoredBy = false;
 
+                  attribution = {
+                    sessionUrl = false;
+                  };
+
                   # Fire an OSC 777 desktop notification when Claude Code
                   # is blocked waiting for input.  Ghostty and other
                   # OSC-777-aware terminals render this as a native
