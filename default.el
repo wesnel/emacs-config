@@ -33,7 +33,16 @@
 (require 'package)
 
 (eval-when-compile
-  (require 'use-package))
+  (require 'use-package)
+
+  ;; NOTE: `use-package' calls `use-package-ensure-function' while the
+  ;;       `use-package' macro is being expanded, which means it runs at
+  ;;       byte-compile time.  Under Nix every package here is already on
+  ;;       the load path, so reaching for package.el only produces errors:
+  ;;       the build sets HOME to an unwritable /homeless-shelter, and the
+  ;;       sandbox has no network.  `:ensure' is still meaningful as the
+  ;;       marker that tells emacs-overlay which packages to install.
+  (setq use-package-ensure-function @ensure@))
 
 ;;;; Miscellaneous Emacs configuration.
 (use-package emacs
@@ -355,7 +364,11 @@
   :functions
   (no-littering-theme-backups)
 
-  :init
+  ;; NOTE: `:config' rather than `:init', because `use-package' runs
+  ;;       `:init' forms before requiring the package.  This still runs
+  ;;       early enough for the path remapping to reach the packages
+  ;;       configured below.
+  :config
   (no-littering-theme-backups))
 
 ;;;; Required for :bind in use-package.
@@ -399,6 +412,17 @@
   ((text-mode prog-mode) . outline-minor-mode))
 
 ;;;; Syntax highlighting.
+;;
+;; NOTE: This has to take effect at byte-compile time as well as at run
+;;       time.  While compiling, `use-package' loads each library it is
+;;       given so that its symbols are in scope, and every built-in
+;;       `*-ts-mode' library asks `treesit-ready-p' about its grammar as
+;;       it loads.  Without this, those questions are answered from an
+;;       empty search path and the build log fills up with warnings.
+(eval-and-compile
+  (when (boundp 'treesit-extra-load-path)
+    (add-to-list 'treesit-extra-load-path @grammars@)))
+
 (use-package treesit
   :commands
   (treesit-font-lock-recompute-features)
@@ -640,8 +664,17 @@
   (janet-mode-map))
 
 ;;;; Interactive Janet development.
-(use-package ijanet-mode
-  :ensure t
+;;
+;; NOTE: The package is called `ijanet-mode', but the only library it
+;;       ships is `ijanet.el'.  `use-package' derives the file to
+;;       autoload from the name in the form, so the name here has to be
+;;       the library, with `:ensure' naming the package.
+;;
+;; NOTE: `:after' because everything below hangs off `janet-mode-map',
+;;       which does not exist until `janet-mode' has loaded.
+(use-package ijanet
+  :ensure ijanet-mode
+  :after janet-mode
 
   :commands
   (ijanet
@@ -1297,8 +1330,14 @@
   (shell-maker-submit))
 
 ;;;; Shell for interacting with LLMs.
+;;
+;; NOTE: `:no-require' because `chatgpt-shell' reads, and on failure
+;;       writes, its saved variables under `shell-maker-root-path' as
+;;       soon as it loads.  Letting `use-package' load it while
+;;       byte-compiling would perform that I/O during the build.
 (use-package chatgpt-shell
   :ensure t
+  :no-require t
 
   :commands
   (chatgpt-shell
@@ -1722,7 +1761,12 @@ GUI notification retains its icon and duration."
   (add-hook 'python-ts-mode-hook #'wgn/python-ts-mode-eglot-setup))
 
 ;;;; C# support.
+;;
+;; NOTE: `:no-require' because this mode lives in `csharp-mode.el' rather
+;;       than a library of its own, so `use-package' cannot load it to
+;;       inspect it while byte-compiling.  It is autoloaded either way.
 (use-package csharp-ts-mode
+  :no-require t
   :mode "\\.cs\\'"
 
   :preface
@@ -1853,7 +1897,14 @@ GUI notification retains its icon and duration."
   (add-hook 'mhtml-mode-hook #'wgn/mhtml-mode-eglot-setup))
 
 ;;;; JSX and TSX support.
+;;
+;; NOTE: `:no-require' because this mode lives in `typescript-ts-mode.el'
+;;       rather than a library of its own, so `use-package' cannot load
+;;       it to inspect it while byte-compiling.  It is autoloaded either
+;;       way.
 (use-package tsx-ts-mode
+  :no-require t
+
   :mode
   (("\\.tsx\\'" . tsx-ts-mode)
    ("\\.jsx\\'" . tsx-ts-mode))
@@ -1874,7 +1925,12 @@ GUI notification retains its icon and duration."
   (add-hook 'tsx-ts-mode-hook #'wgn/tsx-ts-mode-eglot-setup))
 
 ;;;; Javascript support.
+;;
+;; NOTE: `:no-require' because this mode lives in `js.el' rather than a
+;;       library of its own, so `use-package' cannot load it to inspect
+;;       it while byte-compiling.  It is autoloaded either way.
 (use-package js-ts-mode
+  :no-require t
   :mode "\\.js\\'"
 
   :preface
@@ -1945,7 +2001,12 @@ GUI notification retains its icon and duration."
   (add-hook 'json-ts-mode-hook #'wgn/json-ts-mode-eglot-setup))
 
 ;;;; CSS support.
+;;
+;; NOTE: `:no-require' because this mode lives in `css-mode.el' rather
+;;       than a library of its own, so `use-package' cannot load it to
+;;       inspect it while byte-compiling.  It is autoloaded either way.
 (use-package css-ts-mode
+  :no-require t
   :defer t
 
   :preface
@@ -2087,6 +2148,11 @@ GUI notification retains its icon and duration."
    ;; Fix annoyingly bright tab character:
    '(whitespace-tab ((t (:background unspecified)))))
 
+  ;; NOTE: `:config' rather than `:init', because `use-package' runs
+  ;;       `:init' forms before the package is loaded.  Loading a doom
+  ;;       theme above pulls in `doom-themes', which is what makes these
+  ;;       run.
+  :config
   (doom-themes-visual-bell-config)
   (doom-themes-org-config))
 

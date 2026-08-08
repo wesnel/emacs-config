@@ -1,8 +1,60 @@
 final: prev: let
+  # The tree-sitter grammars which Emacs should be able to load.  This
+  # is shared between the Emacs package set (so that the grammars are
+  # installed) and `default.el' (so that it can point
+  # `treesit-extra-load-path' at them).  `treesit-grammars' just builds
+  # a link farm of prebuilt parsers, so it does not depend on which
+  # Emacs is being wrapped.
+  treesit-grammars = pkgs:
+    pkgs.emacsPackages.treesit-grammars.with-grammars (
+      grammars:
+        with grammars; [
+          tree-sitter-bash
+          tree-sitter-bibtex
+          tree-sitter-c
+          tree-sitter-clojure
+          tree-sitter-cmake
+          tree-sitter-commonlisp
+          tree-sitter-cpp
+          tree-sitter-c-sharp
+          tree-sitter-css
+          tree-sitter-dockerfile
+          tree-sitter-elisp
+          tree-sitter-elixir
+          tree-sitter-erlang
+          tree-sitter-fish
+          tree-sitter-gdscript
+          tree-sitter-go
+          tree-sitter-go-template
+          tree-sitter-godot-resource
+          tree-sitter-gomod
+          tree-sitter-gowork
+          tree-sitter-graphql
+          tree-sitter-html
+          tree-sitter-java
+          tree-sitter-javascript
+          tree-sitter-json
+          tree-sitter-kotlin
+          tree-sitter-latex
+          tree-sitter-make
+          tree-sitter-markdown
+          tree-sitter-nix
+          tree-sitter-python
+          tree-sitter-regex
+          tree-sitter-sql
+          tree-sitter-toml
+          tree-sitter-tsx
+          tree-sitter-typescript
+          tree-sitter-yaml
+        ]
+    );
+
   # For building an Emacs configuration for non-Nix systems which
   # are presumed to just have these commands pre-installed.
   build-deps-dynamic = pkgs: {
     parinfer = "(concat parinfer-rust-library-directory parinfer-rust--lib-name)";
+    grammars = ''(expand-file-name "tree-sitter" user-emacs-directory)'';
+    ensure = "#'use-package-ensure-elpa";
   };
 
   # For building an Emacs configuration for Nix systems.  These
@@ -15,6 +67,12 @@ final: prev: let
     in ''
       "${pkg}/lib/libparinfer_rust.so"
     '';
+
+    grammars = ''
+      "${treesit-grammars pkgs}/lib"
+    '';
+
+    ensure = "#'ignore";
   };
 
   build-emacs-config = pkgs: build-deps: let
@@ -27,6 +85,8 @@ final: prev: let
     pkgs.replaceVars ../default.el {
       inherit
         (deps)
+        ensure
+        grammars
         parinfer
         ;
     };
@@ -40,7 +100,7 @@ final: prev: let
       defaultInitFile = config;
 
       extraEmacsPackages = ePkgs:
-        with ePkgs; [
+        (with ePkgs; [
           # TODO: posframe and nerd-icons are required by knockknock,
           # but for some reason the propagatedBuildInputs in the
           # knockknock derivation doesn't make these dependencies
@@ -49,50 +109,31 @@ final: prev: let
           posframe
 
           tree-sitter-langs
-          (treesit-grammars.with-grammars
-            (grammars:
-              with grammars; [
-                tree-sitter-bash
-                tree-sitter-bibtex
-                tree-sitter-c
-                tree-sitter-clojure
-                tree-sitter-cmake
-                tree-sitter-commonlisp
-                tree-sitter-cpp
-                tree-sitter-c-sharp
-                tree-sitter-css
-                tree-sitter-dockerfile
-                tree-sitter-elisp
-                tree-sitter-elixir
-                tree-sitter-erlang
-                tree-sitter-fish
-                tree-sitter-gdscript
-                tree-sitter-go
-                tree-sitter-go-template
-                tree-sitter-godot-resource
-                tree-sitter-gomod
-                tree-sitter-gowork
-                tree-sitter-graphql
-                tree-sitter-html
-                tree-sitter-java
-                tree-sitter-javascript
-                tree-sitter-json
-                tree-sitter-kotlin
-                tree-sitter-latex
-                tree-sitter-make
-                tree-sitter-markdown
-                tree-sitter-nix
-                tree-sitter-python
-                tree-sitter-regex
-                tree-sitter-sql
-                tree-sitter-toml
-                tree-sitter-tsx
-                tree-sitter-typescript
-                tree-sitter-yaml
-              ]))
+        ])
+        ++ [
+          (treesit-grammars pkgs)
         ];
 
       override = ePkgs: ePrev: {
+        # HACK: `emacsWithPackagesFromUsePackage' byte-compiles
+        # `default.el' inside a `trivialBuild' derivation which it
+        # constructs itself, so overriding `trivialBuild' is the only way
+        # to reach it.  That compile needs a writable HOME:
+        # `use-package' loads every configured package in order to
+        # inspect it, and a few of them (`no-littering',
+        # `chatgpt-shell') write under HOME as they load, which fails
+        # against the sandbox's read-only /homeless-shelter.
+        trivialBuild = args:
+          ePrev.trivialBuild (
+            args
+            // pkgs.lib.optionalAttrs (args.pname or "" == "default") {
+              preBuild = ''
+                export HOME="$TMPDIR/home"
+                mkdir -p "$HOME"
+              '';
+            }
+          );
+
         acp = let
           rev = "661af51569acef7384a2801f07a582da5142a6d9";
           sha256 = "sha256-x6KVBM1iEW24fkRVwM9ALRqd6EzBkjJDt3cnyykL4z4=";
