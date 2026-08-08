@@ -276,6 +276,90 @@ final: prev: let
             };
           };
 
+        # Ghostel is a thin Emacs veneer over libghostty, so it needs a
+        # dynamic module built with Zig.  Left to itself, `ghostel.el`
+        # downloads or compiles that module at runtime; building it here
+        # means Nix ships `ghostel-module` alongside the elisp instead.
+        #
+        # nixpkgs already does this, but the pinned revision builds the
+        # module without `xcbuild`, so on Darwin the vendored ghostty
+        # build aborts with `DarwinSdkNotFound`.  Rebuild the package
+        # from a tagged release the way newer nixpkgs does.
+        ghostel = let
+          version = "0.49.0";
+
+          src = pkgs.fetchFromGitHub {
+            owner = "dakra";
+            repo = "ghostel";
+            tag = "v${version}";
+            hash = "sha256-jXJpPEPl9qHIYRxsXjcbJdiy4tcL4bvCn2VWAaGW81Y=";
+          };
+
+          zig = pkgs.zig_0_16;
+
+          zigDeps = zig.fetchDeps {
+            pname = "ghostel";
+            fetchAll = true;
+            hash = "sha256-NcNp0FnMy6FfZ63+pwiTRCmJ8FIovJEOhNvxVr1+uSQ=";
+
+            inherit
+              src
+              version
+              ;
+          };
+
+          libExt = pkgs.stdenv.hostPlatform.extensions.sharedLibrary;
+
+          module = pkgs.stdenv.mkDerivation {
+            pname = "ghostel-module";
+
+            strictDeps = true;
+            dontSetZigDefaultFlags = true;
+            __structuredAttrs = true;
+
+            nativeBuildInputs =
+              [zig]
+              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isDarwin [
+                pkgs.xcbuild
+              ];
+
+            env.EMACS_INCLUDE_DIR = "${pkgs.emacs}/include";
+
+            # See https://github.com/ghostty-org/ghostty/blob/main/PACKAGING.md#build-options
+            zigBuildFlags = [
+              "-Dcpu=baseline"
+              "-Doptimize=ReleaseFast"
+            ];
+
+            postConfigure = ''
+              cp -rLT ${zigDeps} "$ZIG_GLOBAL_CACHE_DIR/p"
+              chmod -R u+w "$ZIG_GLOBAL_CACHE_DIR/p"
+            '';
+
+            inherit
+              src
+              version
+              ;
+          };
+        in
+          ePkgs.melpaBuild {
+            pname = "ghostel";
+
+            files = ''
+              (:defaults "etc" "ghostel-module${libExt}" "ghostel-module.version")
+            '';
+
+            preBuild = ''
+              install ${module}/ghostel-module${libExt} ghostel-module${libExt}
+              install --mode=444 ${module}/ghostel-module.version ghostel-module.version
+            '';
+
+            inherit
+              src
+              version
+              ;
+          };
+
         gptel = let
           rev = "5c82ff85be0beed57a923935e18b9c4d1a8d0858";
           sha256 = "sha256-4L6D2QOl/qUNWfPEv9nbZGGuFU14kebXrOU1LoJWeG8=";
