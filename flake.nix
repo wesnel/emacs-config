@@ -424,9 +424,7 @@
             programs.wgn.emacs = {
               enable = lib.mkEnableOption "Enable the NixOS portion of Wesley's Emacs Configuration";
 
-              package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" {
-                default = pkgs.emacs;
-              };
+              package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" { };
             };
           };
 
