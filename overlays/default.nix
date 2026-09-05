@@ -599,11 +599,11 @@ final: prev: let
           });
 
         tramp = let
-          rev = "2.8.1.4";
-          sha256 = "sha256-PMofWpP8ag0/9z0yuFiz2P379zhKHcDGpw1UAJD8XI4=";
+          rev = "2.8.2.2";
+          sha256 = "sha256-aIIzkQUCkn7T5hkItQv1Aq8t7nw6RkAWIoLFlk72I7I=";
         in
           ePrev.tramp.overrideAttrs (old: {
-            version = "2.8.1.4";
+            version = "2.8.2.2";
 
             src = pkgs.fetchurl {
               url = "https://elpa.gnu.org/packages/tramp-${rev}.tar";
