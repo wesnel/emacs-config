@@ -120,7 +120,7 @@
               open = builtins.readFile "${emacs-skills}/skills/open/SKILL.md";
               select = builtins.readFile "${emacs-skills}/skills/select/SKILL.md";
             }
-            // lib.optionalAttrs pkgs.stdenv.isDarwin {
+            // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
               trash = ./skills/trash/SKILL.md;
             };
         in {
@@ -424,7 +424,7 @@
             programs.wgn.emacs = {
               enable = lib.mkEnableOption "Enable the NixOS portion of Wesley's Emacs Configuration";
 
-              package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" { };
+              package = lib.mkPackageOption pkgs "wgn-emacs-unstable-nox" {};
             };
           };
 
