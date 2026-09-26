@@ -15,11 +15,6 @@
       url = "github:nixos/nixpkgs/nixos-unstable";
     };
 
-    emacs-skills = {
-      url = "github:xenodium/emacs-skills";
-      flake = false;
-    };
-
     emacs-tramp-rpc = {
       url = "github:ArthurHeymans/emacs-tramp-rpc";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -29,7 +24,6 @@
   outputs = {
     self,
     emacs-overlay,
-    emacs-skills,
     nixpkgs,
     flake-utils,
     emacs-tramp-rpc,
@@ -101,28 +95,6 @@
           ...
         }: let
           cfg = config.home.programs.wgn.emacs;
-
-          llm =
-            cfg.claude.enable
-            || cfg.codex.enable
-            || cfg.copilot.enable;
-
-          skills =
-            {
-              mcp-cli = ./skills/mcp-cli/SKILL.md;
-              agent-shell-memory = ./skills/agent-shell-memory/SKILL.md;
-              notify = ./skills/notify/SKILL.md;
-              describe = builtins.readFile "${emacs-skills}/skills/describe/SKILL.md";
-              dired = builtins.readFile "${emacs-skills}/skills/dired/SKILL.md";
-              emacsclient = builtins.readFile "${emacs-skills}/skills/emacsclient/SKILL.md";
-              file-links = builtins.readFile "${emacs-skills}/skills/file-links/SKILL.md";
-              highlight = builtins.readFile "${emacs-skills}/skills/highlight/SKILL.md";
-              open = builtins.readFile "${emacs-skills}/skills/open/SKILL.md";
-              select = builtins.readFile "${emacs-skills}/skills/select/SKILL.md";
-            }
-            // lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
-              trash = ./skills/trash/SKILL.md;
-            };
         in {
           options = {
             home.programs.wgn.emacs = {
@@ -132,6 +104,9 @@
                 enable = lib.mkEnableOption "Enable Wesley's Emacs Gnus Configuration with Home Manager";
               };
 
+              # These gate only the bridge that agent-shell talks to. The
+              # agents' own configuration -- skills, MCP servers, settings,
+              # trusted projects -- lives in wesnel/nix-config.
               copilot = {
                 enable = lib.mkEnableOption "Enable Copilot integration for Emacs";
               };
@@ -147,85 +122,6 @@
           };
 
           config = lib.mkIf cfg.enable {
-            xdg.configFile = {
-              # TODO: Is there a way to just make a symlink instead?
-              "mcp/mcp_servers.json" = lib.mkIf llm {
-                enable = true;
-                source = config.xdg.configFile."mcp/mcp.json".source;
-              };
-            };
-
-            programs = {
-              claude-code = lib.mkIf cfg.claude.enable {
-                enable = true;
-                enableMcpIntegration = true;
-
-                settings = {
-                  includeCoAuthoredBy = false;
-
-                  attribution = {
-                    sessionUrl = false;
-                  };
-
-                  # Fire an OSC 777 desktop notification when Claude Code
-                  # is blocked waiting for input.  Ghostty and other
-                  # OSC-777-aware terminals render this as a native
-                  # notification on the machine displaying the terminal.
-                  hooks = {
-                    Notification = [
-                      {
-                        hooks = [
-                          {
-                            type = "command";
-                            command = ''printf '\033]777;notify;Claude Code;%s\a' "$(${pkgs.jq}/bin/jq -r '.message // "Waiting for input"')"'';
-                          }
-                        ];
-                      }
-                    ];
-                  };
-                };
-
-                inherit skills;
-              };
-
-              codex = lib.mkIf cfg.codex.enable {
-                enable = true;
-                enableMcpIntegration = true;
-
-                settings = {
-                  features = {
-                    codex_git_commit = false;
-                  };
-                };
-
-                inherit skills;
-              };
-
-              mcp = lib.mkIf llm {
-                enable = true;
-
-                servers = {
-                  docs-mcp-server = {
-                    type = "stdio";
-                    command = "${pkgs.nodejs}/bin/npx";
-                    args = [
-                      "-y"
-                      "@arabold/docs-mcp-server@latest"
-                    ];
-                    env = {
-                      DOCS_MCP_TELEMETRY = "false";
-                    };
-                  };
-
-                  # TODO: Add additional MCP servers.
-                  #
-                  # Examples:
-                  #
-                  # - https://github.com/ProfessioneIT/lsp-mcp-server
-                };
-              };
-            };
-
             home = {
               packages = with pkgs;
                 [
@@ -233,41 +129,25 @@
                   multimarkdown
                   ripgrep
                 ]
-                ++ (lib.optional llm mcp-cli)
-                # TODO: Can nodejs instead be made implicitly available to mcp-cli at runtime?
-                ++ (lib.optional llm nodejs)
                 ++ (lib.optional cfg.claude.enable claude-agent-acp)
                 ++ (lib.optional cfg.codex.enable codex-acp)
-                ++ (lib.optional cfg.copilot.enable copilot-language-server)
-                ++ (lib.optional cfg.copilot.enable github-copilot-cli);
+                ++ (lib.optional cfg.copilot.enable copilot-language-server);
 
-              file =
-                {
-                  ".emacs.d/early-init.el".source = let
-                    gnus =
-                      if cfg.gnus.enable
-                      then config.sops.templates.".gnus.el".path
-                      else "~/.emacs.d/etc/gnus/init.el";
-                  in
-                    pkgs.replaceVars ./early-init.el {
-                      inherit
-                        gnus
-                        ;
-                    };
+              file = {
+                ".emacs.d/early-init.el".source = let
+                  gnus =
+                    if cfg.gnus.enable
+                    then config.sops.templates.".gnus.el".path
+                    else "~/.emacs.d/etc/gnus/init.el";
+                in
+                  pkgs.replaceVars ./early-init.el {
+                    inherit
+                      gnus
+                      ;
+                  };
 
-                  ".emacs.d/etc/eshell/login".source = ./login.el;
-                }
-                // lib.optionalAttrs cfg.copilot.enable (
-                  lib.mapAttrs' (
-                    name: content:
-                      lib.nameValuePair ".copilot/skills/${name}/SKILL.md" (
-                        if lib.isPath content
-                        then {source = content;}
-                        else {text = content;}
-                      )
-                  )
-                  skills
-                );
+                ".emacs.d/etc/eshell/login".source = ./login.el;
+              };
             };
 
             sops = lib.mkIf cfg.gnus.enable {
