@@ -1520,6 +1520,17 @@ GUI notification retains its icon and duration."
   :hook
   (agent-shell-mode . agent-shell-knockknock-mode))
 
+;;;; AI pair programming via the Editor Code Assistant.
+;;
+;; NOTE: The `eca' server is resolved from PATH.  Leaving it there rather
+;;       than in `eca-custom-command' is what keeps `eca-emacs' from
+;;       downloading its own copy on startup.
+(use-package eca
+  :ensure t
+
+  :commands
+  (eca))
+
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick
   :ensure t
