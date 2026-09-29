@@ -18,7 +18,7 @@ if (!lib) {
   process.exit(2);
 }
 
-const {VM, createHttpHooks, RealFSProvider, ReadonlyProvider} = await import(lib);
+const {VM, createHttpHooks, RealFSProvider, ReadonlyProvider, buildAssets, verifyAssets} = await import(lib);
 
 const parseArgs = (argv) => {
   const opts = {
@@ -95,6 +95,11 @@ const parseArgs = (argv) => {
 };
 
 const opts = parseArgs(process.argv.slice(2));
+
+if (!opts.image) {
+  const {ensureImage, managedImageOptions} = await import("./image.mjs");
+  opts.image = await ensureImage({...managedImageOptions(), buildAssets, verifyAssets});
+}
 
 const path = await import("node:path");
 const fs = await import("node:fs");

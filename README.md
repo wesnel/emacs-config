@@ -227,7 +227,6 @@ home.programs.wgn.emacs.eca = {
     enable = true;
     backend = "gondolin";
     args = [
-      "--image" "eca:latest"
       "--http-map" "ollama:11434=127.0.0.1:11434"
       "--http-map" "docs:6280=127.0.0.1:6280"
       "--env" "OLLAMA_API_URL=http://ollama:11434"
@@ -241,8 +240,8 @@ hardware virtualization. On Linux hosts without it, select `bubblewrap`;
 its filesystem isolation is enforced, but its proxy egress restrictions
 can be bypassed by a process that ignores the proxy.
 
-The default sandbox arguments select `eca:latest`. Gondolin allows no
-outbound hosts by default; Bubblewrap's proxy allows `models.dev` by default.
+Gondolin uses the automatically prepared guest image and allows no outbound
+hosts by default. Bubblewrap's proxy allows `models.dev` by default.
 Configure service mappings or `--allow-host` entries as needed.
 `args` replaces the entire argument list. `sandbox.enable = false` keeps
 the pinned server on PATH and runs it directly.
@@ -257,20 +256,30 @@ For configurations used without Home Manager, set `eca-custom-command`
 in your personal Emacs configuration or `~/.emacs.d/etc/eca.el`. The default
 configuration otherwise finds `eca` on PATH.
 
-### Building the Gondolin image
+### Gondolin guest image
 
-Build the Gondolin image once per machine from this repository:
+Home Manager prepares the guest image during activation when the Gondolin
+sandbox is enabled. Nix supplies the builder, `mke2fs` and a build configuration
+for the host architecture. The first activation downloads Alpine packages and
+guest helpers and builds the image; it requires network access and can take
+several minutes.
 
-``` sh
-nix shell nixpkgs#e2fsprogs --command \
-  gondolin build --config overlays/eca-gondolin/build-config.json \
-    --arch aarch64 --tag eca:latest
-```
+Images are cached under `$XDG_CACHE_HOME/gondolin/eca-images` (by default
+`~/.cache/gondolin/eca-images`). The cache key includes the image configuration,
+architecture and Gondolin package. Activations reuse a complete cached image;
+changing those inputs or removing the cached image causes another build.
+Updating the ECA server alone does not rebuild the image: its Linux executable
+is mounted into the guest at startup.
 
-Use `--arch x86_64` on x86 hosts. Images live in `~/.cache/gondolin` outside
-Nix. The `gondolin` CLI is installed when that sandbox backend is enabled.
-`e2fsprogs` supplies `mke2fs`, which the image builder needs. The build config
-includes `gcompat` so the glibc-linked ECA binary can run on Alpine's musl.
+The image includes `gcompat` so ECA's glibc-linked binary runs on Alpine's musl,
+and tools such as Git, Python, Node and ripgrep. Builds are verified before a
+complete image is made available to sessions. The standalone wrapper also
+prepares a missing image when it starts.
+
+To use your own image, add `--image` followed by an image directory or Gondolin
+image selector to `sandbox.args`. Home Manager skips managed-image preparation
+when an explicit image is selected.
+Bubblewrap uses the host filesystem and requires no guest image.
 
 Configure model services, provider settings and agents separately from
 Emacs launch settings. The sandbox selects shared skills using
@@ -293,7 +302,6 @@ home.programs.wgn.emacs.eca.sandbox = {
   enable = true;
   backend = "gondolin";
   args = [
-    "--image" "eca:latest"
     "--observe"
     "--log" "/Users/wgn/.cache/eca-network.jsonl"
     "--deny-host" "*.example.com"
@@ -355,8 +363,8 @@ for its local workspaces. Opening that machine over TRAMP from local Emacs
 instead resolves `eca` on the remote PATH and runs it directly; local sandbox
 settings are not transferred.
 
-Gondolin requires a guest image matching the host architecture and hardware
-virtualization. On Linux, check for `/dev/kvm`; QEMU software emulation is
+Gondolin prepares an image matching the host architecture and requires
+hardware virtualization. On Linux, check for `/dev/kvm`; QEMU software emulation is
 far too slow for this use. Cloud guests often do not expose virtualization,
 so Bubblewrap is the alternative for those Linux hosts.
 

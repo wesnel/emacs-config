@@ -10,6 +10,7 @@
     then pkgs.eca-gondolin
     else pkgs.eca-bwrap;
   command = ["${sandbox}/bin/eca-sandbox"] ++ cfg.sandbox.args;
+  managedImage = cfg.sandbox.enable && cfg.sandbox.backend == "gondolin" && !(builtins.elem "--image" cfg.sandbox.args);
   commandElisp = "(" + lib.concatMapStringsSep " " builtins.toJSON command + ")";
 in {
   options.home.programs.wgn.emacs.eca = {
@@ -30,7 +31,7 @@ in {
 
       args = lib.mkOption {
         type = lib.types.listOf lib.types.str;
-        default = ["--image" "eca:latest"];
+        default = [];
         description = "Arguments for the sandbox used by every local ECA workspace.";
       };
     };
@@ -41,6 +42,14 @@ in {
       [pkgs.eca]
       ++ lib.optionals cfg.sandbox.enable [sandbox]
       ++ lib.optionals (cfg.sandbox.enable && cfg.sandbox.backend == "gondolin") [pkgs.gondolin];
+
+    home.activation.ecaGondolinImage = lib.mkIf managedImage (
+      lib.hm.dag.entryAfter ["writeBoundary"] ''
+        $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
+          ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg "${config.xdg.cacheHome}/gondolin/eca-images"} \
+          ${sandbox}/bin/eca-gondolin-prepare
+      ''
+    );
 
     home.file.".emacs.d/etc/eca.el".text = ''
       ;;; eca.el --- Machine ECA launch settings -*- lexical-binding: t; -*-
