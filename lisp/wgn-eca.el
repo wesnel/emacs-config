@@ -1,6 +1,6 @@
 ;;; wgn-eca.el --- ECA workspace host selection -*- lexical-binding: t; -*-
 
-(defvar eca-custom-command)
+(defvar eca-custom-command nil)
 (declare-function eca--session-workspace-folders "eca-util" (session))
 
 (defun wgn/eca--call-on-workspace-host (call workspace &rest args)
