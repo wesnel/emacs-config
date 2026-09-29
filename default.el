@@ -1522,14 +1522,24 @@ GUI notification retains its icon and duration."
 
 ;;;; AI pair programming via the Editor Code Assistant.
 ;;
-;; NOTE: The `eca' server is resolved from PATH.  Leaving it there rather
-;;       than in `eca-custom-command' is what keeps `eca-emacs' from
-;;       downloading its own copy on startup.
+;; Home Manager supplies the local sandbox command in etc/eca.el. Remote
+;; workspaces resolve `eca' on their own host, never this machine's wrapper.
 (use-package eca
   :ensure t
 
   :commands
-  (eca))
+  (eca)
+
+  :preface
+  @eca-helper@
+
+  :custom
+  ;; The editor PID is not meaningful inside a sandbox or on a remote host.
+  (eca-send-process-id nil)
+
+  :config
+  (load (expand-file-name "etc/eca.el" user-emacs-directory) t t)
+  (advice-add 'eca-process-start :around #'wgn/eca--start-on-workspace-host))
 
 ;;;; Convenient LLM-based quick lookup of thing at point.
 (use-package gptel-quick

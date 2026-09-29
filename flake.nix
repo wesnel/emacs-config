@@ -44,25 +44,33 @@
           ;
       };
     in {
-      packages = with pkgs; {
-        inherit
-          emacs-config
-          emacs-config-dynamic
-          claude-agent-acp
-          parinfer-rust-emacs
-          wgn-emacs
-          wgn-emacs-pgtk
-          wgn-emacs-nox
-          wgn-emacs-macport
-          wgn-emacs-macport-cross
-          wgn-emacs-unstable
-          wgn-emacs-unstable-nox
-          wgn-emacs-git
-          wgn-emacs-git-nox
-          ;
+      packages = with pkgs;
+        {
+          inherit
+            emacs-config
+            emacs-config-dynamic
+            claude-agent-acp
+            eca
+            eca-guest
+            eca-gondolin
+            gondolin
+            parinfer-rust-emacs
+            wgn-emacs
+            wgn-emacs-pgtk
+            wgn-emacs-nox
+            wgn-emacs-macport
+            wgn-emacs-macport-cross
+            wgn-emacs-unstable
+            wgn-emacs-unstable-nox
+            wgn-emacs-git
+            wgn-emacs-git-nox
+            ;
 
-        default = wgn-emacs;
-      };
+          default = wgn-emacs;
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          inherit (pkgs) eca-bwrap;
+        };
 
       devShells = {
         default = pkgs.mkShell {
@@ -95,6 +103,8 @@
         }: let
           cfg = config.home.programs.wgn.emacs;
         in {
+          imports = [./modules/eca.nix];
+
           options = {
             home.programs.wgn.emacs = {
               enable = lib.mkEnableOption "Enable the Home Manager portion of Wesley's Emacs Configuration";
@@ -103,9 +113,9 @@
                 enable = lib.mkEnableOption "Enable Wesley's Emacs Gnus Configuration with Home Manager";
               };
 
-              # These gate only the bridge that agent-shell talks to. The
-              # agents' own configuration -- skills, MCP servers, settings,
-              # trusted projects -- lives in wesnel/nix-config.
+              # These enable the bridges used by agent-shell. Configure
+              # agent skills, MCP servers, settings and trusted projects
+              # separately.
               copilot = {
                 enable = lib.mkEnableOption "Enable Copilot integration for Emacs";
               };

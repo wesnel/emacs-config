@@ -83,6 +83,7 @@ final: prev: let
     # use-package forms in order to guarantee that packages are loaded
     # in the correct order regardless of location in final file.
     pkgs.replaceVars ../default.el {
+      eca-helper = builtins.readFile ../lisp/wgn-eca.el;
       inherit
         (deps)
         ensure
@@ -728,6 +729,14 @@ final: prev: let
     build-deps-static
     (pkgs: pkgs.emacs30-macport);
 in {
+  # Pin host and guest ECA servers together. Home Manager selects which
+  # sandbox backend to install alongside the Emacs integration.
+  eca = final.callPackage ./eca {};
+  eca-guest = final.callPackage ./eca {target = "guest";};
+  gondolin = final.callPackage ./gondolin {};
+  eca-gondolin = final.callPackage ./eca-gondolin {};
+  eca-bwrap = final.callPackage ./eca-bwrap {};
+
   inherit
     emacs30-macport
     emacs-config

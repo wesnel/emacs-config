@@ -213,3 +213,170 @@ This flake is also compatible with MacOS systems using [nix-darwin](https://gith
     };
 }
 ```
+
+## ECA and sandboxed local workspaces
+
+The ECA client is configured in `default.el`. Home Manager installs the
+pinned ECA server and writes its machine launch settings into
+`~/.emacs.d/etc/eca.el`.
+
+``` nix
+home.programs.wgn.emacs.eca = {
+  enable = true;
+  sandbox = {
+    enable = true;
+    backend = "gondolin";
+    args = [
+      "--image" "eca:latest"
+      "--http-map" "ollama:11434=127.0.0.1:11434"
+      "--http-map" "docs:6280=127.0.0.1:6280"
+      "--env" "OLLAMA_API_URL=http://ollama:11434"
+    ];
+  };
+};
+```
+
+Both backends expose `eca-sandbox`. Gondolin runs a micro-VM and requires
+hardware virtualization. On Linux hosts without it, select `bubblewrap`;
+its filesystem isolation is enforced, but its proxy egress restrictions
+can be bypassed by a process that ignores the proxy.
+
+The default sandbox arguments select `eca:latest`. Gondolin allows no
+outbound hosts by default; Bubblewrap's proxy allows `models.dev` by default.
+Configure service mappings or `--allow-host` entries as needed.
+`args` replaces the entire argument list. `sandbox.enable = false` keeps
+the pinned server on PATH and runs it directly.
+
+Local sessions use the configured command. TRAMP sessions resolve `eca`
+on the workspace's remote host and run it directly there. The launch
+context comes from the session's first workspace, including on restart
+from a chat buffer. The editor PID is omitted because it is not meaningful
+inside a sandbox or on a different host.
+
+For configurations used without Home Manager, set `eca-custom-command`
+in your personal Emacs configuration or `~/.emacs.d/etc/eca.el`. The default
+configuration otherwise finds `eca` on PATH.
+
+### Building the Gondolin image
+
+Build the Gondolin image once per machine from this repository:
+
+``` sh
+nix shell nixpkgs#e2fsprogs --command \
+  gondolin build --config overlays/eca-gondolin/build-config.json \
+    --arch aarch64 --tag eca:latest
+```
+
+Use `--arch x86_64` on x86 hosts. Images live in `~/.cache/gondolin` outside
+Nix. The `gondolin` CLI is installed when that sandbox backend is enabled.
+`e2fsprogs` supplies `mke2fs`, which the image builder needs. The build config
+includes `gcompat` so the glibc-linked ECA binary can run on Alpine's musl.
+
+Configure model services, provider settings and agents separately from
+Emacs launch settings. The sandbox selects shared skills using
+`~/.config/eca/sandbox-skills.json`.
+
+### Network policy and request logging
+
+Gondolin defaults to denying outbound hosts. Add repeatable `--allow-host`
+arguments to allow particular hosts. Nothing is implicitly allowed, including
+`models.dev`; ECA can start without fetching its model catalogue.
+
+For a hosted model, `--observe` allows outbound hosts while keeping HTTP/TLS
+traffic passing through the inspecting proxy. It overrides the allowlist.
+`--deny-host PATTERN` can still exclude hosts: `*.example.com` matches both
+that domain and its subdomains, `*` matches everything, and other patterns
+match an exact hostname. These two flags are supported by Gondolin only.
+
+``` nix
+home.programs.wgn.emacs.eca.sandbox = {
+  enable = true;
+  backend = "gondolin";
+  args = [
+    "--image" "eca:latest"
+    "--observe"
+    "--log" "/Users/wgn/.cache/eca-network.jsonl"
+    "--deny-host" "*.example.com"
+  ];
+};
+```
+
+Use an absolute host path for `--log` and create its parent directory first.
+Both backends append JSONL request/response metadata (time, method, URL and
+response status). TLS termination makes HTTPS URLs visible to the proxy;
+the log does not include request or response bodies. A refused request is
+recorded without a matching response. Logging is best effort: a failed write
+does not stop the session.
+
+Without `--log`, Gondolin's `--observe` permits traffic without recording it,
+and prints that fact at startup. `--observe` changes the network policy;
+filesystem isolation remains in effect. Keep the `--http-map` and `--env`
+arguments from the local-model example if those services are also needed,
+because `args` replaces the entire list.
+
+### Hosted provider authentication
+
+Gondolin's guest cannot complete `/login`, which opens a browser and waits
+on a loopback port. Authenticate using ECA on the host, then add
+`--share-login` to the sandbox arguments to copy provider tokens into the
+guest's state directory. Combine this with an appropriate allowlist or
+`--observe` to reach the provider.
+
+Tokens are stored with chat history in `db.transit.json`. The wrapper copies
+this file only when the guest has no copy; it preserves an existing file
+because the guest may have refreshed its tokens. To import a fresh host
+login, remove the guest's copy from the sandbox state directory first.
+`--share-login` is a Gondolin option and also transfers the stored history.
+
+### Reaching local services
+
+Gondolin's `--http-map GUEST_HOST[:PORT]=UPSTREAM_HOST:PORT` reaches a host
+service from inside the guest. `--env KEY=VALUE` sets the guest environment.
+The example above maps Ollama and the docs server and sets `OLLAMA_API_URL`
+to the guest-side Ollama address. Use a synthetic guest hostname:
+`localhost` resolves inside the VM and cannot identify the host service.
+
+A mapping grants access only to the named upstream port. HTTP mappings pass
+through the inspecting proxy, appear in `--log`, and rewrite the `Host`
+header for the upstream. That rewrite also allows loopback services which
+reject an unexpected host header as DNS rebinding.
+
+`--tcp-map` takes the same mapping syntax but forwards raw TCP below the
+proxy. Its traffic is not logged or checked by the HTTP allowlist, and no
+headers are rewritten. Use it for services which do not speak HTTP.
+
+The workspace is mounted at the same path inside the guest, so no
+`eca-local-to-remote-prefix-map` is needed.
+
+### Remote hosts and backend differences
+
+Emacs running on another machine uses that machine's configured sandbox
+for its local workspaces. Opening that machine over TRAMP from local Emacs
+instead resolves `eca` on the remote PATH and runs it directly; local sandbox
+settings are not transferred.
+
+Gondolin requires a guest image matching the host architecture and hardware
+virtualization. On Linux, check for `/dev/kvm`; QEMU software emulation is
+far too slow for this use. Cloud guests often do not expose virtualization,
+so Bubblewrap is the alternative for those Linux hosts.
+
+Bubblewrap makes `/` read-only and leaves the workspace and sandbox state
+writable. A local `mitmdump` proxy applies its allowlist and records the same
+JSONL shape as Gondolin. The proxy allows `models.dev` by default, and
+`--allow-host` adds a domain and its subdomains. A process which ignores the
+proxy environment can bypass the egress restrictions; the wrapper reports
+that limitation on every start. Gondolin enforces the network boundary
+outside the guest process.
+
+The wrappers share a command name, but their flags are not interchangeable:
+
+| Option | Gondolin | Bubblewrap |
+| --- | --- | --- |
+| `--allow-host`, `--log` | Supported | Supported |
+| `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
+| `--observe`, `--deny-host` | Supported | Unsupported |
+| `--share-login` | Supported | Unsupported |
+| `--http-map`, `--tcp-map`, `--env` | Supported | Unsupported |
+
+An unsupported option causes Bubblewrap to exit at startup. Choose arguments
+for the selected backend rather than copying the Gondolin examples wholesale.
