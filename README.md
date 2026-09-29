@@ -388,3 +388,25 @@ The wrappers share a command name, but their flags are not interchangeable:
 
 An unsupported option causes Bubblewrap to exit at startup. Choose arguments
 for the selected backend rather than copying the Gondolin examples wholesale.
+
+## Tests
+
+The ECA host-routing tests use ERT and require only Emacs. Run them from
+an Emacs server, using the absolute path to your checkout:
+
+``` sh
+emacsclient --eval '
+(progn
+  (load "/absolute/path/to/emacs-config/tests/run-eca.el" nil t)
+  (wgn-eca-run-tests))
+'
+```
+
+The runner returns the test report and signals an error on failure.
+GitHub Actions runs the same suite on pushes and pull requests.
+
+The guest image provisioning tests use Node's built-in test runner:
+
+``` sh
+node --test tests/image.test.mjs
+```

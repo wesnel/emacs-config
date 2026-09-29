@@ -1,0 +1,49 @@
+name: ECA tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ert:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Install Emacs
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y emacs-nox
+      - name: Run ECA tests
+        run: |
+          emacsclient --alternate-editor="" --socket-name=eca-tests --eval '
+          (progn
+            (load (expand-file-name "tests/run-eca.el" (getenv "GITHUB_WORKSPACE")) nil t)
+            (wgn-eca-run-tests))
+          '
+      - name: Stop test server
+        if: always()
+        run: |
+          emacsclient --socket-name=eca-tests --eval '
+          (kill-emacs)
+          '
+
+  image:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          package-manager-cache: false
+      - name: Test image provisioning
+        run: node --test tests/image.test.mjs
