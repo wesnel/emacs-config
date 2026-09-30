@@ -65,6 +65,35 @@ test("missing assets trigger a rebuild", async (t) => {
   assert.equal(builds(), 2);
 });
 
+test("publishing an image removes superseded images and stale leftovers", async (t) => {
+  const {options} = fixture(t);
+  const old = await ensureImage({...options, builderId: "gondolin-v0"});
+  const cache = options.cacheDirectory;
+  const incomplete = `${old}.incomplete-1234`;
+  const staleBuild = path.join(cache, ".building-stale");
+  const liveBuild = path.join(cache, ".building-live");
+  const unrelated = path.join(cache, "notes.txt");
+  for (const directory of [incomplete, staleBuild, liveBuild]) fs.mkdirSync(directory);
+  fs.writeFileSync(unrelated, "");
+  const dayAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
+  fs.utimesSync(staleBuild, dayAgo, dayAgo);
+
+  const image = await ensureImage(options);
+  assert.deepEqual(
+    fs.readdirSync(cache).sort(),
+    [".building-live", path.basename(image), "notes.txt"].sort(),
+  );
+});
+
+test("reusing a cached image removes nothing", async (t) => {
+  const {options} = fixture(t);
+  const old = await ensureImage({...options, builderId: "gondolin-v0"});
+  const image = await ensureImage(options);
+  fs.mkdirSync(old);
+  assert.equal(await ensureImage(options), image);
+  assert.ok(fs.existsSync(old));
+});
+
 test("concurrent builds publish a complete image at the same path", async (t) => {
   const {options} = fixture(t);
   const [a, b] = await Promise.all([ensureImage(options), ensureImage(options)]);

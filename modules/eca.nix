@@ -55,11 +55,14 @@ in {
       ++ lib.optionals cfg.sandbox.enable [backend launcher]
       ++ lib.optionals (cfg.sandbox.enable && gondolin) [pkgs.gondolin];
 
+    # A failure must not abort the switch: the build needs the network, and
+    # the wrapper builds a missing image itself on first start.
     home.activation.ecaGondolinImage = lib.mkIf managedImage (
       lib.hm.dag.entryAfter ["writeBoundary"] ''
-        $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
+        run ${pkgs.coreutils}/bin/env \
           ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg imageCache} \
-          ${backend}/bin/eca-gondolin-prepare
+          ${backend}/bin/eca-gondolin-prepare \
+          || warnEcho "The ECA guest image was not prepared; the first sandboxed session will build it."
       ''
     );
 

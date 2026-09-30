@@ -265,8 +265,10 @@ several minutes.
 
 Images are cached under `$XDG_CACHE_HOME/gondolin/eca-images` (by default
 `~/.cache/gondolin/eca-images`). The cache key includes the image configuration,
-architecture and Gondolin package. Activations reuse a complete cached image;
-changing those inputs or removing the cached image causes another build.
+architecture and Gondolin version. Activations reuse a complete cached image;
+changing those inputs or removing the cached image causes another build, and
+publishing a new image removes the superseded ones. A failed build during
+activation prints a warning and does not stop the switch.
 Updating the ECA server alone does not rebuild the image: its Linux executable
 is mounted into the guest at startup.
 

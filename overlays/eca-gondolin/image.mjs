@@ -44,9 +44,38 @@ export async function ensureImage({configPath, builderId, cacheDirectory, buildA
     } catch (error) {
       if (!ready(image)) throw error;
     }
+    prune(cacheDirectory, path.basename(image));
     return image;
   } finally {
     fs.rmSync(staging, {recursive: true, force: true});
+  }
+}
+
+// A build younger than this may belong to a concurrent activation.
+const STALE_BUILD_MS = 24 * 60 * 60 * 1000;
+
+// Runs only after a new image is published, which is when the previous one
+// is superseded. A session still running on a removed image keeps its open
+// files, so it is not disturbed.
+function prune(cacheDirectory, keep, now = Date.now()) {
+  for (const name of fs.readdirSync(cacheDirectory)) {
+    if (name === keep) continue;
+
+    const entry = path.join(cacheDirectory, name);
+    const image = /^[a-z0-9_]+-[0-9a-f]{64}(\.incomplete-.+)?$/.test(name);
+    let stale = false;
+
+    if (name.startsWith(".building-")) {
+      try {
+        stale = now - fs.statSync(entry).mtimeMs > STALE_BUILD_MS;
+      } catch {
+        continue;
+      }
+    }
+
+    if (image || stale) {
+      fs.rmSync(entry, {recursive: true, force: true});
+    }
   }
 }
 

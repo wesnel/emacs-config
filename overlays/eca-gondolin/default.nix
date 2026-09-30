@@ -43,6 +43,11 @@ in
       install -Dm644 ${./prepare-image.mjs} $out/libexec/prepare-image.mjs
 
       # Keep images outside the writable ECA state mounted into the guest.
+      #
+      # The builder ID is the version rather than the store path: the image
+      # is Gondolin's guest plus downloaded packages, and a rebuild of the
+      # same release against a newer Node or QEMU would produce the same
+      # image after minutes of downloading.
       for entry in "eca-gondolin:eca-gondolin.mjs" "eca-gondolin-prepare:prepare-image.mjs"; do
         name="''${entry%%:*}"
         script="''${entry#*:}"
@@ -50,7 +55,7 @@ in
           --add-flags $out/libexec/$script \
           --set ECA_GONDOLIN_LIB ${gondolin}/lib/node_modules/@earendil-works/gondolin/dist/src/index.js \
           --set ECA_GONDOLIN_BUILD_CONFIG ${imageConfig} \
-          --set ECA_GONDOLIN_BUILDER_ID ${gondolin} \
+          --set ECA_GONDOLIN_BUILDER_ID gondolin-${gondolin.version} \
           --set-default ECA_SANDBOX_ECA ${eca-guest}/bin/eca \
           --run 'export ECA_GONDOLIN_IMAGE_CACHE="''${ECA_GONDOLIN_IMAGE_CACHE:-''${XDG_CACHE_HOME:-$HOME/.cache}/gondolin/eca-images}"' \
           --prefix PATH : ${lib.makeBinPath [bash coreutils cpio e2fsprogs findutils gondolin lz4 qemu which]}
