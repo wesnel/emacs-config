@@ -1,10 +1,19 @@
 {
+  bash,
+  coreutils,
+  cpio,
   eca-guest,
   e2fsprogs,
+  findutils,
   gondolin,
+  lib,
+  lz4,
   makeWrapper,
   nodejs_24,
+  qemu,
+  runCommand,
   stdenvNoCC,
+  which,
   writeText,
 }: let
   imageConfig = writeText "eca-gondolin-image.json" (builtins.toJSON (
@@ -12,7 +21,7 @@
     // {arch = stdenvNoCC.hostPlatform.parsed.cpu.name;}
   ));
 in
-  stdenvNoCC.mkDerivation {
+  stdenvNoCC.mkDerivation (finalAttrs: {
     pname = "eca-gondolin";
 
     inherit (gondolin) version;
@@ -46,8 +55,7 @@ in
           --run 'export ECA_GONDOLIN_CONFIG="''${ECA_GONDOLIN_CONFIG:-''${XDG_CONFIG_HOME:-$HOME/.config}/eca}"' \
           --run 'export ECA_GONDOLIN_STATE="''${ECA_GONDOLIN_STATE:-''${XDG_CACHE_HOME:-$HOME/.cache}/eca-gondolin}"' \
           --run 'export ECA_GONDOLIN_IMAGE_CACHE="''${ECA_GONDOLIN_IMAGE_CACHE:-''${XDG_CACHE_HOME:-$HOME/.cache}/gondolin/eca-images}"' \
-          --prefix PATH : ${e2fsprogs}/bin \
-          --prefix PATH : ${gondolin}/bin
+          --prefix PATH : ${lib.makeBinPath [bash coreutils cpio e2fsprogs findutils gondolin lz4 qemu which]}
       done
 
       # Both backends expose the same command for the Emacs launch settings.
@@ -57,9 +65,16 @@ in
       runHook postInstall
     '';
 
+    passthru.tests.image-tools = runCommand "eca-gondolin-image-tools" {} ''
+      env -i HOME="$TMPDIR" TMPDIR="$TMPDIR" PATH=/nonexistent \
+        NODE_OPTIONS="--import ${../../tests/gondolin-image-tools.mjs}" \
+        ${finalAttrs.finalPackage}/bin/eca-gondolin-prepare
+      touch $out
+    '';
+
     meta = {
       description = "Runs the ECA server inside a Gondolin micro-VM over raw stdio";
       mainProgram = "eca-gondolin";
       inherit (gondolin.meta) platforms;
     };
-  }
+  })

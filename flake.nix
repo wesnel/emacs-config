@@ -72,6 +72,8 @@
           inherit (pkgs) eca-bwrap;
         };
 
+      checks.eca-gondolin-image-tools = pkgs.eca-gondolin.tests.image-tools;
+
       devShells = {
         default = pkgs.mkShell {
           buildInputs = with pkgs; [

@@ -410,3 +410,14 @@ The guest image provisioning tests use Node's built-in test runner:
 ``` sh
 node --test tests/image.test.mjs
 ```
+
+The packaged image tools are tested in a Nix derivation with an empty inherited
+PATH. This test creates an ext4 filesystem and a compressed initramfs without
+network access:
+
+``` sh
+nix build .#checks.aarch64-darwin.eca-gondolin-image-tools
+```
+
+Use `x86_64-linux` or `aarch64-linux` for those hosts. GitHub Actions runs the
+Linux check alongside the ERT and image-cache tests.
