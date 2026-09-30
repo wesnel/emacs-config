@@ -51,9 +51,7 @@ in
           --set ECA_GONDOLIN_LIB ${gondolin}/lib/node_modules/@earendil-works/gondolin/dist/src/index.js \
           --set ECA_GONDOLIN_BUILD_CONFIG ${imageConfig} \
           --set ECA_GONDOLIN_BUILDER_ID ${gondolin} \
-          --set-default ECA_GONDOLIN_ECA ${eca-guest}/bin/eca \
-          --run 'export ECA_GONDOLIN_CONFIG="''${ECA_GONDOLIN_CONFIG:-''${XDG_CONFIG_HOME:-$HOME/.config}/eca}"' \
-          --run 'export ECA_GONDOLIN_STATE="''${ECA_GONDOLIN_STATE:-''${XDG_CACHE_HOME:-$HOME/.cache}/eca-gondolin}"' \
+          --set-default ECA_SANDBOX_ECA ${eca-guest}/bin/eca \
           --run 'export ECA_GONDOLIN_IMAGE_CACHE="''${ECA_GONDOLIN_IMAGE_CACHE:-''${XDG_CACHE_HOME:-$HOME/.cache}/gondolin/eca-images}"' \
           --prefix PATH : ${lib.makeBinPath [bash coreutils cpio e2fsprogs findutils gondolin lz4 qemu which]}
       done

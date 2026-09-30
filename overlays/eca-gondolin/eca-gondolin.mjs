@@ -18,27 +18,44 @@ if (!lib) {
 
 const {VM, createHttpHooks, RealFSProvider, ReadonlyProvider, buildAssets, verifyAssets} = await import(lib);
 
+const path = await import("node:path");
+const fs = await import("node:fs");
+const os = await import("node:os");
+
+// Resolved the way ECA resolves them: the XDG variable when it is absolute,
+// and the conventional directory under HOME otherwise.
+const xdgDir = (name, fallback) => {
+  const value = process.env[name];
+
+  return value && path.isAbsolute(value) ? value : path.join(os.homedir(), fallback);
+};
+
+const hostConfig = xdgDir("XDG_CONFIG_HOME", ".config");
+const hostCache = xdgDir("XDG_CACHE_HOME", ".cache");
+
+// The ECA_SANDBOX_* variables are shared with the bubblewrap backend.
 const parseArgs = (argv) => {
+  const env = process.env;
   const opts = {
-    workspace: process.env.ECA_GONDOLIN_WORKSPACE || process.cwd(),
-    guestPath: process.env.ECA_GONDOLIN_GUEST_PATH || null,
-    eca: process.env.ECA_GONDOLIN_ECA || null,
-    image: process.env.ECA_GONDOLIN_IMAGE || null,
-    log: process.env.ECA_GONDOLIN_LOG || null,
-    config: process.env.ECA_GONDOLIN_CONFIG || null,
-    state: process.env.ECA_GONDOLIN_STATE || null,
+    workspace: env.ECA_SANDBOX_WORKSPACE || process.cwd(),
+    guestPath: env.ECA_SANDBOX_GUEST_PATH || null,
+    eca: env.ECA_SANDBOX_ECA || null,
+    image: env.ECA_SANDBOX_IMAGE || null,
+    log: env.ECA_SANDBOX_LOG || null,
+    config: env.ECA_SANDBOX_CONFIG || path.join(hostConfig, "eca"),
+    state: env.ECA_SANDBOX_STATE || path.join(hostCache, "eca-gondolin"),
     // No default: the allowlist has to be able to express "nothing", which it
     // cannot if some host is always in it. ECA starts without reaching the
     // model catalogue, so there is nothing that must be reachable.
-    allowedHosts: (process.env.ECA_GONDOLIN_ALLOW_HOSTS || "")
+    allowedHosts: (env.ECA_SANDBOX_ALLOW_HOSTS || "")
       .split(",")
       .map((h) => h.trim())
       .filter(Boolean),
     // Everything is reachable and everything is recorded. The proxy still
     // terminates TLS, so `--log' sees each request either way: the choice is
     // whether the boundary refuses traffic or only watches it.
-    observe: process.env.ECA_GONDOLIN_OBSERVE === "1",
-    shareLogin: process.env.ECA_GONDOLIN_SHARE_LOGIN === "1",
+    observe: env.ECA_SANDBOX_OBSERVE === "1",
+    shareLogin: env.ECA_SANDBOX_SHARE_LOGIN === "1",
     // Refused whichever mode is in force, so a host can be shut out of an
     // otherwise open session without naming every host that stays open.
     deniedHosts: [],
@@ -50,39 +67,54 @@ const parseArgs = (argv) => {
 
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    const value = () => {
+      if (i + 1 >= argv.length) {
+        process.stderr.write(`eca-gondolin: ${arg} needs a value\n`);
+        process.exit(2);
+      }
+
+      return argv[++i];
+    };
 
     if (arg === "--") {
       opts.command = argv.slice(i + 1);
       break;
     } else if (arg === "--workspace") {
-      opts.workspace = argv[++i];
+      opts.workspace = value();
     } else if (arg === "--guest-path") {
-      opts.guestPath = argv[++i];
+      opts.guestPath = value();
     } else if (arg === "--eca") {
-      opts.eca = argv[++i];
+      opts.eca = value();
     } else if (arg === "--image") {
-      opts.image = argv[++i];
+      opts.image = value();
     } else if (arg === "--config") {
-      opts.config = argv[++i];
+      opts.config = value();
     } else if (arg === "--state") {
-      opts.state = argv[++i];
+      opts.state = value();
     } else if (arg === "--log") {
-      opts.log = argv[++i];
+      opts.log = value();
     } else if (arg === "--allow-host") {
-      opts.allowedHosts.push(argv[++i]);
+      opts.allowedHosts.push(value());
     } else if (arg === "--observe") {
       opts.observe = true;
     } else if (arg === "--share-login") {
       opts.shareLogin = true;
     } else if (arg === "--deny-host") {
-      opts.deniedHosts.push(argv[++i]);
+      opts.deniedHosts.push(value());
     } else if (arg === "--tcp-map") {
-      opts.tcpMaps.push(argv[++i]);
+      opts.tcpMaps.push(value());
     } else if (arg === "--http-map") {
-      opts.httpMaps.push(argv[++i]);
+      opts.httpMaps.push(value());
     } else if (arg === "--env") {
-      const [key, ...rest] = argv[++i].split("=");
-      opts.env[key] = rest.join("=");
+      const spec = value();
+      const eq = spec.indexOf("=");
+
+      if (eq <= 0) {
+        process.stderr.write(`eca-gondolin: --env expects KEY=VALUE, got ${spec}\n`);
+        process.exit(2);
+      }
+
+      opts.env[spec.slice(0, eq)] = spec.slice(eq + 1);
     } else {
       process.stderr.write(`eca-gondolin: unknown option ${arg}\n`);
       process.exit(2);
@@ -98,10 +130,6 @@ if (!opts.image) {
   const {ensureImage, managedImageOptions} = await import("./image.mjs");
   opts.image = await ensureImage({...managedImageOptions(), buildAssets, verifyAssets});
 }
-
-const path = await import("node:path");
-const fs = await import("node:fs");
-const os = await import("node:os");
 
 // Every tool the agent runs is a child of the server process, so the VM
 // boundary covers the whole tool surface rather than just shell commands.
@@ -132,14 +160,6 @@ if (opts.eca) {
 // nothing every session: no skills, and a login that has to be redone.
 const GUEST_HOME = "/root";
 
-// Where the server keeps its own state on this machine, resolved the way it
-// resolves it: XDG_CACHE_HOME when that is absolute, and ~/.cache otherwise.
-const hostCache = () => {
-  const xdg = process.env.XDG_CACHE_HOME;
-
-  return xdg && path.isAbsolute(xdg) ? xdg : path.join(os.homedir(), ".cache");
-};
-
 // Home-manager writes this tree as symlinks into the Nix store, which the
 // guest has no copy of. Mounted as it stands, every leaf dangles there: the
 // skill and agent directories list normally and not one of their files can be
@@ -149,11 +169,12 @@ const hostCache = () => {
 // finds below that, so the copy has to walk the tree itself: `stat' follows a
 // link and `copyFile' reads through one, which together turn each entry into
 // a file the guest can open.
-const copyResolved = (from, to, keep = null) => {
+// `include' filters only the entries directly under `from'.
+const copyResolved = (from, to, include = () => true) => {
   fs.mkdirSync(to, {recursive: true});
 
   for (const entry of fs.readdirSync(from, {withFileTypes: true})) {
-    if (keep && !keep.has(entry.name)) continue;
+    if (!include(entry.name)) continue;
 
     const source = path.join(from, entry.name);
     const target = path.join(to, entry.name);
@@ -203,18 +224,17 @@ if (opts.config) {
   if (fs.existsSync(config)) {
     staged = fs.mkdtempSync(path.join(os.tmpdir(), "eca-gondolin-config-"));
 
-    copyResolved(config, staged);
+    // Covers a failed start and every later exit short of SIGKILL.
+    process.on("exit", () => fs.rmSync(staged, {recursive: true, force: true}));
 
     const keep = sandboxSkills(config);
 
-    if (keep) {
-      fs.rmSync(path.join(staged, "skills"), {recursive: true, force: true});
+    copyResolved(config, staged, (name) => !keep || name !== "skills");
 
-      const skills = path.join(config, "skills");
+    const skills = path.join(config, "skills");
 
-      if (fs.existsSync(skills)) {
-        copyResolved(skills, path.join(staged, "skills"), keep);
-      }
+    if (keep && fs.existsSync(skills)) {
+      copyResolved(skills, path.join(staged, "skills"), (name) => keep.has(name));
     }
 
     mounts[`${GUEST_HOME}/.config/eca`] = new ReadonlyProvider(
@@ -234,7 +254,7 @@ if (opts.state) {
   // guest keeps its own state directory, so they do not arrive on their own.
   if (opts.shareLogin) {
     const file = "db.transit.json";
-    const from = path.join(hostCache(), "eca", file);
+    const from = path.join(hostCache, "eca", file);
     const to = path.join(state, file);
 
     if (!fs.existsSync(from)) {
@@ -501,10 +521,6 @@ const shutdown = async (code) => {
     await vm.close();
   } catch {
     // Already gone.
-  }
-
-  if (staged) {
-    fs.rmSync(staged, {recursive: true, force: true});
   }
 
   process.exit(code);

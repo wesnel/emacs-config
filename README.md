@@ -407,10 +407,12 @@ emacsclient --eval '
 The runner returns the test report and signals an error on failure.
 GitHub Actions runs the same suite on pushes and pull requests.
 
-The guest image provisioning tests use Node's built-in test runner:
+The guest image provisioning tests and the Gondolin wrapper tests use
+Node's built-in test runner. The wrapper tests replace the Gondolin SDK
+with a stub, so they need no VM:
 
 ``` sh
-node --test tests/image.test.mjs
+node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs
 ```
 
 The packaged image tools are tested in a Nix derivation with an empty inherited

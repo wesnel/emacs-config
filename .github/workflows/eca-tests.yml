@@ -45,8 +45,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Test image provisioning
-        run: node --test tests/image.test.mjs
+      - name: Test image provisioning and the Gondolin wrapper
+        run: node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs
 
   image-tools:
     runs-on: ubuntu-24.04
