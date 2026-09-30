@@ -29,10 +29,6 @@ stdenvNoCC.mkDerivation {
       --replace-fail '@mitmdump@' '${mitmproxy}/bin/mitmdump' \
       --replace-fail '@python@' '${lib.getExe python3}'
 
-    # Both backends expose the same command for the Emacs launch settings.
-    # Home Manager installs only the selected backend.
-    ln -s eca-bwrap $out/bin/eca-sandbox
-
     runHook postInstall
   '';
 

@@ -7,9 +7,7 @@
 // this deliberately does not use the `gondolin bash` CLI, which attaches a
 // PTY.
 //
-// Home Manager configures this as the local Emacs ECA command. The Emacs
-// integration clears that command for TRAMP sessions so they resolve `eca'
-// on their own host.
+// Home Manager wraps this, with the configured arguments, as `eca-sandbox'.
 
 const lib = process.env.ECA_GONDOLIN_LIB;
 

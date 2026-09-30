@@ -58,10 +58,6 @@ in
           --prefix PATH : ${lib.makeBinPath [bash coreutils cpio e2fsprogs findutils gondolin lz4 qemu which]}
       done
 
-      # Both backends expose the same command for the Emacs launch settings.
-      # Home Manager installs only the selected backend.
-      ln -s eca-gondolin $out/bin/eca-sandbox
-
       runHook postInstall
     '';
 

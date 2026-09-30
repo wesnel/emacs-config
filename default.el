@@ -1523,7 +1523,8 @@ GUI notification retains its icon and duration."
 ;;;; AI pair programming via the Editor Code Assistant.
 ;;
 ;; Home Manager supplies the local sandbox command in etc/eca.el. Remote
-;; workspaces resolve `eca' on their own host, never this machine's wrapper.
+;; workspaces run their own host's `eca-sandbox' or `eca', never this
+;; machine's wrapper.
 (use-package eca
   :ensure t
 

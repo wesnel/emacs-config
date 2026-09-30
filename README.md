@@ -235,8 +235,9 @@ home.programs.wgn.emacs.eca = {
 };
 ```
 
-Both backends expose `eca-sandbox`. Gondolin runs a micro-VM and requires
-hardware virtualization. On Linux hosts without it, select `bubblewrap`;
+Home Manager installs an `eca-sandbox` command that runs the selected
+backend with `args`. Gondolin runs a micro-VM and requires hardware
+virtualization. On Linux hosts without it, select `bubblewrap`;
 its filesystem isolation is enforced, but its proxy egress restrictions
 can be bypassed by a process that ignores the proxy.
 
@@ -246,11 +247,12 @@ Configure service mappings or `--allow-host` entries as needed.
 `args` replaces the entire argument list. `sandbox.enable = false` keeps
 the pinned server on PATH and runs it directly.
 
-Local sessions use the configured command. TRAMP sessions resolve `eca`
-on the workspace's remote host and run it directly there. The launch
-context comes from the session's first workspace, including on restart
-from a chat buffer. The editor PID is omitted because it is not meaningful
-inside a sandbox or on a different host.
+Local sessions use the configured command. TRAMP sessions run
+`eca-sandbox` on the workspace's remote host when it is on the remote
+PATH, and otherwise `eca`. The launch context comes from the session's
+first workspace, including on restart from a chat buffer. The editor PID
+is omitted because it is not meaningful inside a sandbox or on a
+different host.
 
 For configurations used without Home Manager, set `eca-custom-command`
 in your personal Emacs configuration or `~/.emacs.d/etc/eca.el`. The default
@@ -360,8 +362,8 @@ The workspace is mounted at the same path inside the guest, so no
 
 Emacs running on another machine uses that machine's configured sandbox
 for its local workspaces. Opening that machine over TRAMP from local Emacs
-instead resolves `eca` on the remote PATH and runs it directly; local sandbox
-settings are not transferred.
+runs that machine's `eca-sandbox`, with the arguments configured there;
+local sandbox settings are not transferred.
 
 Gondolin prepares an image matching the host architecture and requires
 hardware virtualization. On Linux, check for `/dev/kvm`; QEMU software emulation is

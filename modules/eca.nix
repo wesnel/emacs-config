@@ -5,13 +5,23 @@
   ...
 }: let
   cfg = config.home.programs.wgn.emacs.eca;
-  sandbox =
-    if cfg.sandbox.backend == "gondolin"
+  gondolin = cfg.sandbox.backend == "gondolin";
+  backend =
+    if gondolin
     then pkgs.eca-gondolin
     else pkgs.eca-bwrap;
-  command = ["${sandbox}/bin/eca-sandbox"] ++ cfg.sandbox.args;
-  managedImage = cfg.sandbox.enable && cfg.sandbox.backend == "gondolin" && !(builtins.elem "--image" cfg.sandbox.args);
-  commandElisp = "(" + lib.concatMapStringsSep " " builtins.toJSON command + ")";
+
+  # Shared by activation and sessions, which must agree on it.
+  imageCache = "${config.xdg.cacheHome}/gondolin/eca-images";
+
+  # Carries the configured arguments, so that a TRAMP session from another
+  # machine, which finds this on PATH, runs with them as well.
+  launcher = pkgs.writeShellScriptBin "eca-sandbox" ''
+    ${lib.optionalString gondolin "export ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg imageCache}"}
+    exec ${lib.getExe backend} ${lib.escapeShellArgs cfg.sandbox.args} "$@"
+  '';
+
+  managedImage = cfg.sandbox.enable && gondolin && !(builtins.elem "--image" cfg.sandbox.args);
 in {
   options.home.programs.wgn.emacs.eca = {
     enable = lib.mkEnableOption "Install the pinned ECA server for Emacs";
@@ -32,7 +42,10 @@ in {
       args = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [];
-        description = "Arguments for the sandbox used by every local ECA workspace.";
+        description = ''
+          Arguments for the sandbox, baked into the `eca-sandbox` command
+          that local sessions and TRAMP sessions from other machines run.
+        '';
       };
     };
   };
@@ -40,25 +53,26 @@ in {
   config = lib.mkIf (config.home.programs.wgn.emacs.enable && cfg.enable) {
     home.packages =
       [pkgs.eca]
-      ++ lib.optionals cfg.sandbox.enable [sandbox]
-      ++ lib.optionals (cfg.sandbox.enable && cfg.sandbox.backend == "gondolin") [pkgs.gondolin];
+      ++ lib.optionals cfg.sandbox.enable [backend launcher]
+      ++ lib.optionals (cfg.sandbox.enable && gondolin) [pkgs.gondolin];
 
     home.activation.ecaGondolinImage = lib.mkIf managedImage (
       lib.hm.dag.entryAfter ["writeBoundary"] ''
         $DRY_RUN_CMD ${pkgs.coreutils}/bin/env \
-          ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg "${config.xdg.cacheHome}/gondolin/eca-images"} \
-          ${sandbox}/bin/eca-gondolin-prepare
+          ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg imageCache} \
+          ${backend}/bin/eca-gondolin-prepare
       ''
     );
 
+    # The profile path rather than the store path, so that a running Emacs
+    # picks up a new generation's launcher without reloading this file.
     home.file.".emacs.d/etc/eca.el".text = ''
       ;;; eca.el --- Machine ECA launch settings -*- lexical-binding: t; -*-
       (setq eca-custom-command ${
         if cfg.sandbox.enable
-        then "'" + commandElisp
+        then "'(${builtins.toJSON "${config.home.profileDirectory}/bin/eca-sandbox"})"
         else "nil"
-      }
-            eca-send-process-id nil)
+      })
     '';
   };
 }

@@ -5,10 +5,13 @@
 
 (defun wgn/eca--call-on-workspace-host (call workspace &rest args)
   "Call CALL with ARGS on the host of WORKSPACE.
-Use the configured command locally and resolve `eca' over TRAMP."
+Use the configured command locally. Over TRAMP, use the remote host's
+`eca-sandbox' when it has one, and otherwise let ECA resolve `eca'."
   (let* ((default-directory (or workspace default-directory))
          (eca-custom-command
-          (unless (file-remote-p default-directory)
+          (if (file-remote-p default-directory)
+              (when-let* ((sandbox (executable-find "eca-sandbox" t)))
+                (list sandbox))
             eca-custom-command)))
     (apply call args)))
 
