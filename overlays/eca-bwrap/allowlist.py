@@ -11,6 +11,7 @@ import time
 
 from mitmproxy import http
 
+# Empty means nothing is reachable, matching Gondolin.
 ALLOWED = [h for h in os.environ.get("ECA_SANDBOX_ALLOW_HOSTS", "").split(",") if h]
 LOG = os.environ.get("ECA_SANDBOX_LOG") or None
 
@@ -34,9 +35,26 @@ def _allowed(host):
     return any(host == entry or host.endswith("." + entry) for entry in ALLOWED)
 
 
-def request(flow: http.HTTPFlow) -> None:
-    host = flow.request.pretty_host
+def _refuse(flow):
+    flow.metadata["eca_blocked"] = True
+    flow.response = http.Response.make(403, b"blocked by eca-sandbox allowlist\n")
 
+
+def http_connect(flow: http.HTTPFlow) -> None:
+    # Refused before the tunnel opens, so a blocked HTTPS host is never
+    # contacted. An allowed tunnel is logged per request inside it instead.
+    if not _allowed(flow.request.pretty_host):
+        _record(
+            {
+                "dir": "request",
+                "method": "CONNECT",
+                "url": f"{flow.request.pretty_host}:{flow.request.port}",
+            }
+        )
+        _refuse(flow)
+
+
+def request(flow: http.HTTPFlow) -> None:
     _record(
         {
             "dir": "request",
@@ -45,11 +63,8 @@ def request(flow: http.HTTPFlow) -> None:
         }
     )
 
-    if ALLOWED and not _allowed(host):
-        flow.metadata["eca_blocked"] = True
-        flow.response = http.Response.make(
-            403, b"blocked by eca-sandbox allowlist\n"
-        )
+    if not _allowed(flow.request.pretty_host):
+        _refuse(flow)
 
 
 def response(flow: http.HTTPFlow) -> None:

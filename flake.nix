@@ -72,7 +72,13 @@
           inherit (pkgs) eca-bwrap;
         };
 
-      checks.eca-gondolin-image-tools = pkgs.eca-gondolin.tests.image-tools;
+      checks =
+        {
+          eca-gondolin-image-tools = pkgs.eca-gondolin.tests.image-tools;
+        }
+        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
+          eca-bwrap-sandbox = pkgs.eca-bwrap.tests.sandbox;
+        };
 
       devShells = {
         default = pkgs.mkShell {

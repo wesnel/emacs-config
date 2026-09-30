@@ -33,9 +33,8 @@ in {
         type = lib.types.enum ["gondolin" "bubblewrap"];
         default = "gondolin";
         description = ''
-          Gondolin uses a micro-VM and enforces egress at the network layer.
-          Bubblewrap works without hardware virtualization, but its proxy
-          egress restrictions can be bypassed by the guest process.
+          Gondolin uses a micro-VM and requires hardware virtualization.
+          Bubblewrap uses Linux namespaces and works without it.
         '';
       };
 

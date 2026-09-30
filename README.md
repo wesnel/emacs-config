@@ -237,15 +237,12 @@ home.programs.wgn.emacs.eca = {
 
 Home Manager installs an `eca-sandbox` command that runs the selected
 backend with `args`. Gondolin runs a micro-VM and requires hardware
-virtualization. On Linux hosts without it, select `bubblewrap`;
-its filesystem isolation is enforced, but its proxy egress restrictions
-can be bypassed by a process that ignores the proxy.
+virtualization. On Linux hosts without it, select `bubblewrap`.
 
-Gondolin uses the automatically prepared guest image and allows no outbound
-hosts by default. Bubblewrap's proxy allows `models.dev` by default.
-Configure service mappings or `--allow-host` entries as needed.
-`args` replaces the entire argument list. `sandbox.enable = false` keeps
-the pinned server on PATH and runs it directly.
+Neither backend allows any outbound host by default. Configure service
+mappings or `--allow-host` entries as needed. `args` replaces the entire
+argument list. `sandbox.enable = false` keeps the pinned server on PATH
+and runs it directly.
 
 Local sessions use the configured command. TRAMP sessions run
 `eca-sandbox` on the workspace's remote host when it is on the remote
@@ -289,9 +286,10 @@ Emacs launch settings. The sandbox selects shared skills using
 
 ### Network policy and request logging
 
-Gondolin defaults to denying outbound hosts. Add repeatable `--allow-host`
-arguments to allow particular hosts. Nothing is implicitly allowed, including
-`models.dev`; ECA can start without fetching its model catalogue.
+Both backends default to denying outbound hosts. Add repeatable
+`--allow-host` arguments to allow particular hosts. Nothing is implicitly
+allowed, including `models.dev`; ECA can start without fetching its model
+catalogue.
 
 For a hosted model, `--observe` allows outbound hosts while keeping HTTP/TLS
 traffic passing through the inspecting proxy. It overrides the allowlist.
@@ -341,7 +339,8 @@ login, remove the guest's copy from the sandbox state directory first.
 ### Reaching local services
 
 Gondolin's `--http-map GUEST_HOST[:PORT]=UPSTREAM_HOST:PORT` reaches a host
-service from inside the guest. `--env KEY=VALUE` sets the guest environment.
+service from inside the guest. `--env KEY=VALUE` sets the guest environment
+in both backends.
 The example above maps Ollama and the docs server and sets `OLLAMA_API_URL`
 to the guest-side Ollama address. Use a synthetic guest hostname:
 `localhost` resolves inside the VM and cannot identify the host service.
@@ -370,23 +369,24 @@ hardware virtualization. On Linux, check for `/dev/kvm`; QEMU software emulation
 far too slow for this use. Cloud guests often do not expose virtualization,
 so Bubblewrap is the alternative for those Linux hosts.
 
-Bubblewrap makes `/` read-only and leaves the workspace and sandbox state
-writable. A local `mitmdump` proxy applies its allowlist and records the same
-JSONL shape as Gondolin. The proxy allows `models.dev` by default, and
-`--allow-host` adds a domain and its subdomains. A process which ignores the
-proxy environment can bypass the egress restrictions; the wrapper reports
-that limitation on every start. Gondolin enforces the network boundary
-outside the guest process.
+Bubblewrap makes `/` read-only and replaces `$HOME` with an empty tmpfs,
+into which it binds the workspace and sandbox state writable, the ECA
+config read-only, and the `PATH` entries under `$HOME` read-only. The
+environment is cleared except for `PATH`, locale and terminal variables.
+The sandbox has no network of its own: its only way out is a local
+`mitmdump` proxy, which applies the allowlist and records the same JSONL
+shape as Gondolin. `--allow-host` adds a domain and its subdomains;
+allowing `127.0.0.1` reaches services on the host through the proxy.
 
-The wrappers share a command name, but their flags are not interchangeable:
+The backends' flags are not interchangeable:
 
 | Option | Gondolin | Bubblewrap |
 | --- | --- | --- |
-| `--allow-host`, `--log` | Supported | Supported |
+| `--allow-host`, `--log`, `--env` | Supported | Supported |
 | `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
 | `--observe`, `--deny-host` | Supported | Unsupported |
 | `--share-login` | Supported | Unsupported |
-| `--http-map`, `--tcp-map`, `--env` | Supported | Unsupported |
+| `--http-map`, `--tcp-map` | Supported | Unsupported |
 
 An unsupported option causes Bubblewrap to exit at startup. Choose arguments
 for the selected backend rather than copying the Gondolin examples wholesale.
@@ -421,5 +421,13 @@ network access:
 nix build .#checks.aarch64-darwin.eca-gondolin-image-tools
 ```
 
-Use `x86_64-linux` or `aarch64-linux` for those hosts. GitHub Actions runs the
-Linux check alongside the ERT and image-cache tests.
+Use `x86_64-linux` or `aarch64-linux` for those hosts. On Linux,
+`eca-bwrap-sandbox` runs the Bubblewrap wrapper against a local HTTP server
+and checks what the guest can see and reach. It needs a builder that allows
+unprivileged user namespaces inside the build sandbox:
+
+``` sh
+nix build .#checks.x86_64-linux.eca-bwrap-sandbox
+```
+
+GitHub Actions runs the Linux checks alongside the ERT and Node tests.

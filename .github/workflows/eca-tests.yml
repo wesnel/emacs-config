@@ -58,3 +58,14 @@ jobs:
       - uses: cachix/install-nix-action@v31.11.1
       - name: Test packaged image tools
         run: nix build --print-build-logs .#checks.x86_64-linux.eca-gondolin-image-tools
+
+  bwrap-sandbox:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@v31.11.1
+      - name: Test the Bubblewrap sandbox
+        run: nix build --print-build-logs .#checks.x86_64-linux.eca-bwrap-sandbox
