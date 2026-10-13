@@ -225,4 +225,145 @@ The model replies at once.  BODY sees the guide's source as `source'."
     (review-guide-test--goto "AI issue on RIGHT 11")
     (should-error (review-guide-forward) :type 'user-error)))
 
+;;;; Local changes
+
+(require 'review-guide-local)
+
+(defmacro review-guide-test--with-repo (&rest body)
+  "Run BODY with `repo' bound to a fresh repository of local changes.
+On branch work, branched from main, a.txt has one committed change
+and one uncommitted one, new.txt is untracked, and x.log is ignored.
+Git ignores the user's configuration, so it neither signs nor hooks."
+  (declare (indent 0))
+  `(let* ((repo (file-name-as-directory
+                 (file-truename (make-temp-file "review-guide-repo" t))))
+          (process-environment
+           (append '("GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
+                     "GIT_AUTHOR_NAME=t" "GIT_AUTHOR_EMAIL=t@example.com"
+                     "GIT_COMMITTER_NAME=t" "GIT_COMMITTER_EMAIL=t@example.com")
+                   process-environment)))
+     (unwind-protect
+         (progn
+           (review-guide-test--git repo "init" "--quiet" "--initial-branch=main")
+           (review-guide-test--write repo "a.txt" "one\ntwo\nthree\n")
+           (review-guide-test--write repo ".gitignore" "*.log\n")
+           (review-guide-test--git repo "add" "a.txt" ".gitignore")
+           (review-guide-test--git repo "commit" "--quiet" "-m" "Base")
+           (review-guide-test--git repo "switch" "--quiet" "-c" "work")
+           (review-guide-test--write repo "a.txt" "one\nTWO\nthree\n")
+           (review-guide-test--git repo "commit" "--quiet" "-am" "Shout two\n\nBecause.")
+           (review-guide-test--write repo "a.txt" "one\nTWO\nTHREE\n")
+           (review-guide-test--write repo "new.txt" "fresh\n")
+           (review-guide-test--write repo "x.log" "noise\n")
+           ,@body)
+       (delete-directory repo t))))
+
+(defun review-guide-test--git (repo &rest args)
+  (apply #'review-guide-local--git repo '(0) args))
+
+(defun review-guide-test--write (repo file text)
+  (with-temp-file (expand-file-name file repo)
+    (insert text)))
+
+(defun review-guide-test--local (repo &optional head)
+  (review-guide-local-create
+   :directory repo :base-label "main" :head head
+   :base (string-trim (review-guide-test--git repo "merge-base" "main" "HEAD"))))
+
+(defun review-guide-test--diff-lines (source)
+  (mapcan (lambda (hunk) (copy-sequence (review-guide-hunk-lines hunk)))
+          (review-guide-diff-parse (review-guide-source-diff source))))
+
+(ert-deftest review-guide-local-working-tree-includes-untracked-files ()
+  (review-guide-test--with-repo
+    (let ((source (review-guide-test--local repo)))
+      (should (equal (mapcar #'review-guide-hunk-path
+                             (review-guide-diff-parse (review-guide-source-diff source)))
+                     '("a.txt" "new.txt")))
+      (should (equal (review-guide-test--diff-lines source)
+                     '(" one" "-two" "-three" "+TWO" "+THREE" "+fresh"))))))
+
+(ert-deftest review-guide-local-revision-excludes-the-working-tree ()
+  (review-guide-test--with-repo
+    (should (equal (review-guide-test--diff-lines (review-guide-test--local repo "HEAD"))
+                   '(" one" "-two" "+TWO" " three")))))
+
+(ert-deftest review-guide-local-describes-the-commits ()
+  (review-guide-test--with-repo
+    (pcase-let ((`(,name ,title ,description)
+                 (review-guide-source-describe (review-guide-test--local repo))))
+      (should (equal name (format "%s main..working tree"
+                                  (file-name-nondirectory (directory-file-name repo)))))
+      (should (equal title "Local changes on work"))
+      (should (equal description "Commit messages:\n\n* Shout two\n\nBecause.\n\n")))))
+
+(ert-deftest review-guide-local-defaults-to-the-default-branch ()
+  (review-guide-test--with-repo
+    (let ((default-directory repo)
+          (current-prefix-arg nil))
+      (should (equal (review-guide-local--read-args)
+                     (list (directory-file-name repo) "main"))))))
+
+(ert-deftest review-guide-local-visits-the-base-side ()
+  (review-guide-test--with-repo
+    (let ((source (review-guide-test--local repo)))
+      (save-window-excursion
+        (review-guide-source-visit source "a.txt" "LEFT" 2)
+        (unwind-protect
+            (progn
+              (should buffer-read-only)
+              (should (equal (buffer-substring (point) (line-end-position)) "two")))
+          (kill-buffer))))))
+
+(ert-deftest review-guide-local-submits-comments-as-markdown ()
+  (review-guide-test--with-repo
+    (let ((source (review-guide-test--local repo))
+          (kill-ring nil))
+      (setf (review-guide-local-threads source)
+            '(((path . "new.txt") (line . 1) (side . "RIGHT") (body . "Is this needed?"))
+              ((startLine . 2) (startSide . "LEFT")
+               (path . "a.txt") (line . 2) (side . "RIGHT") (body . " Why shout? "))))
+      (save-window-excursion
+        (review-guide-source-submit source)
+        (kill-buffer))
+      (should (equal (car kill-ring)
+                     (concat
+                      "Review comments on "
+                      (car (review-guide-source-describe source)) ".\n"
+                      "\n## a.txt, removed line 2 to line 2\n\n"
+                      "```diff\n-two\n-three\n+TWO\n```\n\n"
+                      "Why shout?\n"
+                      "\n## new.txt, line 1\n\n"
+                      "```diff\n+fresh\n```\n\n"
+                      "Is this needed?\n")))
+      (should-not (review-guide-local-threads source)))))
+
+(ert-deftest review-guide-local-adds-and-deletes-comments ()
+  (let ((source (review-guide-local-create))
+        (added 0))
+    (save-window-excursion
+      (review-guide-source-add-thread
+       source '((path . "a.txt") (line . 2) (side . "RIGHT")) "Draft"
+       (lambda () (cl-incf added)))
+      (should (equal (buffer-string) "Draft"))
+      (goto-char (point-max))
+      (insert ", edited.")
+      (review-guide-comment-finish))
+    (should (= added 1))
+    (should (equal (review-guide-source-threads source)
+                   '(((path . "a.txt") (line . 2) (side . "RIGHT")
+                      (body . "Draft, edited.")))))
+    (save-window-excursion
+      (review-guide-source-add-thread
+       source '((path . "a.txt") (line . 3) (side . "RIGHT")) nil
+       (lambda () (cl-incf added)))
+      (review-guide-comment-abort))
+    (should (= added 1))
+    (review-guide-source-delete-thread source (car (review-guide-source-threads source)))
+    (should-not (review-guide-source-threads source))))
+
+(ert-deftest review-guide-local-fences-code-holding-backticks ()
+  (should (equal (review-guide-local--fence "+```elisp") "````"))
+  (should (equal (review-guide-local--fence "+x") "```")))
+
 ;;; review-guide.el ends here

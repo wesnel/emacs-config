@@ -15,8 +15,10 @@
 ;; diff decides where pending comments go on submission: see
 ;; `review-guide-source.el'.
 ;;
-;; Entry point: `review-guide', for a pull request open in `pr-review',
-;; from a forge pull request, or from a pull request URL.
+;; Entry points: `review-guide', for a pull request open in `pr-review',
+;; from a forge pull request, or from a pull request URL; and
+;; `review-guide-local', for changes in a local repository that are not
+;; pushed yet.
 
 ;;; Code:
 
@@ -26,6 +28,7 @@
 (require 'review-guide-ai)
 (require 'review-guide-source)
 (require 'review-guide-pr-review)
+(require 'review-guide-local)
 
 ;;;; State
 
@@ -344,14 +347,17 @@ For a pull request, that is a review submitted from `pr-review'."
   "Show the review guide for SOURCE, creating it if needed.
 A new guide asks the model to arrange the diff into chunks straight
 away.  A guide is identified by its source's name, so opening the same
-change again shows the existing guide with its source replaced."
+change again shows the existing guide, which keeps its own source and
+the pending comments in it, unless that source is a killed buffer."
   (let* ((name (car (review-guide-source-describe source)))
          (buffer (get-buffer-create (format "*review-guide %s*" name)))
          (new (not (buffer-local-value 'review-guide--source buffer))))
     (with-current-buffer buffer
       (unless (derived-mode-p 'review-guide-mode)
         (review-guide-mode))
-      (setq review-guide--source source)
+      (when (or new (and (bufferp review-guide--source)
+                         (not (buffer-live-p review-guide--source))))
+        (setq review-guide--source source))
       (review-guide-refresh)
       (when new (review-guide-arrange)))
     (pop-to-buffer buffer)))

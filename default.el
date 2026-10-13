@@ -740,15 +740,17 @@ if USER is given, its username is USER.  The port is not matched."
   :custom
   (pr-review-ghub-auth-name 'forge))
 
-;;;; Read a pull request in chunks a model arranges, and review it with a
-;;;; model whose comments can be edited and forwarded to the pending
-;;;; review.  Requests go to `gptel-backend' and `gptel-model' unless
-;;;; `review-guide-backend' and `review-guide-model' say otherwise.
+;;;; Read a pull request, or unpushed local changes, in chunks a model
+;;;; arranges, and review it with a model whose comments can be edited and
+;;;; forwarded to the pending review.  Requests go to `gptel-backend' and
+;;;; `gptel-model' unless `review-guide-backend' and `review-guide-model'
+;;;; say otherwise.
 (use-package review-guide
   :ensure t
 
   :commands
-  (review-guide))
+  (review-guide
+   review-guide-local))
 
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos
