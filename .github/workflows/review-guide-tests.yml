@@ -1,0 +1,37 @@
+name: review-guide tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ert:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # elpa-magit-section lets the guide buffer's tests run rather than skip.
+      - name: Install Emacs
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y emacs-nox elpa-magit-section
+      - name: Run review-guide tests
+        run: |
+          emacsclient --alternate-editor="" --socket-name=review-guide-tests --eval '
+          (progn
+            (package-initialize)
+            (load (expand-file-name "tests/run-review-guide.el" (getenv "GITHUB_WORKSPACE")) nil t)
+            (review-guide-run-tests))
+          '
+      - name: Stop test server
+        if: always()
+        run: |
+          emacsclient --socket-name=review-guide-tests --eval '
+          (kill-emacs)
+          '
