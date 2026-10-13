@@ -20,11 +20,23 @@ Use the configured command locally. Over TRAMP, use the remote host's
   (apply #'wgn/eca--call-on-workspace-host
          start (car (eca--session-workspace-folders session)) session args))
 
+(declare-function eca "eca")
+
+(defun wgn/eca-unsandboxed ()
+  "Start an ECA session on this machine without the sandbox.
+The session has every skill, including those that drive this Emacs
+through emacsclient, and the same access to this machine as Emacs
+itself. An ECA session already running for the workspace is reused as
+it is, so stop it first."
+  (interactive)
+  (when (file-remote-p default-directory)
+    (user-error "Unsandboxed sessions run only in local workspaces"))
+  (let ((eca-custom-command nil))
+    (call-interactively #'eca)))
+
 (defvar wgn/eca-pr-loop-client nil
   "Directory holding the sandbox's `pr-loop' client, or nil when the
 bot review loop is not set up on this machine.")
-
-(declare-function eca "eca")
 
 (defun wgn/eca-pr-loop ()
   "Start a sandboxed ECA session for the bot review loop.

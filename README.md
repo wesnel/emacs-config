@@ -251,6 +251,14 @@ first workspace, including on restart from a chat buffer. The editor PID
 is omitted because it is not meaningful inside a sandbox or on a
 different host.
 
+`M-x wgn/eca-unsandboxed` starts one local session without the sandbox,
+whatever the machine's setting. It has every skill in `~/.config/eca/skills`,
+including those that drive this Emacs through `emacsclient`, and the same
+access to the machine as Emacs itself. ECA asks Emacs for diagnostics,
+definitions and references over its own connection, which works in either
+kind of session. A session already running for the workspace is reused
+unchanged, so stop it first.
+
 For configurations used without Home Manager, set `eca-custom-command`
 in your personal Emacs configuration or `~/.emacs.d/etc/eca.el`. The default
 configuration otherwise finds `eca` on PATH.

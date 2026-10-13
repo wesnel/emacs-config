@@ -78,6 +78,16 @@ lookups, which TRAMP makes itself, are left to the real function."
                      '("local-sandbox" "--pr-loop" "/nix/store/client/bin"))))
     (should (equal eca-custom-command '("local-sandbox")))))
 
+(ert-deftest wgn-eca-unsandboxed-drops-the-sandbox-for-one-session ()
+  (let ((default-directory "/tmp/")
+        (eca-custom-command '("local-sandbox")))
+    (cl-letf (((symbol-function 'eca)
+               (lambda () (interactive) (list 'started eca-custom-command))))
+      (should (equal (wgn/eca-unsandboxed) '(started nil))))
+    (should (equal eca-custom-command '("local-sandbox"))))
+  (let ((default-directory "/ssh:example:/srv/"))
+    (should-error (wgn/eca-unsandboxed) :type 'user-error)))
+
 (ert-deftest wgn-eca-pr-loop-refuses-without-its-setup ()
   (let ((default-directory "/tmp/")
         (eca-custom-command '("local-sandbox"))
