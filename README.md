@@ -354,6 +354,13 @@ args = [
 ];
 ```
 
+To keep the value out of Emacs's environment, name a file for the launcher
+to read it from:
+
+``` nix
+home.programs.wgn.emacs.eca.sandbox.secretFiles.GITHUB_TOKEN = "/path/to/token";
+```
+
 The hosts are matched after an `--http-map` rewrites the request, so a secret
 for a mapped service names the upstream host, such as `127.0.0.1`; naming
 the guest-side host gets the request refused.

@@ -18,6 +18,11 @@
   # machine, which finds this on PATH, runs with them as well.
   launcher = pkgs.writeShellScriptBin "eca-sandbox" ''
     ${lib.optionalString gondolin "export ECA_GONDOLIN_IMAGE_CACHE=${lib.escapeShellArg imageCache}"}
+    ${lib.concatStrings (lib.mapAttrsToList (name: file: ''
+        ${name}="$(cat ${lib.escapeShellArg file})"
+        export ${name}
+      '')
+      cfg.sandbox.secretFiles)}
     exec ${lib.getExe backend} ${lib.escapeShellArgs cfg.sandbox.args} "$@"
   '';
 
@@ -44,6 +49,18 @@ in {
         description = ''
           Arguments for the sandbox, baked into the `eca-sandbox` command
           that local sessions and TRAMP sessions from other machines run.
+        '';
+      };
+
+      secretFiles = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = {};
+        example = {MCP_PROXY_TOKEN = "/home/me/.local/state/mcp-proxy/token";};
+        description = ''
+          Environment variables the launcher reads from files before starting
+          the sandbox, for `--secret NAME=HOST` in {option}`args` to take
+          their values from. The files are read on this machine; the guest
+          sees only Gondolin's placeholder.
         '';
       };
 
