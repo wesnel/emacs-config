@@ -19,12 +19,13 @@ eca="${ECA_SANDBOX_ECA:-eca}"
 allow="${ECA_SANDBOX_ALLOW_HOSTS:-}"
 pr_loop="${ECA_SANDBOX_PR_LOOP:-}"
 env_args=()
+protect=()
 command=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --) shift; command=("$@"); break ;;
-        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop)
+        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop|--protect)
             if [[ $# -lt 2 ]]; then
                 printf 'eca-bwrap: %s needs a value\n' "$1" >&2
                 exit 2
@@ -37,6 +38,7 @@ while [[ $# -gt 0 ]]; do
                 --eca) eca="$2" ;;
                 --allow-host) allow="$allow,$2" ;;
                 --pr-loop) pr_loop="$2" ;;
+                --protect) protect+=("${2#/}") ;;
                 --env)
                     if [[ "$2" != *=* ]]; then
                         printf 'eca-bwrap: --env expects KEY=VALUE, got %s\n' "$2" >&2
@@ -248,8 +250,12 @@ if [[ -n "$pr_loop" ]]; then
     # Git hooks and config, which the next git command run out here would
     # obey, and other agents' project settings, which can name hooks that run
     # outside any sandbox, are read-only inside. A bind that does not exist
-    # yet cannot be made, so those directories are left out.
-    for protected in .git/hooks .git/config .claude .codex; do
+    # yet cannot be made, so those directories are left out. Any --protect
+    # replaces this list rather than adding to it.
+    if [[ ${#protect[@]} -eq 0 ]]; then
+        protect=(.git/hooks .git/config .claude .codex)
+    fi
+    for protected in "${protect[@]}"; do
         if [[ -e "$workspace/$protected" ]]; then
             bwrap_args+=(--ro-bind "$workspace/$protected" "$workspace/$protected")
         fi

@@ -64,6 +64,7 @@ const parseArgs = (argv) => {
     httpMaps: [],
     env: {},
     secrets: {},
+    protect: [],
     command: [],
   };
 
@@ -109,6 +110,8 @@ const parseArgs = (argv) => {
       opts.tcpMaps.push(value());
     } else if (arg === "--http-map") {
       opts.httpMaps.push(value());
+    } else if (arg === "--protect") {
+      opts.protect.push(value());
     } else if (arg === "--env") {
       const spec = value();
       const eq = spec.indexOf("=");
@@ -186,8 +189,11 @@ mounts[guestPath] = new RealFSProvider(workspace);
 // Paths in the workspace that programs on this side run or load: git hooks
 // and config, which the next git command run here would obey, and other
 // agents' project settings, which can name hooks that run outside any
-// sandbox. A review-loop guest may read them but not change them.
-const PROTECTED = ["/.git/hooks", "/.git/config", "/.claude", "/.codex"];
+// sandbox. A review-loop guest may read them but not change them. Any
+// `--protect PATH' replaces this list rather than adding to it.
+const PROTECTED = (
+  opts.protect.length > 0 ? opts.protect : [".git/hooks", ".git/config", ".claude", ".codex"]
+).map((p) => `/${p.replace(/^\/+/, "")}`);
 
 // Wraps a provider so that writes to the protected paths, or to anything that
 // resolves to one, fail as on a read-only file system. Renaming or removing a

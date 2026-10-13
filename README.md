@@ -388,7 +388,8 @@ runs `pr-loop guard` before every tool call. The config on the host is left
 unchanged, and it must be plain JSON.
 
 The guest can read but not change the workspace's `.git/hooks`, `.git/config`,
-`.claude` and `.codex`. The host would run what these name: the next `git`
+`.claude` and `.codex`, or, given any repeatable `--protect PATH`, exactly
+the paths given instead. The host would run what these name: the next `git`
 command run on the host obeys the hooks and config, and other agents load
 hooks from their project settings and run them outside any sandbox. Gondolin
 refuses those writes, and writes through symbolic or hard links to them; it
@@ -450,7 +451,7 @@ The backends' flags are not interchangeable:
 
 | Option | Gondolin | Bubblewrap |
 | --- | --- | --- |
-| `--allow-host`, `--log`, `--env`, `--pr-loop` | Supported | Supported |
+| `--allow-host`, `--log`, `--env`, `--pr-loop`, `--protect` | Supported | Supported |
 | `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
 | `--observe`, `--deny-host` | Supported | Unsupported |
 | `--share-login`, `--secret` | Supported | Unsupported |
