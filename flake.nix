@@ -185,8 +185,11 @@
 
                 ;;; Commentary:
 
-                ;; NOTE: ~/.authinfo.gpg must contain credentials for your email
-                ;;       account(s).
+                ;; NOTE: auth-source must hold credentials for your email
+                ;;       account(s): a 1Password Login item per account, its
+                ;;       websites the IMAP and SMTP servers and its username
+                ;;       the address,
+                ;;       or ~/.authinfo.gpg where the 1Password CLI is absent.
                 ;;
                 ;; NOTE: Please set the following variables with customize:
                 ;;; `user-mail-address' with your primary email address.

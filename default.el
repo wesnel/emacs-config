@@ -331,9 +331,6 @@
                    "NIX_SSL_CERT_FILE"
                    "NVM_BIN"
                    "NVM_DIR"
-                   "PASSWORD_STORE_DIR"
-                   "PASSWORD_STORE_KEY"
-                   "PASSWORD_STORE_SIGNING_KEY"
                    "SHELL"
                    "SSH_AGENT_PID"
                    "SSH_AUTH_SOCK"
@@ -342,12 +339,76 @@
       (exec-path-from-shell-initialize))))
 
 ;;;; Store secrets in Emacs.
+;;
+;; Where the 1Password CLI is installed, 1Password is the only source:
+;; ~/.authinfo.gpg is no longer read there.
 (use-package auth-source
-  :custom
-  (auth-source-pass-filename (getenv "PASSWORD_STORE_DIR"))
+  :preface
+  (defun wgn/auth-source-1password--op (&rest args)
+    "Run the 1Password CLI with ARGS and return its parsed JSON output.
+Returns nil when op fails, so that a locked 1Password, or one whose
+CLI integration is off, reads as no match rather than as an error."
+    (with-temp-buffer
+      (when (eq 0 (apply #'call-process "op" nil '(t nil) nil
+                         (append args '("--format" "json"))))
+        (goto-char (point-min))
+        (json-parse-buffer :object-type 'plist
+                           :array-type 'list
+                           :null-object nil
+                           :false-object nil))))
 
-  :init
-  (auth-source-pass-enable))
+  (defun wgn/auth-source-1password--field (item purpose)
+    "Return the value of the field of ITEM whose purpose is PURPOSE."
+    (plist-get (seq-find (lambda (field)
+                           (equal (plist-get field :purpose) purpose))
+                         (plist-get item :fields))
+               :value))
+
+  (defun wgn/auth-source-1password--host (url)
+    "Return the host of URL, a 1Password website that may lack a scheme."
+    (url-host (url-generic-parse-url
+               (if (string-match-p "://" url) url (concat "https://" url)))))
+
+  (cl-defun wgn/auth-source-1password-search
+      (&rest _spec &key host user max &allow-other-keys)
+    "Return up to MAX 1Password logins for HOST and USER.
+A login matches when one of its websites has HOST as its host and,
+if USER is given, its username is USER.  The port is not matched."
+    (let ((hosts (seq-filter #'stringp (ensure-list host)))
+          (users (seq-filter #'stringp (ensure-list user)))
+          found)
+      (dolist (summary (and hosts
+                            (wgn/auth-source-1password--op
+                             "item" "list" "--categories" "Login")))
+        (when-let* (((< (length found) max))
+                    (matched
+                     (seq-find (lambda (h) (member h hosts))
+                               (mapcar (lambda (url)
+                                         (wgn/auth-source-1password--host
+                                          (plist-get url :href)))
+                                       (plist-get summary :urls))))
+                    (item (wgn/auth-source-1password--op
+                           "item" "get" (plist-get summary :id) "--reveal"))
+                    (name (wgn/auth-source-1password--field item "USERNAME"))
+                    (secret (wgn/auth-source-1password--field item "PASSWORD"))
+                    ((or (null users) (member name users))))
+          (push (list :host matched
+                      :user name
+                      :secret (lambda () secret))
+                found)))
+      (nreverse found)))
+
+  :config
+  (add-hook 'auth-source-backend-parser-functions
+            (lambda (entry)
+              (when (eq entry '1password)
+                (auth-source-backend
+                 :source "1Password"
+                 :type '1password
+                 :search-function #'wgn/auth-source-1password-search))))
+
+  (when (executable-find "op")
+    (setq auth-sources '(1password))))
 
 ;;;; Automatically encrypt and decrypt files.
 (use-package epa-file
@@ -2199,36 +2260,6 @@ GUI notification retains its icon and duration."
   (add-to-list
    'proced-format-alist
    '(custom user pid ppid sess tree pcpu pmem rss start time state (args comm))))
-
-;;;; Functions for interacting with pass.
-(use-package password-store
-  :ensure t
-
-  :commands
-  (password-store-edit
-   password-store-get
-   password-store-get-field
-   password-store-clear
-   password-store-copy
-   password-store-copy-field
-   password-store-init
-   password-store-insert
-   password-store-generate
-   password-store-generate-no-symbols
-   password-store-remove
-   password-store-rename
-   password-store-version
-   password-store-url))
-
-;;;; Interface for interacting with pass.
-(use-package pass
-  :ensure t
-
-  :commands
-  (pass)
-
-  :bind
-  (("C-c p p" . #'pass)))
 
 ;;;; Support for hledger for accounting.
 ;;
