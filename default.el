@@ -753,6 +753,18 @@ if USER is given, its username is USER.  The port is not matched."
   :after
   (magit))
 
+;;;; Review pull requests with inline comments.  It shares forge's GitHub
+;;;; token, under the host `api.github.com' and the user `USERNAME^forge'.
+(use-package pr-review
+  :ensure t
+
+  :commands
+  (pr-review
+   pr-review-open-url)
+
+  :custom
+  (pr-review-ghub-auth-name 'forge))
+
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos
   :ensure t
