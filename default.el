@@ -131,6 +131,8 @@
    server-start)
 
   :init
+  ;; The Home Manager module points EMACS_SOCKET_NAME at this directory for
+  ;; emacsclient; keep the two in step.
   (setq server-use-tcp nil
         server-socket-dir (expand-file-name
                            "var/server/socket/"

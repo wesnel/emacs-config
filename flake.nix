@@ -140,6 +140,11 @@
 
           config = lib.mkIf cfg.enable {
             home = {
+              # default.el moves the server's socket out of the default
+              # directory, so emacsclient has to be told where it is. Keep the
+              # two in step.
+              sessionVariables.EMACS_SOCKET_NAME = "${config.home.homeDirectory}/.emacs.d/var/server/socket/server";
+
               packages = with pkgs;
                 [
                   direnv
