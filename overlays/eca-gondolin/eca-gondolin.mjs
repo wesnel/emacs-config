@@ -62,6 +62,7 @@ const parseArgs = (argv) => {
     tcpMaps: [],
     httpMaps: [],
     env: {},
+    secrets: {},
     command: [],
   };
 
@@ -115,8 +116,40 @@ const parseArgs = (argv) => {
       }
 
       opts.env[spec.slice(0, eq)] = spec.slice(eq + 1);
+    } else if (arg === "--secret") {
+      // The value comes from this process's environment rather than the
+      // argument, so it never appears in the process table.
+      const spec = value();
+      const eq = spec.indexOf("=");
+      const name = spec.slice(0, eq);
+      const hosts = spec
+        .slice(eq + 1)
+        .split(",")
+        .map((h) => h.trim())
+        .filter(Boolean);
+
+      if (eq <= 0 || hosts.length === 0) {
+        process.stderr.write(`eca-gondolin: --secret expects NAME=HOST[,HOST...], got ${spec}\n`);
+        process.exit(2);
+      }
+
+      if (!env[name]) {
+        process.stderr.write(`eca-gondolin: --secret ${name} is not set in this environment\n`);
+        process.exit(2);
+      }
+
+      opts.secrets[name] = {hosts, value: env[name]};
     } else {
       process.stderr.write(`eca-gondolin: unknown option ${arg}\n`);
+      process.exit(2);
+    }
+  }
+
+  // The guest environment applies --env after the placeholders, so the same
+  // name in both would hand the guest that value in place of the placeholder.
+  for (const name of Object.keys(opts.secrets)) {
+    if (name in opts.env) {
+      process.stderr.write(`eca-gondolin: ${name} is given by both --env and --secret\n`);
       process.exit(2);
     }
   }
@@ -446,6 +479,12 @@ const {httpHooks, env} = createHttpHooks({
   // an empty one, means the hosts in it and nothing else.
   allowedHosts: opts.observe ? undefined : opts.allowedHosts,
   allowedInternalHosts,
+
+  // The guest sees only a placeholder, which is swapped for the value in the
+  // headers of requests to the secret's hosts. Those hosts use Gondolin's
+  // patterns, where `*.example.com' does not match `example.com', and do not
+  // admit anything to the allowlist.
+  secrets: opts.secrets,
 
   // Reached only once the allowlist has already admitted the host, so this
   // can narrow that decision but never widen it.

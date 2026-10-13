@@ -338,6 +338,33 @@ because the guest may have refreshed its tokens. To import a fresh host
 login, remove the guest's copy from the sandbox state directory first.
 `--share-login` is a Gondolin option and also transfers the stored history.
 
+### Credentials the guest cannot read
+
+Gondolin's `--secret NAME=HOST[,HOST...]` gives the guest a placeholder in
+`$NAME` in place of the value, and the proxy swaps the value in for the
+placeholder in request headers sent to those hosts. The value is read from
+`$NAME` in the environment `eca-sandbox` starts in, and the wrapper exits if
+it is unset. A request whose headers carry the placeholder or the value to
+any other host is refused.
+
+``` nix
+args = [
+  "--allow-host" "api.github.com"
+  "--secret" "GITHUB_TOKEN=api.github.com"
+];
+```
+
+The hosts are matched after an `--http-map` rewrites the request, so a secret
+for a mapped service names the upstream host, such as `127.0.0.1`; naming
+the guest-side host gets the request refused.
+
+The hosts do not admit anything: allow them separately. Their patterns are
+Gondolin's, in which `*` matches any substring, so `*.github.com` does not
+match `github.com`. Only headers are rewritten, so a credential sent in a
+request body or a query string does not work. The guest can still use the
+credential for anything it permits on those hosts, and a host that echoes
+request headers back returns the value to the guest.
+
 ### Reaching local services
 
 Gondolin's `--http-map GUEST_HOST[:PORT]=UPSTREAM_HOST:PORT` reaches a host
@@ -387,7 +414,7 @@ The backends' flags are not interchangeable:
 | `--allow-host`, `--log`, `--env` | Supported | Supported |
 | `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
 | `--observe`, `--deny-host` | Supported | Unsupported |
-| `--share-login` | Supported | Unsupported |
+| `--share-login`, `--secret` | Supported | Unsupported |
 | `--http-map`, `--tcp-map` | Supported | Unsupported |
 
 An unsupported option causes Bubblewrap to exit at startup. Choose arguments

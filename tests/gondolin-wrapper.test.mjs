@@ -48,7 +48,7 @@ const fixture = (t) => {
 
 test("a flag without its value is refused", (t) => {
   const {run} = fixture(t);
-  for (const flag of ["--allow-host", "--http-map", "--env", "--workspace"]) {
+  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace"]) {
     const result = run([flag]);
     assert.equal(result.status, 2, flag);
     assert.match(result.stderr, new RegExp(`${flag} needs a value`));
@@ -137,4 +137,28 @@ test("the shared environment variables configure the allowlist", (t) => {
   const {run} = fixture(t);
   const result = run([], {ECA_SANDBOX_ALLOW_HOSTS: "a.example, b.example"});
   assert.deepEqual(result.report.allowedHosts, ["a.example", "b.example"]);
+});
+
+test("a secret reaches the hooks and only its placeholder reaches the guest", (t) => {
+  const {run} = fixture(t);
+  const result = run(["--secret", "TOKEN=api.example, *.example.org"], {TOKEN: "s3cret"});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.secrets, {
+    TOKEN: {hosts: ["api.example", "*.example.org"], value: "s3cret"},
+  });
+  assert.equal(result.report.env.TOKEN, "placeholder-TOKEN");
+  assert.ok(!JSON.stringify(result.report.env).includes("s3cret"));
+});
+
+test("a secret that cannot be resolved is refused", (t) => {
+  const {run} = fixture(t);
+  assert.match(run(["--secret", "TOKEN=api.example"]).stderr, /--secret TOKEN is not set/);
+  for (const spec of ["TOKEN", "=api.example", "TOKEN="]) {
+    const result = run(["--secret", spec], {TOKEN: "s3cret"});
+    assert.equal(result.status, 2, spec);
+    assert.match(result.stderr, /--secret expects NAME=HOST/);
+  }
+  const both = run(["--secret", "TOKEN=api.example", "--env", "TOKEN=x"], {TOKEN: "s3cret"});
+  assert.equal(both.status, 2);
+  assert.match(both.stderr, /TOKEN is given by both --env and --secret/);
 });

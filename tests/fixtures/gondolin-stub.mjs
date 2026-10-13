@@ -21,7 +21,12 @@ export class ReadonlyProvider {
 
 export const createHttpHooks = (options) => {
   hooks = options;
-  return {httpHooks: {}, env: {}};
+  return {
+    httpHooks: {},
+    env: Object.fromEntries(
+      Object.keys(options.secrets ?? {}).map((name) => [name, `placeholder-${name}`]),
+    ),
+  };
 };
 
 export const buildAssets = () => {
@@ -65,6 +70,7 @@ export class VM {
         ),
         config: config ? tree(config.root) : null,
         allowedHosts: hooks.allowedHosts ?? null,
+        secrets: hooks.secrets ?? null,
         allowedInternalHosts: hooks.allowedInternalHosts,
         ipAllowed: (probes.ip ?? []).map((info) => hooks.isIpAllowed(info)),
         rewritten: (probes.urls ?? []).map((url) => hooks.onRequest(new Request(url))?.url ?? null),
