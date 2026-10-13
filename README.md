@@ -365,6 +365,45 @@ request body or a query string does not work. The guest can still use the
 credential for anything it permits on those hosts, and a host that echoes
 request headers back returns the value to the guest.
 
+### Writing to GitHub through a policy relay
+
+`--pr-loop DIR` runs `sandbox-relay serve` on the host for the session's
+workspace and gives the guest a `pr-loop` client from `DIR`, which must hold
+an executable named `pr-loop`. The guest still has no GitHub credentials: the
+relay runs `pr-loop` on the host, which holds the login and refuses anything
+outside its own policy. Both backends support it.
+
+- Gondolin mounts `DIR` read-only over `/usr/local/bin` and maps the relay
+  as `http://sandbox-relay`. `DIR` must hold a static Linux build for the
+  guest's architecture.
+- Bubblewrap puts `DIR` first on `PATH` and binds the relay's socket into
+  the sandbox.
+
+`sandbox-relay` and `pr-loop` must be on the host's `PATH`. The guest
+receives `SANDBOX_RELAY_URL`,
+`PR_LOOP_SESSION=1`, the workspace's `user.name` and `user.email` as Git
+author and committer, and Git configuration that turns off commit signing.
+The session's copy of the ECA config also gains a `preToolCall` hook that
+runs `pr-loop guard` before every tool call. The config on the host is left
+unchanged, and it must be plain JSON.
+
+The guest can read but not change the workspace's `.git/hooks`, `.git/config`,
+`.claude` and `.codex`. The host would run what these name: the next `git`
+command run on the host obeys the hooks and config, and other agents load
+hooks from their project settings and run them outside any sandbox. Gondolin
+refuses those writes, and writes through symbolic or hard links to them; it
+also refuses renaming the directories that hold them. Bubblewrap mounts
+whichever of them exist read-only. The Gondolin guest also trusts the
+workspace as a Git `safe.directory`, because it runs as a different user
+from the one that owns the files.
+
+Ordinary sessions do not get `--pr-loop`. Set
+`home.programs.wgn.emacs.eca.sandbox.prLoop` to the client directory and
+start a loop session with `M-x wgn/eca-pr-loop`, which adds the flag for that
+session only. A session already running for the workspace is reused
+unchanged. The loop itself -- its agents, `pr-loop` and the signing pass
+afterwards -- is set up by [nix-config](https://github.com/wesnel/nix-config#the-bot-review-loop).
+
 ### Reaching local services
 
 Gondolin's `--http-map GUEST_HOST[:PORT]=UPSTREAM_HOST:PORT` reaches a host
@@ -411,7 +450,7 @@ The backends' flags are not interchangeable:
 
 | Option | Gondolin | Bubblewrap |
 | --- | --- | --- |
-| `--allow-host`, `--log`, `--env` | Supported | Supported |
+| `--allow-host`, `--log`, `--env`, `--pr-loop` | Supported | Supported |
 | `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
 | `--observe`, `--deny-host` | Supported | Unsupported |
 | `--share-login`, `--secret` | Supported | Unsupported |

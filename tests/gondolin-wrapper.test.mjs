@@ -162,3 +162,87 @@ test("a secret that cannot be resolved is refused", (t) => {
   assert.equal(both.status, 2);
   assert.match(both.stderr, /TOKEN is given by both --env and --secret/);
 });
+
+// Stands in for `sandbox-relay serve': records its arguments and announces a
+// port.
+const fakeRelay = (dirs, announce = true) => {
+  const server = path.join(dirs.tmp, "sandbox-relay");
+  const args = path.join(dirs.tmp, "sandbox-relay-args");
+  fs.writeFileSync(
+    server,
+    `#!/bin/sh\nprintf '%s\\n' "$@" > '${args}'\n` +
+      (announce ? `echo "sandbox-relay: serving x on http://127.0.0.1:4567"\nexec sleep 30\n` : "exit 1\n"),
+    {mode: 0o755},
+  );
+  return {server, args};
+};
+
+test("pr-loop is served from this side and reached from the guest", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server, args} = fakeRelay(dirs);
+  const client = path.join(dirs.tmp, "client");
+  fs.mkdirSync(client);
+  const result = run(["--pr-loop", client], {
+    ECA_SANDBOX_RELAY: server,
+    STUB_PROBES: JSON.stringify({urls: ["http://sandbox-relay/"]}),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(fs.readFileSync(args, "utf8").trim().split("\n"), [
+    "serve", "--workspace", dirs.workspace, "--guest-path", dirs.workspace, "--listen", "127.0.0.1:0",
+  ]);
+  assert.deepEqual(result.report.mounts["/usr/local/bin"], {root: client, readonly: true});
+  assert.deepEqual(result.report.rewritten, ["http://127.0.0.1:4567/"]);
+  assert.equal(result.report.env.SANDBOX_RELAY_URL, "http://sandbox-relay");
+  assert.equal(result.report.env.PR_LOOP_SESSION, "1");
+  assert.equal(result.report.env.GIT_CONFIG_KEY_0, "commit.gpgsign");
+  assert.equal(result.report.env.GIT_CONFIG_VALUE_0, "false");
+});
+
+test("a pr-loop session adds the guard hook to the staged config only", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  const own = {hooks: {mine: {type: "postToolCall", actions: []}}, chat: {defaultTrust: false}};
+  fs.writeFileSync(path.join(dirs.config, "config.json"), JSON.stringify(own));
+
+  const loop = run(["--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
+  assert.equal(loop.status, 0, loop.stderr);
+  const staged = JSON.parse(loop.report.config["config.json"]);
+  assert.deepEqual(staged.chat, own.chat);
+  assert.deepEqual(staged.hooks.mine, own.hooks.mine);
+  assert.equal(staged.hooks["pr-loop-guard"].type, "preToolCall");
+  assert.deepEqual(staged.hooks["pr-loop-guard"].actions, [{type: "shell", shell: "pr-loop guard"}]);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(dirs.config, "config.json"), "utf8")), own);
+
+  const plain = run([]);
+  assert.equal(plain.status, 0, plain.stderr);
+  assert.equal(JSON.parse(plain.report.config["config.json"]).hooks["pr-loop-guard"], undefined);
+});
+
+test("a config that is not plain JSON stops a pr-loop session", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  fs.writeFileSync(path.join(dirs.config, "config.json"), "{ // a comment\n}");
+  const result = run(["--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /cannot add the pr-loop guard/);
+});
+
+test("a pr-loop session without any ECA config still gets the guard", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  const result = run(["--pr-loop", dirs.tmp], {
+    ECA_SANDBOX_RELAY: server,
+    ECA_SANDBOX_CONFIG: path.join(root, "absent"),
+  });
+  assert.equal(result.status, 0, result.stderr);
+  assert.ok(JSON.parse(result.report.config["config.json"]).hooks["pr-loop-guard"]);
+});
+
+test("a relay that does not start stops the wrapper", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs, false);
+  const result = run(["--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 2);
+  assert.match(result.stderr, /sandbox-relay serve exited before listening/);
+  assert.equal(result.report, null);
+});

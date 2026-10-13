@@ -68,4 +68,24 @@ lookups, which TRAMP makes itself, are left to the real function."
              '("/tmp/project/" ("local-sandbox"))))
     (should (equal default-directory "/ssh:example:/srv/chat/"))))
 
+(ert-deftest wgn-eca-pr-loop-adds-the-relay-for-one-session ()
+  (let ((default-directory "/tmp/")
+        (eca-custom-command '("local-sandbox"))
+        (wgn/eca-pr-loop-client "/nix/store/client/bin"))
+    (cl-letf (((symbol-function 'eca)
+               (lambda () (interactive) eca-custom-command)))
+      (should (equal (wgn/eca-pr-loop)
+                     '("local-sandbox" "--pr-loop" "/nix/store/client/bin"))))
+    (should (equal eca-custom-command '("local-sandbox")))))
+
+(ert-deftest wgn-eca-pr-loop-refuses-without-its-setup ()
+  (let ((default-directory "/tmp/")
+        (eca-custom-command '("local-sandbox"))
+        (wgn/eca-pr-loop-client nil))
+    (should-error (wgn/eca-pr-loop) :type 'user-error))
+  (let ((default-directory "/tmp/")
+        (eca-custom-command nil)
+        (wgn/eca-pr-loop-client "/nix/store/client/bin"))
+    (should-error (wgn/eca-pr-loop) :type 'user-error)))
+
 ;;; eca.el ends here

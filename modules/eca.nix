@@ -46,6 +46,18 @@ in {
           that local sessions and TRAMP sessions from other machines run.
         '';
       };
+
+      prLoop = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = null;
+        description = ''
+          Directory holding a `pr-loop` client for the sandbox. When set,
+          `M-x wgn/eca-pr-loop` starts a local session with `--pr-loop` and
+          this directory, for the bot review loop; other sessions run without
+          it. `sandbox-relay` and `pr-loop` must also be on PATH outside the
+          sandbox.
+        '';
+      };
     };
   };
 
@@ -73,6 +85,11 @@ in {
       (setq eca-custom-command ${
         if cfg.sandbox.enable
         then "'(${builtins.toJSON "${config.home.profileDirectory}/bin/eca-sandbox"})"
+        else "nil"
+      })
+      (setq wgn/eca-pr-loop-client ${
+        if cfg.sandbox.enable && cfg.sandbox.prLoop != null
+        then builtins.toJSON cfg.sandbox.prLoop
         else "nil"
       })
     '';

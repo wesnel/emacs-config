@@ -56,6 +56,7 @@ const parseArgs = (argv) => {
     // whether the boundary refuses traffic or only watches it.
     observe: env.ECA_SANDBOX_OBSERVE === "1",
     shareLogin: env.ECA_SANDBOX_SHARE_LOGIN === "1",
+    prLoop: env.ECA_SANDBOX_PR_LOOP || null,
     // Refused whichever mode is in force, so a host can be shut out of an
     // otherwise open session without naming every host that stays open.
     deniedHosts: [],
@@ -100,6 +101,8 @@ const parseArgs = (argv) => {
       opts.observe = true;
     } else if (arg === "--share-login") {
       opts.shareLogin = true;
+    } else if (arg === "--pr-loop") {
+      opts.prLoop = value();
     } else if (arg === "--deny-host") {
       opts.deniedHosts.push(value());
     } else if (arg === "--tcp-map") {
@@ -179,6 +182,135 @@ const workspace = path.resolve(opts.workspace);
 const guestPath = opts.guestPath ?? workspace;
 
 mounts[guestPath] = new RealFSProvider(workspace);
+
+// Paths in the workspace that programs on this side run or load: git hooks
+// and config, which the next git command run here would obey, and other
+// agents' project settings, which can name hooks that run outside any
+// sandbox. A review-loop guest may read them but not change them.
+const PROTECTED = ["/.git/hooks", "/.git/config", "/.claude", "/.codex"];
+
+// Wraps a provider so that writes to the protected paths, or to anything that
+// resolves to one, fail as on a read-only file system. Renaming or removing a
+// directory above one fails too, which would otherwise replace it wholesale.
+const protectPaths = (backend, protectedPaths) => {
+  const normal = (p) => path.posix.normalize(`/${p}`);
+  const inside = (p) => protectedPaths.some((q) => p === q || p.startsWith(`${q}/`));
+  const above = (p) => protectedPaths.some((q) => p === "/" || q.startsWith(`${p}/`));
+  const resolved = (p) => {
+    try {
+      return normal(backend.realpathSync(p));
+    } catch {
+      return p;
+    }
+  };
+  const blocked = (p, {ancestors = false} = {}) => {
+    const n = normal(p);
+    return inside(n) || inside(resolved(n)) || (ancestors && above(n));
+  };
+  const deny = (op, p) => {
+    const error = new Error(`EROFS: read-only file system, ${op} '${p}'`);
+    error.code = "EROFS";
+    error.errno = -30;
+    error.syscall = op;
+    error.path = p;
+    throw error;
+  };
+  const writes = /[wa+]/;
+  const checks = {
+    open: (p, flags) => writes.test(String(flags)) && blocked(p) && deny("open", p),
+    mkdir: (p) => blocked(p) && deny("mkdir", p),
+    rmdir: (p) => blocked(p, {ancestors: true}) && deny("rmdir", p),
+    unlink: (p) => blocked(p) && deny("unlink", p),
+    rename: (from, to) =>
+      (blocked(from, {ancestors: true}) || blocked(to, {ancestors: true})) && deny("rename", from),
+    link: (existing, created) => (blocked(existing) || blocked(created)) && deny("link", created),
+    symlink: (_target, created) => blocked(created) && deny("symlink", created),
+  };
+
+  // Every call goes to the provider itself, which may keep private fields that
+  // a proxy as `this' could not reach.
+  return new Proxy(backend, {
+    get(target, prop) {
+      const value = Reflect.get(target, prop, target);
+      if (typeof value !== "function") return value;
+      const check = checks[String(prop).replace(/Sync$/, "")];
+      if (!check) return value.bind(target);
+      return (...args) => {
+        check(...args);
+        return value.apply(target, args);
+      };
+    },
+  });
+};
+
+// The guest gets a `pr-loop' client and no GitHub credentials, so every write
+// the review loop makes to GitHub passes through `sandbox-relay serve' on this
+// side, which runs `pr-loop' with the login, and `pr-loop' enforces the loop's
+// branch policy. The client directory is mounted over /usr/local/bin, which is
+// on the guest's PATH and empty in the image.
+if (opts.prLoop) {
+  const {spawn, execFileSync} = await import("node:child_process");
+  const server = spawn(
+    process.env.ECA_SANDBOX_RELAY || "sandbox-relay",
+    ["serve", "--workspace", workspace, "--guest-path", guestPath, "--listen", "127.0.0.1:0"],
+    {stdio: ["ignore", "pipe", "inherit"]},
+  );
+
+  process.on("exit", () => server.kill());
+
+  const port = await new Promise((resolve) => {
+    let seen = "";
+
+    server.on("error", (error) => {
+      process.stderr.write(`eca-gondolin: cannot start sandbox-relay serve: ${error.message}\n`);
+      process.exit(2);
+    });
+    server.on("exit", () => resolve(null));
+    server.stdout.on("data", (chunk) => {
+      seen += chunk;
+      const match = seen.match(/on http:\/\/127\.0\.0\.1:(\d+)/);
+
+      if (match) resolve(Number(match[1]));
+    });
+  });
+
+  if (!port) {
+    process.stderr.write("eca-gondolin: sandbox-relay serve exited before listening\n");
+    process.exit(2);
+  }
+
+  opts.httpMaps.push(`sandbox-relay:80=127.0.0.1:${port}`);
+  mounts["/usr/local/bin"] = new ReadonlyProvider(new RealFSProvider(path.resolve(opts.prLoop)));
+  mounts[guestPath] = protectPaths(mounts[guestPath], PROTECTED);
+
+  // The guest has no gitconfig of its own, so commits need the identity
+  // spelled out. They are unsigned: no key reaches the guest, and the loop's
+  // signing pass re-signs them on this side.
+  const identity = (key) => {
+    try {
+      return execFileSync("git", ["-C", workspace, "config", key], {encoding: "utf8"}).trim();
+    } catch {
+      return "";
+    }
+  };
+  const name = identity("user.name");
+  const email = identity("user.email");
+
+  // The guest runs as root and the workspace belongs to the host's user, which
+  // git would otherwise refuse as dubious ownership.
+  opts.env = {
+    SANDBOX_RELAY_URL: "http://sandbox-relay",
+    PR_LOOP_SESSION: "1",
+    GIT_CONFIG_COUNT: "2",
+    GIT_CONFIG_KEY_0: "commit.gpgsign",
+    GIT_CONFIG_VALUE_0: "false",
+    GIT_CONFIG_KEY_1: "safe.directory",
+    GIT_CONFIG_VALUE_1: "*",
+    ...(name ? {GIT_AUTHOR_NAME: name, GIT_COMMITTER_NAME: name} : {}),
+    ...(email ? {GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_EMAIL: email} : {}),
+    ...opts.env,
+  };
+}
 
 // The guest image has no copy of the server, so a Linux build is mounted
 // read-only rather than baked in.
@@ -274,6 +406,41 @@ if (opts.config) {
       new RealFSProvider(staged),
     );
   }
+}
+
+// A review-loop session also runs `pr-loop guard' before every tool call.
+// It goes into the staged copy, so ordinary sessions and the config ECA
+// writes on this side never carry it.
+if (opts.prLoop) {
+  if (!staged) {
+    staged = fs.mkdtempSync(path.join(os.tmpdir(), "eca-gondolin-config-"));
+    process.on("exit", () => fs.rmSync(staged, {recursive: true, force: true}));
+    mounts[`${GUEST_HOME}/.config/eca`] = new ReadonlyProvider(new RealFSProvider(staged));
+  }
+
+  const file = path.join(staged, "config.json");
+  let config = {};
+
+  if (fs.existsSync(file)) {
+    try {
+      config = JSON.parse(fs.readFileSync(file, "utf8"));
+    } catch (error) {
+      process.stderr.write(`eca-gondolin: cannot add the pr-loop guard to ${file}: ${error.message}\n`);
+      process.exit(2);
+    }
+  }
+
+  config.hooks = {
+    ...config.hooks,
+    "pr-loop-guard": {
+      type: "preToolCall",
+      matcher: ".*",
+      visible: false,
+      description: "Deny writes to GitHub and Linear outside pr-loop",
+      actions: [{type: "shell", shell: "pr-loop guard"}],
+    },
+  };
+  fs.writeFileSync(file, JSON.stringify(config, null, 2));
 }
 
 if (opts.state) {

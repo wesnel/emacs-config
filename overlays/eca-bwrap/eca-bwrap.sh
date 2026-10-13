@@ -17,13 +17,14 @@ log="${ECA_SANDBOX_LOG:-}"
 eca="${ECA_SANDBOX_ECA:-eca}"
 # Empty means no host is reachable.
 allow="${ECA_SANDBOX_ALLOW_HOSTS:-}"
+pr_loop="${ECA_SANDBOX_PR_LOOP:-}"
 env_args=()
 command=()
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --) shift; command=("$@"); break ;;
-        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path)
+        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop)
             if [[ $# -lt 2 ]]; then
                 printf 'eca-bwrap: %s needs a value\n' "$1" >&2
                 exit 2
@@ -35,6 +36,7 @@ while [[ $# -gt 0 ]]; do
                 --log) log="$2" ;;
                 --eca) eca="$2" ;;
                 --allow-host) allow="$allow,$2" ;;
+                --pr-loop) pr_loop="$2" ;;
                 --env)
                     if [[ "$2" != *=* ]]; then
                         printf 'eca-bwrap: --env expects KEY=VALUE, got %s\n' "$2" >&2
@@ -66,7 +68,7 @@ relay="$(mktemp -d "${TMPDIR:-/tmp}/eca-bwrap.XXXXXX")"
 mkdir -p "$state" "$confdir"
 
 cleanup() {
-    for pid in "${proxy_pid:-}" "${relay_pid:-}"; do
+    for pid in "${proxy_pid:-}" "${relay_pid:-}" "${pr_loop_pid:-}"; do
         if [[ -n "$pid" ]]; then
             kill "$pid" 2>/dev/null || true
         fi
@@ -185,8 +187,90 @@ bwrap_args+=(
     --setenv NODE_EXTRA_CA_CERTS "$inner/ca.pem"
 )
 
+# A review-loop session also runs `pr-loop guard' before every tool call. It
+# goes into a staged copy, so ordinary sessions and the config ECA writes out
+# here never carry it.
+if [[ -n "$pr_loop" ]]; then
+    staged="$relay/eca-config"
+    mkdir -p "$staged"
+    if [[ -d "$config" ]]; then
+        cp -RL "$config/." "$staged/"
+        chmod -R u+w "$staged"
+    fi
+    if ! "@python@" - "$staged/config.json" <<'PY'
+import json, os, sys
+path = sys.argv[1]
+config = json.load(open(path)) if os.path.exists(path) else {}
+config.setdefault("hooks", {})["pr-loop-guard"] = {
+    "type": "preToolCall",
+    "matcher": ".*",
+    "visible": False,
+    "description": "Deny writes to GitHub and Linear outside pr-loop",
+    "actions": [{"type": "shell", "shell": "pr-loop guard"}],
+}
+json.dump(config, open(path, "w"), indent=2)
+PY
+    then
+        printf 'eca-bwrap: cannot add the pr-loop guard to %s\n' "$staged/config.json" >&2
+        exit 2
+    fi
+    config="$staged"
+fi
+
 if [[ -d "$config" ]]; then
     bwrap_args+=(--ro-bind "$config" "$HOME/.config/eca")
+fi
+
+# The sandbox gets a `pr-loop' client and no GitHub credentials, so every write
+# the review loop makes to GitHub passes through `sandbox-relay serve' out
+# here, which runs `pr-loop' with the login, and `pr-loop' enforces the loop's
+# branch policy. Its socket sits in the relay directory, which the sandbox
+# already sees.
+if [[ -n "$pr_loop" ]]; then
+    sandbox-relay serve --workspace "$workspace" --socket "$relay/sandbox-relay.sock" >/dev/null &
+    pr_loop_pid=$!
+
+    for _ in $(seq 1 100); do
+        if [[ -S "$relay/sandbox-relay.sock" ]]; then
+            break
+        fi
+        sleep 0.05
+    done
+
+    if [[ ! -S "$relay/sandbox-relay.sock" ]]; then
+        printf 'eca-bwrap: sandbox-relay serve failed to start\n' >&2
+        exit 1
+    fi
+
+    # $HOME is empty inside, so the identity has to be spelled out. Commits
+    # are unsigned: no key reaches the sandbox, and the loop's signing pass
+    # re-signs them out here.
+    # Git hooks and config, which the next git command run out here would
+    # obey, and other agents' project settings, which can name hooks that run
+    # outside any sandbox, are read-only inside. A bind that does not exist
+    # yet cannot be made, so those directories are left out.
+    for protected in .git/hooks .git/config .claude .codex; do
+        if [[ -e "$workspace/$protected" ]]; then
+            bwrap_args+=(--ro-bind "$workspace/$protected" "$workspace/$protected")
+        fi
+    done
+
+    bwrap_args+=(
+        --setenv PATH "$pr_loop:$PATH"
+        --setenv SANDBOX_RELAY_URL "unix:$inner/sandbox-relay.sock"
+        --setenv PR_LOOP_SESSION 1
+        --setenv GIT_CONFIG_COUNT 1
+        --setenv GIT_CONFIG_KEY_0 commit.gpgsign
+        --setenv GIT_CONFIG_VALUE_0 false
+    )
+    for pair in name:NAME email:EMAIL; do
+        if value="$(git -C "$workspace" config "user.${pair%%:*}")"; then
+            bwrap_args+=(
+                --setenv "GIT_AUTHOR_${pair#*:}" "$value"
+                --setenv "GIT_COMMITTER_${pair#*:}" "$value"
+            )
+        fi
+    done
 fi
 
 bwrap_args+=("${env_args[@]}")
