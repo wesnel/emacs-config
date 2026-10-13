@@ -704,6 +704,26 @@ if USER is given, its username is USER.  The port is not matched."
   :hook
   (magit-mode . magit-delta-mode))
 
+;;;; Compare two versions of a branch in magit, such as before and after a
+;;;; rebase, or two rounds of review fixes (`d i' from the diff menu).
+(use-package magit-tbdiff
+  :ensure t
+
+  :after
+  (magit)
+
+  :custom
+  (magit-tbdiff-subcommand "range-diff"))
+
+;;;; Pull requests, issues and review threads in magit.  Forge reads its
+;;;; GitHub token from auth-source, under the host `api.github.com' and the
+;;;; user `USERNAME^forge'.
+(use-package forge
+  :ensure t
+
+  :after
+  (magit))
+
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos
   :ensure t
