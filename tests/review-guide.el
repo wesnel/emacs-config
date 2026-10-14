@@ -495,6 +495,22 @@ round 1 for Copilot.  BODY sees those fixups as `qodo' and `copilot'."
                      `(((,copilot "a.txt" ("-one" "+ONE" " TWO" " THREE")))
                        ((,qodo "a.txt" (" one" " TWO" "-three" "+THREE")))))))))
 
+(ert-deftest review-guide-loop-includes-fixups-for-local-findings ()
+  (review-guide-test--with-loop-repo
+    (review-guide-test--write repo "a.txt" "ONE\nTWO\nTHREE!\n")
+    (review-guide-test--git
+     repo "commit" "--quiet" "-a" (concat "--fixup=" pr-commit)
+     "-m" "The reviewer found the shout uneven."
+     "--trailer" "Review-Finding: 2.1")
+    (let* ((source (review-guide-test--loop repo))
+           (chunks (review-guide-source-chunks
+                    source (review-guide-diff-parse (review-guide-source-diff source)))))
+      (should (equal (mapcar #'review-guide-chunk-title chunks)
+                     '("Round 1, Copilot: Shout two" "Round 2, Qodo: Shout two"
+                       "Round 2, local review: Shout two")))
+      (should (equal (review-guide-chunk-summary (car (last chunks)))
+                     "The reviewer found the shout uneven.\n\nLocal review finding 2.1")))))
+
 (ert-deftest review-guide-loop-visits-the-fixup-and-its-parent ()
   (review-guide-test--with-loop-repo
     (let ((source (review-guide-test--loop repo)))

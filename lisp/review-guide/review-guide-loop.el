@@ -12,6 +12,10 @@
 ;;   Review-Bot: <bot>
 ;;   Review-Round: <round>
 ;;
+;; A fixup answering a finding of a local review carries instead:
+;;
+;;   Review-Finding: <round>.<id>
+;;
 ;; The guide shows one chunk per such commit, in round order, holding
 ;; that commit's own diff, so it opens without asking the model.  Each
 ;; hunk's lines are numbered within its commit; see
@@ -36,12 +40,13 @@
 
 (cl-defstruct (review-guide-loop-fixup (:constructor review-guide-loop-fixup-create)
                                        (:copier nil))
-  "A commit the review loop made to answer one review thread."
-  commit subject body thread bot round)
+  "A commit the review loop made to answer one review thread or finding."
+  commit subject body thread bot round finding)
 
 ;;;; Git
 
-(defconst review-guide-loop--trailers '("Review-Thread" "Review-Bot" "Review-Round")
+(defconst review-guide-loop--trailers
+  '("Review-Thread" "Review-Bot" "Review-Round" "Review-Finding")
   "The trailers a review loop's fixup carries.
 `review-guide-loop--fixups' reads them into fields in this order.")
 
@@ -64,8 +69,9 @@
 (defun review-guide-loop--fixups (source)
   "Return the review loop's fixups on SOURCE's branch, in round order.
 They are the commits since SOURCE's base that carry a Review-Thread
-trailer.  Within a round, and for commits without a Review-Round
-trailer, which come last, they stay in the branch's order."
+or Review-Finding trailer.  A finding's round is the part of its
+number before the dot.  Within a round, and for commits without one,
+which come last, they stay in the branch's order."
   (let* ((log (review-guide-local--git
                (review-guide-local-directory source) '(0)
                "log" "--reverse" "--no-merges"
@@ -80,18 +86,23 @@ trailer, which come last, they stay in the branch's order."
          (fixups
           (cl-loop
            for record in (split-string log "\x1e" t "[\n]+")
-           for (commit subject body thread bot round)
+           for (commit subject body thread bot round finding)
            = (mapcar (lambda (field)
                        (unless (string-empty-p (string-trim field))
                          (string-trim field)))
                      (split-string record "\x1f"))
-           when thread
+           for finding-id = (review-guide-loop--first-value finding)
+           when (or thread finding-id)
            collect (review-guide-loop-fixup-create
                     :commit commit :subject subject
                     :body (review-guide-loop--strip-trailers (or body ""))
                     :thread (review-guide-loop--first-value thread)
                     :bot (review-guide-loop--first-value bot)
-                    :round (review-guide-loop--first-value round)))))
+                    :round (or (review-guide-loop--first-value round)
+                               (and finding-id
+                                    (string-match (rx bos (group (+ digit)) ".") finding-id)
+                                    (match-string 1 finding-id)))
+                    :finding finding-id))))
     (sort fixups
           (lambda (a b)
             (< (review-guide-loop--round-number a) (review-guide-loop--round-number b))))))
@@ -109,20 +120,24 @@ trailer, which come last, they stay in the branch's order."
                             (review-guide-loop-fixup-subject fixup)))
 
 (defun review-guide-loop--title (fixup)
-  "Return FIXUP's round, bot and target, as a chunk title."
+  "Return FIXUP's round, reviewer and target, as a chunk title."
   (let ((who (string-join
               (delq nil (list (when-let* ((round (review-guide-loop-fixup-round fixup)))
                                 (format "Round %s" round))
-                              (review-guide-loop-fixup-bot fixup)))
+                              (or (review-guide-loop-fixup-bot fixup)
+                                  (and (review-guide-loop-fixup-finding fixup)
+                                       "local review"))))
               ", ")))
     (concat (unless (string-empty-p who) (concat who ": "))
             (review-guide-loop--target fixup))))
 
 (defun review-guide-loop--summary (fixup)
-  "Return FIXUP's message body and review thread, as a chunk summary."
+  "Return FIXUP's message body and what it answers, as a chunk summary."
   (string-join (delq nil (list (let ((body (review-guide-loop-fixup-body fixup)))
                                  (unless (string-empty-p body) body))
-                               (review-guide-loop-fixup-thread fixup)))
+                               (or (review-guide-loop-fixup-thread fixup)
+                                   (when-let* ((finding (review-guide-loop-fixup-finding fixup)))
+                                     (format "Local review finding %s" finding)))))
                "\n\n"))
 
 ;;;; The source
@@ -231,9 +246,10 @@ base; with one, ask for the branch and the base."
 (defun review-guide-loop (directory branch &optional base)
   "Show the review guide for the review loop's fixups on BRANCH.
 DIRECTORY is the git repository.  The fixups are the commits since
-where BASE and BRANCH diverged that carry a Review-Thread trailer,
-one chunk each, in round order.  BASE defaults to the local branch
-below BRANCH in its stack, or else the default branch.
+where BASE and BRANCH diverged that carry a Review-Thread or
+Review-Finding trailer, one chunk each, in round order.  BASE
+defaults to the local branch below BRANCH in its stack, or else the
+default branch.
 
 Interactively, review the current branch; with a prefix argument, ask
 for BRANCH and BASE."
