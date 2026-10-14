@@ -18,7 +18,8 @@
   # withholds the plans mount from that one.
   planArgs =
     lib.optionals (cfg.sandbox.plansDir != null) ["--plans" cfg.sandbox.plansDir]
-    ++ lib.optionals (cfg.sandbox.guardConfig != null) ["--guard-config" cfg.sandbox.guardConfig];
+    ++ lib.optionals (cfg.sandbox.guardConfig != null) ["--guard-config" cfg.sandbox.guardConfig]
+    ++ lib.optionals (cfg.sandbox.tools != null) ["--tools" cfg.sandbox.tools];
 
   # Carries the configured arguments, so that a TRAMP session from another
   # machine, which finds this on PATH, runs with them as well.
@@ -92,6 +93,18 @@ in {
           The agent-tools config, which `agent-plan` and the guard read.
           Every session sees it read-only at `~/.config/agent-tools/config.json`.
           Null mounts nothing.
+        '';
+      };
+
+      tools = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = cfg.sandbox.prLoop;
+        defaultText = lib.literalExpression "config.home.programs.wgn.emacs.eca.sandbox.prLoop";
+        description = ''
+          Directory holding the Linux `pr-loop` and `agent-plan` clients.
+          Ordinary sessions get it read-only on the guest's PATH, so the plan
+          guard hook runs and `agent-plan` works there; they start no relay and
+          run both directly. Null puts nothing on PATH.
         '';
       };
 

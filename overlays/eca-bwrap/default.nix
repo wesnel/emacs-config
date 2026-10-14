@@ -62,7 +62,7 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         sleep 0.1
       done
 
-      mkdir -p "$HOME/notes/agents" "$TMPDIR/bin" "$TMPDIR/client"
+      mkdir -p "$HOME/notes/agents" "$TMPDIR/bin" "$TMPDIR/client" "$TMPDIR/tools"
       printf '{"plans": {}}' > "$TMPDIR/guard.json"
 
       # Stands in for `sandbox-relay serve': records its arguments and
@@ -91,14 +91,21 @@ stdenvNoCC.mkDerivation (finalAttrs: {
       grep -qx pr-loop "$TMPDIR/relay-args"
       grep -qx agent-plan "$TMPDIR/relay-args"
 
-      ${finalAttrs.finalPackage}/bin/eca-bwrap \
+      # An ordinary session gets the tools and starts no relay.
+      rm "$TMPDIR/relay-args"
+      printf '#!${lib.getExe bash}\necho tool\n' > "$TMPDIR/tools/agent-plan"
+      chmod +x "$TMPDIR/tools/agent-plan"
+
+      PATH="$TMPDIR/bin:$PATH" ${finalAttrs.finalPackage}/bin/eca-bwrap \
         --allow-host 127.0.0.1 \
         --log "$TMPDIR/log.jsonl" \
         --env TEST_VAR=ok \
         --plans "$HOME/notes/agents" \
         --guard-config "$TMPDIR/guard.json" \
-        -- ${lib.getExe bash} ${../../tests/bwrap-guest.sh} "$port" "$HOME/notes/agents"
+        --tools "$TMPDIR/tools" \
+        -- ${lib.getExe bash} ${../../tests/bwrap-guest.sh} "$port" "$HOME/notes/agents" "" "$TMPDIR/tools"
       [ -f "$HOME/notes/agents/written" ]
+      [ ! -e "$TMPDIR/relay-args" ]
 
       grep -q '"dir": "response", "status": 200, "url": "http://127.0.0.1:'"$port"'/hello"' "$TMPDIR/log.jsonl"
       grep -q '"url": "http://blocked.invalid/"' "$TMPDIR/log.jsonl"

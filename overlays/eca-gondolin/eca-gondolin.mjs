@@ -58,6 +58,7 @@ const parseArgs = (argv) => {
     shareLogin: env.ECA_SANDBOX_SHARE_LOGIN === "1",
     prLoop: env.ECA_SANDBOX_PR_LOOP || null,
     plans: null,
+    tools: null,
     guardConfig: null,
     // Refused whichever mode is in force, so a host can be shut out of an
     // otherwise open session without naming every host that stays open.
@@ -108,6 +109,8 @@ const parseArgs = (argv) => {
       opts.prLoop = value();
     } else if (arg === "--plans") {
       opts.plans = value();
+    } else if (arg === "--tools") {
+      opts.tools = value();
     } else if (arg === "--guard-config") {
       opts.guardConfig = value();
     } else if (arg === "--deny-host") {
@@ -336,6 +339,19 @@ if (opts.plans && !opts.prLoop) {
     mounts[plans] = new RealFSProvider(plans);
   } else {
     process.stderr.write(`eca-gondolin: --plans ${plans} does not exist; plans are not mounted\n`);
+  }
+}
+
+// An ordinary session runs `agent-plan' and the plan guard itself, so it gets
+// the client directory on PATH and no relay. A review-loop session already
+// has it mounted.
+if (opts.tools && !opts.prLoop) {
+  const tools = path.resolve(opts.tools);
+
+  if (fs.statSync(tools, {throwIfNoEntry: false})?.isDirectory()) {
+    mounts["/usr/local/bin"] = new ReadonlyProvider(new RealFSProvider(tools));
+  } else {
+    process.stderr.write(`eca-gondolin: --tools ${tools} does not exist; it is not mounted\n`);
   }
 }
 

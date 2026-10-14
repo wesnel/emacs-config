@@ -1,7 +1,7 @@
 # Run inside eca-bwrap by its Nix test. $1 is a port on the host's loopback
 # where an HTTP server answers /hello, and 127.0.0.1 is allowed. $2 is the
 # plans directory the session was given, and "loop" as $3 marks a --pr-loop
-# session.
+# session. An ordinary session may pass its --tools directory as $4.
 set -euo pipefail
 
 port="$1"
@@ -28,6 +28,17 @@ if [[ "$mode" == loop ]]; then
 fi
 
 touch "$plans/written" || fail "the plans directory is not writable"
+
+# $4 is the --tools directory, which holds an `agent-plan' that prints "tool".
+tools="${4:-}"
+if [[ -n "$tools" ]]; then
+    [[ "$(command -v agent-plan)" == "$tools/agent-plan" ]] || fail "agent-plan is not on PATH from the tools directory"
+    [[ "$(agent-plan)" == tool ]] || fail "agent-plan does not run"
+    if touch "$tools/written" 2>/dev/null; then
+        fail "the tools directory is writable"
+    fi
+    [[ -z "${SANDBOX_RELAY_URL:-}" ]] || fail "an ordinary session has a relay"
+fi
 
 [[ ! -e "$HOME/.ssh" ]] || fail "~/.ssh is visible"
 [[ -z "${SSH_AUTH_SOCK:-}" ]] || fail "SSH_AUTH_SOCK leaked"

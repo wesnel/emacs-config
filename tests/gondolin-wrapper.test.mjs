@@ -48,7 +48,7 @@ const fixture = (t) => {
 
 test("a flag without its value is refused", (t) => {
   const {run} = fixture(t);
-  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace", "--plans", "--guard-config"]) {
+  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace", "--plans", "--guard-config", "--tools"]) {
     const result = run([flag]);
     assert.equal(result.status, 2, flag);
     assert.match(result.stderr, new RegExp(`${flag} needs a value`));
@@ -265,6 +265,40 @@ test("a pr-loop session logs only through the relay and gets no plans mount", (t
   const result = run(["--plans", plans, "--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.report.mounts[plans], undefined);
+});
+
+test("an ordinary session gets the tools on PATH and no relay", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server, args} = fakeRelay(dirs);
+  const tools = path.join(dirs.tmp, "tools");
+  fs.mkdirSync(tools);
+  const result = run(["--tools", tools], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.mounts["/usr/local/bin"], {root: tools, readonly: true});
+  assert.equal(fs.existsSync(args), false);
+  assert.equal(result.report.env.SANDBOX_RELAY_URL, undefined);
+  assert.equal(result.report.env.PR_LOOP_SESSION, undefined);
+});
+
+test("a pr-loop session keeps its own client directory over the tools", (t) => {
+  const {dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  const client = path.join(dirs.tmp, "client");
+  const tools = path.join(dirs.tmp, "tools");
+  fs.mkdirSync(client);
+  fs.mkdirSync(tools);
+  const result = run(["--tools", tools, "--pr-loop", client], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.mounts["/usr/local/bin"], {root: client, readonly: true});
+  assert.equal(result.report.env.SANDBOX_RELAY_URL, "http://sandbox-relay");
+});
+
+test("a tools directory that does not exist is left out with a notice", (t) => {
+  const {root, run} = fixture(t);
+  const result = run(["--tools", path.join(root, "absent")]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.mounts["/usr/local/bin"], undefined);
+  assert.match(result.stderr, /--tools .*absent.* does not exist/);
 });
 
 test("a plans directory that does not exist is left out with a notice", (t) => {

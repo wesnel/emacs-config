@@ -19,6 +19,7 @@ eca="${ECA_SANDBOX_ECA:-eca}"
 allow="${ECA_SANDBOX_ALLOW_HOSTS:-}"
 pr_loop="${ECA_SANDBOX_PR_LOOP:-}"
 plans=""
+tools=""
 guard_config=""
 env_args=()
 protect=()
@@ -27,7 +28,7 @@ command=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --) shift; command=("$@"); break ;;
-        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop|--protect|--plans|--guard-config)
+        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop|--protect|--plans|--tools|--guard-config)
             if [[ $# -lt 2 ]]; then
                 printf 'eca-bwrap: %s needs a value\n' "$1" >&2
                 exit 2
@@ -42,6 +43,7 @@ while [[ $# -gt 0 ]]; do
                 --pr-loop) pr_loop="$2" ;;
                 --protect) protect+=("${2#/}") ;;
                 --plans) plans="$2" ;;
+                --tools) tools="$2" ;;
                 --guard-config) guard_config="$2" ;;
                 --env)
                     if [[ "$2" != *=* ]]; then
@@ -244,6 +246,18 @@ if [[ -n "$plans" && -z "$pr_loop" ]]; then
         bwrap_args+=(--bind "$plans" "$plans")
     else
         printf 'eca-bwrap: --plans %s does not exist; plans are not mounted\n' "$plans" >&2
+    fi
+fi
+
+# An ordinary session runs `agent-plan' and the plan guard itself, so it gets
+# the client directory on PATH, read-only, and no relay. A review-loop session
+# has the same directory through --pr-loop.
+if [[ -n "$tools" && -z "$pr_loop" ]]; then
+    if [[ -d "$tools" ]]; then
+        tools="$(cd "$tools" && pwd)"
+        bwrap_args+=(--ro-bind "$tools" "$tools" --setenv PATH "$tools:$PATH")
+    else
+        printf 'eca-bwrap: --tools %s does not exist; it is not on PATH\n' "$tools" >&2
     fi
 fi
 
