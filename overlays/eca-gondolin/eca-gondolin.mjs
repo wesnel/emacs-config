@@ -65,6 +65,10 @@ const parseArgs = (argv) => {
     env: {},
     secrets: {},
     protect: [],
+    offline: false,
+    roMounts: [],
+    memory: null,
+    cpus: null,
     command: [],
   };
 
@@ -112,6 +116,44 @@ const parseArgs = (argv) => {
       opts.httpMaps.push(value());
     } else if (arg === "--protect") {
       opts.protect.push(value());
+    } else if (arg === "--offline") {
+      opts.offline = true;
+    } else if (arg === "--ro-mount") {
+      // Split at the last colon: the guest side is an absolute path, and
+      // host paths are the likelier of the two to contain one.
+      const spec = value();
+      const colon = spec.lastIndexOf(":");
+      const host = spec.slice(0, colon);
+      const guest = path.posix.normalize(spec.slice(colon + 1)).replace(/(.)\/+$/, "$1");
+
+      if (colon <= 0 || !path.posix.isAbsolute(guest) || guest === "/") {
+        process.stderr.write(`eca-gondolin: --ro-mount expects HOST:GUEST with an absolute GUEST, got ${spec}\n`);
+        process.exit(2);
+      }
+
+      if (!fs.statSync(host, {throwIfNoEntry: false})?.isDirectory()) {
+        process.stderr.write(`eca-gondolin: --ro-mount ${host} is not a directory\n`);
+        process.exit(2);
+      }
+
+      opts.roMounts.push({host: path.resolve(host), guest});
+    } else if (arg === "--memory") {
+      // QEMU's size syntax, as Gondolin passes it through.
+      opts.memory = value();
+
+      if (!/^[1-9]\d*[KMGT]?$/i.test(opts.memory)) {
+        process.stderr.write(`eca-gondolin: --memory expects a size such as 4G, got ${opts.memory}\n`);
+        process.exit(2);
+      }
+    } else if (arg === "--cpus") {
+      const spec = value();
+
+      if (!/^[1-9]\d*$/.test(spec)) {
+        process.stderr.write(`eca-gondolin: --cpus expects a positive whole number, got ${spec}\n`);
+        process.exit(2);
+      }
+
+      opts.cpus = Number(spec);
     } else if (arg === "--env") {
       const spec = value();
       const eq = spec.indexOf("=");
@@ -160,6 +202,35 @@ const parseArgs = (argv) => {
     }
   }
 
+  // An offline guest has no network device at all, so anything that would
+  // reach a host through the proxy is refused rather than left to fail
+  // inside the guest.
+  if (opts.offline) {
+    const networked = [
+      [opts.allowedHosts.length > 0, "--allow-host"],
+      [opts.observe, "--observe"],
+      [opts.deniedHosts.length > 0, "--deny-host"],
+      [opts.httpMaps.length > 0, "--http-map"],
+      [opts.tcpMaps.length > 0, "--tcp-map"],
+      [Object.keys(opts.secrets).length > 0, "--secret"],
+      [opts.prLoop, "--pr-loop"],
+      [opts.shareLogin, "--share-login"],
+      [opts.log, "--log"],
+    ]
+      .filter(([given]) => given)
+      .map(([, flag]) => flag);
+
+    if (networked.length > 0) {
+      process.stderr.write(`eca-gondolin: --offline has no network, so it cannot take ${networked.join(", ")}\n`);
+      process.exit(2);
+    }
+
+    if (opts.command.length === 0) {
+      process.stderr.write("eca-gondolin: --offline runs only a command given after --\n");
+      process.exit(2);
+    }
+  }
+
   return opts;
 };
 
@@ -184,7 +255,11 @@ const workspace = path.resolve(opts.workspace);
 // cannot satisfy both directions at once.
 const guestPath = opts.guestPath ?? workspace;
 
-mounts[guestPath] = new RealFSProvider(workspace);
+// An offline run is for code nobody has vetted for this machine, so it gets
+// the workspace read-only.
+mounts[guestPath] = opts.offline
+  ? new ReadonlyProvider(new RealFSProvider(workspace))
+  : new RealFSProvider(workspace);
 
 // Paths in the workspace that programs on this side run or load: git hooks
 // and config, which the next git command run here would obey, and other
@@ -488,6 +563,16 @@ if (opts.state) {
   mounts[`${GUEST_HOME}/.cache/eca`] = new RealFSProvider(state);
 }
 
+// Last, so that one cannot quietly replace a mount made above.
+for (const {host, guest} of opts.roMounts) {
+  if (guest in mounts) {
+    process.stderr.write(`eca-gondolin: --ro-mount ${guest} is already mounted\n`);
+    process.exit(2);
+  }
+
+  mounts[guest] = new ReadonlyProvider(new RealFSProvider(host));
+}
+
 const command = opts.command.length
   ? opts.command
   : [opts.eca ? `/opt/eca/${path.basename(opts.eca)}` : "eca", "server"];
@@ -647,7 +732,8 @@ if (opts.observe) {
   );
 }
 
-const {httpHooks, env} = createHttpHooks({
+// Offline, there is no proxy for hooks to sit in.
+const {httpHooks, env} = opts.offline ? {} : createHttpHooks({
   // Undefined is how the allowlist is turned off altogether; an array, even
   // an empty one, means the hosts in it and nothing else.
   allowedHosts: opts.observe ? undefined : opts.allowedHosts,
@@ -694,7 +780,7 @@ const {httpHooks, env} = createHttpHooks({
 
 const vm = new VM({
   vfs: {mounts},
-  httpHooks,
+  ...(opts.offline ? {} : {httpHooks}),
 
   // The guest image points the XDG variables at /tmp, and the server resolves
   // its config and cache through those rather than through HOME, so setting
@@ -710,17 +796,34 @@ const vm = new VM({
 
   // Anything not resolvable is unreachable, which is what makes the
   // allowlist an enforced boundary rather than a cooperative one.
-  dns: {
-    mode: "synthetic",
-    ...(mapped ? {syntheticHostMapping: "per-host"} : {}),
-  },
+  ...(opts.offline
+    ? {}
+    : {
+        dns: {
+          mode: "synthetic",
+          ...(mapped ? {syntheticHostMapping: "per-host"} : {}),
+        },
+      }),
 
   ...(mapped ? {tcp: {hosts: tcpHosts}} : {}),
+  ...(opts.memory ? {memory: opts.memory} : {}),
+  ...(opts.cpus ? {cpus: opts.cpus} : {}),
 
-  // The stock guest is Alpine, whose musl has no glibc loader, so the
-  // server's native build cannot start there. An image built with `gcompat'
-  // supplies /lib/ld-linux-aarch64.so.1.
-  ...(opts.image ? {sandbox: {imagePath: opts.image}} : {}),
+  ...(opts.image || opts.offline
+    ? {
+        sandbox: {
+          // The stock guest is Alpine, whose musl has no glibc loader, so the
+          // server's native build cannot start there. An image built with
+          // `gcompat' supplies /lib/ld-linux-aarch64.so.1.
+          ...(opts.image ? {imagePath: opts.image} : {}),
+
+          // No network device at all, rather than one behind a proxy that
+          // refuses everything: that proxy still looks each name up on this
+          // side before refusing it.
+          ...(opts.offline ? {netEnabled: false} : {}),
+        },
+      }
+    : {}),
 });
 
 let closed = false;
