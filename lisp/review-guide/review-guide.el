@@ -319,7 +319,9 @@ On a pending comment, delete it."
   "Send the pending comments on to wherever the guide's source sends them.
 For a pull request, that is a review submitted from `pr-review'."
   (interactive)
-  (review-guide-source-submit review-guide--source))
+  (let ((buffer (current-buffer)))
+    (review-guide-source-submit review-guide--source
+                                (lambda () (review-guide--rerender buffer)))))
 
 (defvar-keymap review-guide-mode-map
   :parent magit-section-mode-map

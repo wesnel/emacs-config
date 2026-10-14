@@ -56,7 +56,7 @@
        (pr-review--add-pending-review-thread-exit-callback source thread body)
        (funcall on-add)))))
 
-(cl-defmethod review-guide-source-submit ((source buffer))
+(cl-defmethod review-guide-source-submit ((source buffer) _on-done)
   "Choose whether the review comments, approves or requests changes,
 and write its top-level comment, in `pr-review'."
   (pop-to-buffer source)

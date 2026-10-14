@@ -9,7 +9,8 @@
 ;; no forge to post to, comments stay in the source until submitted,
 ;; which turns them into one Markdown document, each comment with the
 ;; lines it is about, for whoever is making the change; typically an
-;; agent, before its work is pushed.
+;; agent, before its work is pushed.  The document can be sent straight
+;; to an agent working in the repository: see `review-guide-send.el'.
 
 ;;; Code:
 
@@ -17,6 +18,7 @@
 (require 'subr-x)
 (require 'review-guide-diff)
 (require 'review-guide-source)
+(require 'review-guide-send)
 
 (declare-function review-guide-open "review-guide")
 
@@ -139,26 +141,78 @@ Signal an error unless git exits with a status in OK."
           (set-buffer-modified-p nil)
           (current-buffer)))))
 
-(cl-defmethod review-guide-source-submit ((source review-guide-local))
-  "Copy the pending comments as one Markdown document, and clear them.
-The document is also shown, to edit or send from."
+(defvar-local review-guide-local--feedback nil
+  "(SOURCE THREADS ON-DONE WINDOWS) for a feedback buffer.")
+
+(cl-defmethod review-guide-source-submit ((source review-guide-local) on-done)
+  "Show the pending comments as one Markdown document to edit and send.
+Sending it, with \\<review-guide-feedback-mode-map>\\[review-guide-feedback-send], \
+clears the comments it holds and calls ON-DONE."
   (let ((threads (review-guide-local-threads source))
-        (name (car (review-guide-source-describe source))))
+        (name (car (review-guide-source-describe source)))
+        (windows (current-window-configuration)))
     (unless threads
       (user-error "No pending comments"))
-    (let ((text (review-guide-local-feedback
-                 name (review-guide-diff-parse (review-guide-source-diff source))
-                 threads)))
-      (kill-new text)
-      (setf (review-guide-local-threads source) nil)
-      (with-current-buffer (get-buffer-create (format "*review-guide feedback %s*" name))
-        (let ((inhibit-read-only t))
-          (erase-buffer)
-          (insert text))
-        (if (fboundp 'gfm-mode) (gfm-mode) (text-mode))
-        (goto-char (point-min))
-        (pop-to-buffer (current-buffer)))
-      (message "Copied %d comments, and cleared them from the guide" (length threads)))))
+    (pop-to-buffer
+     (with-current-buffer (get-buffer-create (format "*review-guide feedback %s*" name))
+       (let ((inhibit-read-only t))
+         (erase-buffer)
+         (insert (review-guide-local-feedback
+                  name (review-guide-diff-parse (review-guide-source-diff source))
+                  threads)))
+       (if (fboundp 'gfm-mode) (gfm-mode) (text-mode))
+       (review-guide-feedback-mode)
+       (setq review-guide-local--feedback (list source threads on-done windows)
+             header-line-format
+             (substitute-command-keys
+              (concat "Send with \\[review-guide-feedback-send],"
+                      " cancel with \\[review-guide-feedback-cancel]")))
+       (goto-char (point-min))
+       (current-buffer)))))
+
+;;;; Sending feedback
+
+(defun review-guide-local--read-target ()
+  "Read where to send this buffer's feedback, as (LABEL . SEND)."
+  (let* ((source (car review-guide-local--feedback))
+         (targets (review-guide-send-targets (review-guide-local-directory source)))
+         (label (completing-read
+                 (format-prompt "Send feedback to" (caar targets))
+                 targets nil t nil nil (caar targets))))
+    (assoc label targets)))
+
+(defun review-guide-feedback-send (target)
+  "Send this buffer's feedback to TARGET, a (LABEL . SEND).
+The comments it was made from are then cleared from the guide.
+Interactively, choose among the agents and terminals working in the
+repository, or the kill ring; see `review-guide-send-target-functions'."
+  (interactive (list (review-guide-local--read-target)))
+  (pcase-let ((`(,source ,threads ,on-done ,windows) review-guide-local--feedback)
+              (text (string-trim (buffer-string))))
+    (funcall (cdr target) text)
+    (setf (review-guide-local-threads source)
+          (cl-set-difference (review-guide-local-threads source) threads :test #'eq))
+    (kill-buffer)
+    (when windows
+      (set-window-configuration windows))
+    (funcall on-done)
+    (message "Sent %d comments to %s" (length threads) (car target))))
+
+(defun review-guide-feedback-cancel ()
+  "Discard this feedback buffer, keeping the comments in the guide."
+  (interactive)
+  (let ((windows (nth 3 review-guide-local--feedback)))
+    (kill-buffer)
+    (when windows
+      (set-window-configuration windows))))
+
+(defvar-keymap review-guide-feedback-mode-map
+  "C-c C-c" #'review-guide-feedback-send
+  "C-c C-k" #'review-guide-feedback-cancel)
+
+(define-minor-mode review-guide-feedback-mode
+  "Minor mode for review feedback on its way to whoever is making the change."
+  :keymap review-guide-feedback-mode-map)
 
 ;;;; Feedback
 

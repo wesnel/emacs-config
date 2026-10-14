@@ -315,28 +315,87 @@ Git ignores the user's configuration, so it neither signs nor hooks."
               (should (equal (buffer-substring (point) (line-end-position)) "two")))
           (kill-buffer))))))
 
+(defconst review-guide-test--threads
+  '(((path . "new.txt") (line . 1) (side . "RIGHT") (body . "Is this needed?"))
+    ((startLine . 2) (startSide . "LEFT")
+     (path . "a.txt") (line . 2) (side . "RIGHT") (body . " Why shout? "))))
+
 (ert-deftest review-guide-local-submits-comments-as-markdown ()
   (review-guide-test--with-repo
     (let ((source (review-guide-test--local repo))
-          (kill-ring nil))
+          (later '((path . "a.txt") (line . 3) (side . "RIGHT") (body . "Later.")))
+          done sent)
       (setf (review-guide-local-threads source)
-            '(((path . "new.txt") (line . 1) (side . "RIGHT") (body . "Is this needed?"))
-              ((startLine . 2) (startSide . "LEFT")
-               (path . "a.txt") (line . 2) (side . "RIGHT") (body . " Why shout? "))))
+            (copy-sequence review-guide-test--threads))
       (save-window-excursion
-        (review-guide-source-submit source)
-        (kill-buffer))
-      (should (equal (car kill-ring)
-                     (concat
-                      "Review comments on "
-                      (car (review-guide-source-describe source)) ".\n"
-                      "\n## a.txt, removed line 2 to line 2\n\n"
-                      "```diff\n-two\n-three\n+TWO\n```\n\n"
-                      "Why shout?\n"
-                      "\n## new.txt, line 1\n\n"
-                      "```diff\n+fresh\n```\n\n"
-                      "Is this needed?\n")))
-      (should-not (review-guide-local-threads source)))))
+        (review-guide-source-submit source (lambda () (setq done t)))
+        (should review-guide-feedback-mode)
+        (should (equal (buffer-string)
+                       (concat
+                        "Review comments on "
+                        (car (review-guide-source-describe source)) ".\n"
+                        "\n## a.txt, removed line 2 to line 2\n\n"
+                        "```diff\n-two\n-three\n+TWO\n```\n\n"
+                        "Why shout?\n"
+                        "\n## new.txt, line 1\n\n"
+                        "```diff\n+fresh\n```\n\n"
+                        "Is this needed?\n")))
+        (goto-char (point-max))
+        (insert "\nThanks.\n")
+        ;; A comment written while the feedback is open is not in it.
+        (push later (review-guide-local-threads source))
+        (review-guide-feedback-send (cons "Test" (lambda (text) (setq sent text)))))
+      (should done)
+      (should (string-suffix-p "Is this needed?\n\nThanks." sent))
+      (should (equal (review-guide-local-threads source) (list later))))))
+
+(ert-deftest review-guide-local-cancelling-feedback-keeps-comments ()
+  (review-guide-test--with-repo
+    (let ((source (review-guide-test--local repo))
+          done)
+      (setf (review-guide-local-threads source)
+            (copy-sequence review-guide-test--threads))
+      (save-window-excursion
+        (review-guide-source-submit source (lambda () (setq done t)))
+        (review-guide-feedback-cancel))
+      (should-not done)
+      (should (equal (review-guide-local-threads source) review-guide-test--threads)))))
+
+(define-derived-mode review-guide-test-terminal-mode fundamental-mode "Terminal")
+
+(ert-deftest review-guide-send-finds-buffers-working-in-the-repository ()
+  ;; The change under review is in a worktree nested in the repository,
+  ;; at sub/.  Work in the main checkout above it counts; work in a
+  ;; directory that merely contains it does not.
+  (review-guide-test--with-repo
+    (let ((worktree (expand-file-name "sub/" repo))
+          (main (generate-new-buffer " *main checkout*"))
+          (inside (generate-new-buffer " *inside worktree*"))
+          (ancestor (generate-new-buffer " *ancestor*"))
+          (unrelated (generate-new-buffer " *unrelated*")))
+      (unwind-protect
+          (progn
+            (make-directory (expand-file-name "deeper" worktree) t)
+            (dolist (setup `((,main . ,repo)
+                             (,inside . ,(expand-file-name "deeper/" worktree))
+                             (,ancestor . ,(file-name-directory
+                                            (directory-file-name repo)))
+                             (,unrelated . ,(expand-file-name "~/"))))
+              (with-current-buffer (car setup)
+                (review-guide-test-terminal-mode)
+                (setq default-directory (cdr setup))))
+            (should (equal (sort (mapcar #'buffer-name
+                                         (review-guide-send--buffers
+                                          'review-guide-test-terminal-mode worktree))
+                                 #'string<)
+                           (list (buffer-name inside) (buffer-name main)))))
+        (mapc #'kill-buffer (list main inside ancestor unrelated))))))
+
+(ert-deftest review-guide-send-always-offers-the-kill-ring-last ()
+  (let ((review-guide-send-target-functions
+         (list (lambda (root) (list (cons (concat "Agent in " root) #'ignore))))))
+    (should (equal (mapcar #'car (review-guide-send-targets "/repo/"))
+                   '("Agent in /repo/" "Copy to the kill ring")))))
 
 (ert-deftest review-guide-local-adds-and-deletes-comments ()
   (let ((source (review-guide-local-create))

@@ -38,8 +38,10 @@ comment is added.")
 (cl-defgeneric review-guide-source-visit (source path side line)
   "Show LINE of PATH on SIDE of SOURCE's diff, in another window.")
 
-(cl-defgeneric review-guide-source-submit (source)
-  "Send the pending comments in SOURCE on to wherever they belong.")
+(cl-defgeneric review-guide-source-submit (source on-done)
+  "Send the pending comments in SOURCE on to wherever they belong.
+Call ON-DONE with no arguments once they have gone, when SOURCE can
+tell.")
 
 (provide 'review-guide-source)
 ;;; review-guide-source.el ends here
