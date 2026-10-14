@@ -244,6 +244,13 @@ mappings or `--allow-host` entries as needed. `args` replaces the entire
 argument list. `sandbox.enable = false` keeps the pinned server on PATH
 and runs it directly.
 
+`sandbox.plansDir` (default `~/git/notes/agents`) is where agents keep their
+plans. Ordinary sessions get it read-write at the same path, and
+`sandbox.guardConfig` (default `~/.config/agent-tools/config.json`) readable
+at that path in the guest. Set `plansDir` to the `plans.dir` that file names.
+A review-loop session gets no plans mount and logs through the relay. Both
+options take `null` to mount nothing.
+
 Local sessions use the configured command. TRAMP sessions run
 `eca-sandbox` on the workspace's remote host when it is on the remote
 PATH, and otherwise `eca`. The launch context comes from the session's
