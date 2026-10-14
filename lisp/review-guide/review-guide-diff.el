@@ -18,6 +18,9 @@
   "One hunk of a unified diff."
   (id nil :documentation "Stable identifier, such as \"H3\", given to the model.")
   (path nil :documentation "Path on the head side, or the base side for a deletion.")
+  (commit nil :documentation "The commit whose own diff holds the hunk, in a diff
+that is a series of commits, or nil.  Its line numbers are then relative to that
+commit: LEFT is its parent, RIGHT the commit itself.")
   (old-start 0) (old-count 0) (new-start 0) (new-count 0)
   (header nil :documentation "The \"@@ ... @@\" line, including any function context.")
   (lines nil :documentation "Body lines, each still prefixed with \" \", \"-\" or \"+\"."))
@@ -25,6 +28,9 @@
 (defconst review-guide-diff--hunk-header-regexp
   (rx bol "@@ -" (group (+ digit)) (? "," (group (+ digit)))
       " +" (group (+ digit)) (? "," (group (+ digit))) " @@"))
+
+(defconst review-guide-diff--commit-regexp
+  (rx bos "commit " (group (>= 40 hex-digit)) eow))
 
 (defun review-guide-diff--strip-prefix (path prefixed)
   "Return PATH without its a/ or b/ prefix when PREFIXED is non-nil.
@@ -39,11 +45,18 @@ Return nil for /dev/null."
 Hunks are numbered H1, H2, ... in the order they appear.  Both git's
 a/ and b/ prefixed form and the unprefixed form that `pr-review'
 fetches are accepted.  Files without hunks, such as binary files and
-pure renames, contribute nothing."
+pure renames, contribute nothing.
+
+A line \"commit SHA\" outside a hunk, as `git log -p' writes, starts
+that commit's diff: the hunks after it carry it as their commit."
   (let ((hunks nil) (n 0) (old-left 0) (new-left 0)
-        old-path new-path prefixed current)
+        old-path new-path prefixed current commit)
     (dolist (line (split-string diff "\n"))
       (cond
+       ((string-match review-guide-diff--commit-regexp line)
+        (when current (push current hunks))
+        (setq current nil old-path nil new-path nil
+              commit (match-string 1 line)))
        ((string-prefix-p "diff --git " line)
         (when current (push current hunks))
         (setq current nil old-path nil new-path nil
@@ -60,6 +73,7 @@ pure renames, contribute nothing."
               (review-guide-hunk-create
                :id (format "H%d" (cl-incf n))
                :path (or new-path old-path)
+               :commit commit
                :old-start (string-to-number (match-string 1 line))
                :old-count (if (match-string 2 line)
                               (string-to-number (match-string 2 line))
@@ -122,8 +136,12 @@ lines, which is where GitHub anchors a comment on each.  The
 Each body line is preceded by L<n> or R<n>, the coordinates a review
 comment on that line would use."
   (concat
-   (format "### %s %s\n%s\n" (review-guide-hunk-id hunk)
-           (review-guide-hunk-path hunk) (review-guide-hunk-header hunk))
+   (format "### %s %s%s\n%s\n" (review-guide-hunk-id hunk)
+           (review-guide-hunk-path hunk)
+           (if-let* ((commit (review-guide-hunk-commit hunk)))
+               (format " in commit %s" (substring commit 0 12))
+             "")
+           (review-guide-hunk-header hunk))
    (mapconcat (pcase-lambda (`(,text ,side ,line))
                 (format "%s%-5d|%s" (substring side 0 1) line text))
               (review-guide-hunk-coordinates hunk)

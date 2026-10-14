@@ -116,11 +116,16 @@ Signal an error unless git exits with a status in OK."
   (setf (review-guide-local-threads source)
         (delq thread (review-guide-local-threads source))))
 
-(cl-defmethod review-guide-source-visit ((source review-guide-local) path side line)
+(cl-defmethod review-guide-source-visit
+  ((source review-guide-local) path side line &optional commit)
   (let* ((directory (review-guide-local-directory source))
-         (rev (if (equal side "LEFT")
-                  (review-guide-local-base source)
-                (review-guide-local-head source))))
+         (rev (cond
+               ((and commit (equal side "LEFT"))
+                (or (review-guide-local--rev directory (concat commit "^"))
+                    (user-error "%s has no parent" commit)))
+               (commit)
+               ((equal side "LEFT") (review-guide-local-base source))
+               (t (review-guide-local-head source)))))
     (pop-to-buffer
      (if rev
          (review-guide-local--revision-buffer directory rev path)
@@ -222,14 +227,17 @@ repository, or the kill ring; see `review-guide-send-target-functions'."
     (let ((start-side (or .startSide .side))
           (start (or .startLine .line))
           (removed (lambda (side) (if (equal side "LEFT") "removed line" "line"))))
-      (cond
-       ((and (equal start-side .side) (eql start .line))
-        (format "%s %d" (funcall removed .side) .line))
-       ((equal start-side .side)
-        (format "%ss %d-%d" (funcall removed .side) start .line))
-       (t
-        (format "%s %d to %s %d" (funcall removed start-side) start
-                (funcall removed .side) .line))))))
+      (concat
+       (cond
+        ((and (equal start-side .side) (eql start .line))
+         (format "%s %d" (funcall removed .side) .line))
+        ((equal start-side .side)
+         (format "%ss %d-%d" (funcall removed .side) start .line))
+        (t
+         (format "%s %d to %s %d" (funcall removed start-side) start
+                 (funcall removed .side) .line)))
+       (when .commit
+         (format " in commit %s" (substring .commit 0 12)))))))
 
 (defun review-guide-local--excerpt (hunks thread)
   "Return the diff lines THREAD covers in HUNKS, or nil if none hold them."
@@ -238,7 +246,8 @@ repository, or the kill ring; see `review-guide-send-target-functions'."
           (last (list .side .line)))
       (cl-some
        (lambda (hunk)
-         (when (equal (review-guide-hunk-path hunk) .path)
+         (when (and (equal (review-guide-hunk-path hunk) .path)
+                    (equal (review-guide-hunk-commit hunk) .commit))
            (let* ((coords (review-guide-hunk-coordinates hunk))
                   (from (cl-position first coords :key #'cdr :test #'equal))
                   (to (cl-position last coords :key #'cdr :test #'equal)))

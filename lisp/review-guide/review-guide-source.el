@@ -7,7 +7,9 @@
 ;; A source supplies the diff a guide shows and keeps the comments
 ;; written on it until they are submitted.  Pending comments are
 ;; alists of GitHub's draft review thread fields: path, line and side,
-;; startLine and startSide for a range, and body.
+;; startLine and startSide for a range, and body.  When the diff is a
+;; series of commits, each comment also has a commit field naming the
+;; commit its lines are numbered in; see `review-guide-hunk-commit'.
 
 ;;; Code:
 
@@ -20,6 +22,13 @@
   "Return (NAME TITLE DESCRIPTION) for SOURCE.
 NAME identifies the guide's buffer.  TITLE and DESCRIPTION tell the
 model what the change is for; either may be nil.")
+
+(cl-defgeneric review-guide-source-chunks (source hunks)
+  "Return SOURCE's own arrangement of HUNKS into `review-guide-chunk's.
+HUNKS are parsed from SOURCE's diff.  Return nil to have the model
+arrange them instead."
+  (ignore source hunks)
+  nil)
 
 (cl-defgeneric review-guide-source-threads (source)
   "Return the pending comments in SOURCE.")
@@ -35,8 +44,9 @@ comment is added.")
   (user-error "Edit this comment where %s keeps it"
               (car (review-guide-source-describe source))))
 
-(cl-defgeneric review-guide-source-visit (source path side line)
-  "Show LINE of PATH on SIDE of SOURCE's diff, in another window.")
+(cl-defgeneric review-guide-source-visit (source path side line &optional commit)
+  "Show LINE of PATH on SIDE of SOURCE's diff, in another window.
+COMMIT is the `review-guide-hunk-commit' of the hunk holding the line.")
 
 (cl-defgeneric review-guide-source-submit (source on-done)
   "Send the pending comments in SOURCE on to wherever they belong.

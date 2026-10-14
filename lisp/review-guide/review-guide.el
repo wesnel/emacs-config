@@ -16,9 +16,10 @@
 ;; `review-guide-source.el'.
 ;;
 ;; Entry points: `review-guide', for a pull request open in `pr-review',
-;; from a forge pull request, or from a pull request URL; and
+;; from a forge pull request, or from a pull request URL;
 ;; `review-guide-local', for changes in a local repository that are not
-;; pushed yet.
+;; pushed yet; and `review-guide-loop', for the fixups an automated
+;; review loop committed on a branch, one chunk each.
 
 ;;; Code:
 
@@ -29,6 +30,7 @@
 (require 'review-guide-source)
 (require 'review-guide-pr-review)
 (require 'review-guide-local)
+(require 'review-guide-loop)
 
 ;;;; State
 
@@ -39,7 +41,7 @@
 (defvar-local review-guide--hunks nil)
 (defvar-local review-guide--overview nil)
 (defvar-local review-guide--chunks nil
-  "The model's chunks, or nil before it has answered.")
+  "The source's chunks or the model's, or nil for the diff in order.")
 (defvar-local review-guide--review-summary nil)
 (defvar-local review-guide--findings nil)
 (defvar-local review-guide--busy nil
@@ -109,7 +111,8 @@ rather than filled."
 
 (defun review-guide--insert-hunk (hunk threads)
   "Insert HUNK with the findings and pending THREADS that end on its lines."
-  (let ((path (review-guide-hunk-path hunk)))
+  (let ((path (review-guide-hunk-path hunk))
+        (commit (review-guide-hunk-commit hunk)))
     (magit-insert-section (review-guide-hunk hunk)
       (magit-insert-heading
         (propertize (format "%s  %s" path (review-guide-hunk-header hunk))
@@ -117,9 +120,10 @@ rather than filled."
       (pcase-dolist (`(,text ,side ,line) (review-guide-hunk-coordinates hunk))
         (insert (propertize (concat text "\n")
                             'face (review-guide--diff-face text)
-                            'review-guide-line (list path side line)))
+                            'review-guide-line (list path side line commit)))
         (dolist (thread threads)
           (when (and (equal (alist-get 'path thread) path)
+                     (equal (alist-get 'commit thread) commit)
                      (equal (alist-get 'side thread) side)
                      (eql (alist-get 'line thread) line))
             (review-guide--insert-thread thread)))
@@ -184,7 +188,8 @@ rather than filled."
 ;;;; Commands
 
 (defun review-guide--line-at (pos)
-  "Return (PATH SIDE LINE) for the diff line at POS, or nil."
+  "Return (PATH SIDE LINE COMMIT) for the diff line at POS, or nil.
+COMMIT is the `review-guide-hunk-commit' of the line's hunk."
   (get-text-property (save-excursion (goto-char pos) (line-beginning-position))
                      'review-guide-line))
 
@@ -205,14 +210,16 @@ rather than filled."
   "Re-read the diff from the guide's source and redraw.
 For a pull request, refresh the `pr-review' buffer first to fetch new
 commits.  When the diff has changed, the model's chunks and comments
-refer to hunks that no longer exist, so they are discarded."
+refer to hunks that no longer exist, so they are discarded, and the
+source's own chunks, if it has any, take their place."
   (interactive)
   (let ((diff (review-guide-source-diff review-guide--source)))
     (unless (equal diff review-guide--diff)
       (setq review-guide--diff diff
             review-guide--hunks (review-guide-diff-parse diff)
             review-guide--overview nil
-            review-guide--chunks nil
+            review-guide--chunks (review-guide-source-chunks review-guide--source
+                                                             review-guide--hunks)
             review-guide--review-summary nil
             review-guide--findings nil)))
   (review-guide--render))
@@ -257,29 +264,35 @@ The comments stay local until forwarded with `review-guide-forward'."
   "Show the diff line at point where the guide's source keeps it."
   (interactive)
   (pcase (review-guide--line-at (point))
-    (`(,path ,side ,line) (review-guide-source-visit review-guide--source path side line))
+    (`(,path ,side ,line ,commit)
+     (review-guide-source-visit review-guide--source path side line commit))
     (_ (user-error "Not on a diff line"))))
 
 (defun review-guide-comment (beg end)
   "Add a comment on the diff line at point to the pending review.
 With an active region from BEG to END, comment on the range of lines
-it covers, which must lie in one file."
+it covers, which must lie in one file, and in one commit when the
+diff is a series of them."
   (interactive (if (use-region-p)
                    (list (region-beginning) (1- (region-end)))
                  (list (point) (point))))
-  (pcase-let ((`(,path ,side ,line) (review-guide--line-at end))
-              (`(,start-path ,start-side ,start-line) (review-guide--line-at beg))
+  (pcase-let ((`(,path ,side ,line ,commit) (review-guide--line-at end))
+              (`(,start-path ,start-side ,start-line ,start-commit)
+               (review-guide--line-at beg))
               (buffer (current-buffer)))
     (unless (and path start-path)
       (user-error "The comment must start and end on diff lines"))
     (unless (equal path start-path)
       (user-error "A comment on a range of lines must stay in one file"))
+    (unless (equal commit start-commit)
+      (user-error "A comment on a range of lines must stay in one commit"))
     (deactivate-mark)
     (review-guide-source-add-thread
      review-guide--source
      (append (unless (and (equal side start-side) (eql line start-line))
                `((startLine . ,start-line) (startSide . ,start-side)))
-             `((path . ,path) (line . ,line) (side . ,side)))
+             `((path . ,path) (line . ,line) (side . ,side))
+             (when commit `((commit . ,commit))))
      nil
      (lambda () (review-guide--rerender buffer)))))
 
@@ -345,10 +358,12 @@ For a pull request, that is a review submitted from `pr-review'."
 
 ;;;; Entry point
 
+;;;###autoload
 (defun review-guide-open (source)
   "Show the review guide for SOURCE, creating it if needed.
 A new guide asks the model to arrange the diff into chunks straight
-away.  A guide is identified by its source's name, so opening the same
+away, unless SOURCE supplies its own; see `review-guide-source-chunks'.
+A guide is identified by its source's name, so opening the same
 change again shows the existing guide, which keeps its own source and
 the pending comments in it, unless that source is a killed buffer."
   (let* ((name (car (review-guide-source-describe source)))
@@ -361,7 +376,8 @@ the pending comments in it, unless that source is a killed buffer."
                          (not (buffer-live-p review-guide--source))))
         (setq review-guide--source source))
       (review-guide-refresh)
-      (when new (review-guide-arrange)))
+      (when (and new (not review-guide--chunks))
+        (review-guide-arrange)))
     (pop-to-buffer buffer)))
 
 (provide 'review-guide)
