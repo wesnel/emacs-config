@@ -77,6 +77,12 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         exit 1
       fi
       [ -f "$HOME/project/written" ]
+
+      # An empty state is not bound, and the proxy's CA stays out of the
+      # workspace.
+      ${finalAttrs.finalPackage}/bin/eca-bwrap --state "" \
+        -- ${lib.getExe bash} -c '[ ! -e "$HOME/.cache/eca" ]'
+      [ ! -e "$HOME/project/-proxy" ]
       touch $out
     '';
 

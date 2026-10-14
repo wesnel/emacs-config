@@ -62,12 +62,17 @@ state="${state%/}"
 allow="$(printf '%s\n' "${allow//,/$'\n'}" | awk 'NF && !seen[$0]++' | paste -sd, -)"
 
 # Outside $state, which the guest can write, because this holds the CA's
-# private key. It persists so that the CA stays stable between sessions.
-confdir="$state-proxy"
+# private key. It persists so that the CA stays stable between sessions. An
+# empty --state binds no state, and the CA stays where the default would put
+# it.
+confdir="${state:-${XDG_CACHE_HOME:-$HOME/.cache}/eca-bwrap}-proxy"
 proxy_log="$confdir/mitmdump.log"
 relay="$(mktemp -d "${TMPDIR:-/tmp}/eca-bwrap.XXXXXX")"
 
-mkdir -p "$state" "$confdir"
+mkdir -p "$confdir"
+if [[ -n "$state" ]]; then
+    mkdir -p "$state"
+fi
 
 cleanup() {
     for pid in "${proxy_pid:-}" "${relay_pid:-}" "${pr_loop_pid:-}"; do
@@ -170,7 +175,6 @@ done
 
 bwrap_args+=(
     --bind "$workspace" "$workspace"
-    --bind "$state" "$HOME/.cache/eca"
     --ro-bind "$relay" "$inner"
     --chdir "$workspace"
     --setenv HOME "$HOME"
@@ -188,6 +192,10 @@ bwrap_args+=(
     --setenv SSL_CERT_FILE "$inner/ca.pem"
     --setenv NODE_EXTRA_CA_CERTS "$inner/ca.pem"
 )
+
+if [[ -n "$state" ]]; then
+    bwrap_args+=(--bind "$state" "$HOME/.cache/eca")
+fi
 
 # A review-loop session also runs `pr-loop guard' before every tool call. It
 # goes into a staged copy, so ordinary sessions and the config ECA writes out
