@@ -84,6 +84,7 @@ final: prev: let
     # in the correct order regardless of location in final file.
     pkgs.replaceVars ../default.el {
       eca-helper = builtins.readFile ../lisp/wgn-eca.el;
+      untrusted-helper = builtins.readFile ../lisp/wgn-untrusted.el;
       inherit
         (deps)
         ensure

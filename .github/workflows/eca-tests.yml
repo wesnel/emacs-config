@@ -27,6 +27,13 @@ jobs:
             (load (expand-file-name "tests/run-eca.el" (getenv "GITHUB_WORKSPACE")) nil t)
             (wgn-eca-run-tests))
           '
+      - name: Run untrusted directory tests
+        run: |
+          emacsclient --socket-name=eca-tests --eval '
+          (progn
+            (load (expand-file-name "tests/run-untrusted.el" (getenv "GITHUB_WORKSPACE")) nil t)
+            (wgn-untrusted-run-tests))
+          '
       - name: Stop test server
         if: always()
         run: |
