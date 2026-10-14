@@ -67,6 +67,17 @@ test("the workspace is mounted where it lives and the server runs there", (t) =>
   assert.equal(result.report.command, "'/opt/eca/eca' 'server'");
 });
 
+test("an empty state or config is not mounted at all", (t) => {
+  const {dirs, run} = fixture(t);
+  fs.writeFileSync(path.join(dirs.config, "config.json"), "{}");
+  const result = run(["--state", "", "--config", ""]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.mounts["/root/.cache/eca"], undefined);
+  assert.equal(result.report.mounts["/root/.config/eca"], undefined);
+  assert.deepEqual(fs.readdirSync(dirs.home), []);
+  assert.deepEqual(fs.readdirSync(dirs.workspace), []);
+});
+
 test("only listed skills reach the guest, with links resolved", (t) => {
   const {root, dirs, run} = fixture(t);
   const store = path.join(root, "store");
