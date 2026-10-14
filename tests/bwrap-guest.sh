@@ -1,13 +1,33 @@
 # Run inside eca-bwrap by its Nix test. $1 is a port on the host's loopback
-# where an HTTP server answers /hello, and 127.0.0.1 is allowed.
+# where an HTTP server answers /hello, and 127.0.0.1 is allowed. $2 is the
+# plans directory the session was given, and "loop" as $3 marks a --pr-loop
+# session.
 set -euo pipefail
 
 port="$1"
+plans="$2"
+mode="${3:-}"
 
 fail() {
     printf 'bwrap-guest: %s\n' "$1" >&2
     exit 1
 }
+
+guard="$HOME/.config/agent-tools/config.json"
+[[ "$(cat "$guard")" == '{"plans": {}}' ]] || fail "the guard config is not readable at $guard"
+if (: >>"$guard") 2>/dev/null; then
+    fail "the guard config is writable"
+fi
+
+if [[ "$mode" == loop ]]; then
+    if touch "$plans/written" 2>/dev/null; then
+        fail "a pr-loop session can write the plans directory"
+    fi
+    [[ -n "${SANDBOX_RELAY_URL:-}" ]] || fail "a pr-loop session has no relay"
+    exit 0
+fi
+
+touch "$plans/written" || fail "the plans directory is not writable"
 
 [[ ! -e "$HOME/.ssh" ]] || fail "~/.ssh is visible"
 [[ -z "${SSH_AUTH_SOCK:-}" ]] || fail "SSH_AUTH_SOCK leaked"
