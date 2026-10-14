@@ -48,7 +48,7 @@ const fixture = (t) => {
 
 test("a flag without its value is refused", (t) => {
   const {run} = fixture(t);
-  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace"]) {
+  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace", "--plans", "--guard-config"]) {
     const result = run([flag]);
     assert.equal(result.status, 2, flag);
     assert.match(result.stderr, new RegExp(`${flag} needs a value`));
@@ -189,6 +189,7 @@ test("pr-loop is served from this side and reached from the guest", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.deepEqual(fs.readFileSync(args, "utf8").trim().split("\n"), [
     "serve", "--workspace", dirs.workspace, "--guest-path", dirs.workspace, "--listen", "127.0.0.1:0",
+    "--program", "pr-loop", "--program", "agent-plan",
   ]);
   assert.deepEqual(result.report.mounts["/usr/local/bin"], {root: client, readonly: true});
   assert.deepEqual(result.report.rewritten, ["http://127.0.0.1:4567/"]);
@@ -245,4 +246,63 @@ test("a relay that does not start stops the wrapper", (t) => {
   assert.equal(result.status, 2);
   assert.match(result.stderr, /sandbox-relay serve exited before listening/);
   assert.equal(result.report, null);
+});
+
+test("the plans directory is writable in the guest where it lives", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const plans = path.join(root, "notes", "agents");
+  fs.mkdirSync(plans, {recursive: true});
+  const result = run(["--plans", plans]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.mounts[plans], {root: plans, readonly: false});
+});
+
+test("a pr-loop session logs only through the relay and gets no plans mount", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  const plans = path.join(root, "notes", "agents");
+  fs.mkdirSync(plans, {recursive: true});
+  const result = run(["--plans", plans, "--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.mounts[plans], undefined);
+});
+
+test("a plans directory that does not exist is left out with a notice", (t) => {
+  const {root, run} = fixture(t);
+  const plans = path.join(root, "absent");
+  const result = run(["--plans", plans]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.mounts[plans], undefined);
+  assert.match(result.stderr, /--plans .*absent.* does not exist/);
+});
+
+test("the guard config is readable where agent-plan looks, with links resolved", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const store = path.join(root, "store.json");
+  fs.writeFileSync(store, '{"plans": {"dir": "/x"}}');
+  const link = path.join(root, "config.json");
+  fs.symlinkSync(store, link);
+  const result = run(["--guard-config", link]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.mounts["/root/.config/agent-tools"].readonly, true);
+  assert.deepEqual(result.report.guardConfig, {"config.json": '{"plans": {"dir": "/x"}}'});
+  assert.deepEqual(fs.readdirSync(dirs.tmp), []);
+});
+
+test("the guard config stays visible to a pr-loop session", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const {server} = fakeRelay(dirs);
+  const file = path.join(root, "guard.json");
+  fs.writeFileSync(file, "{}");
+  const result = run(["--guard-config", file, "--pr-loop", dirs.tmp], {ECA_SANDBOX_RELAY: server});
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.guardConfig, {"config.json": "{}"});
+});
+
+test("a guard config that does not exist is left out with a notice", (t) => {
+  const {root, run} = fixture(t);
+  const result = run(["--guard-config", path.join(root, "absent.json")]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.guardConfig, null);
+  assert.match(result.stderr, /--guard-config .*absent.json.* does not exist/);
 });

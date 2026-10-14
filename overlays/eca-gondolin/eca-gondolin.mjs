@@ -57,6 +57,8 @@ const parseArgs = (argv) => {
     observe: env.ECA_SANDBOX_OBSERVE === "1",
     shareLogin: env.ECA_SANDBOX_SHARE_LOGIN === "1",
     prLoop: env.ECA_SANDBOX_PR_LOOP || null,
+    plans: null,
+    guardConfig: null,
     // Refused whichever mode is in force, so a host can be shut out of an
     // otherwise open session without naming every host that stays open.
     deniedHosts: [],
@@ -104,6 +106,10 @@ const parseArgs = (argv) => {
       opts.shareLogin = true;
     } else if (arg === "--pr-loop") {
       opts.prLoop = value();
+    } else if (arg === "--plans") {
+      opts.plans = value();
+    } else if (arg === "--guard-config") {
+      opts.guardConfig = value();
     } else if (arg === "--deny-host") {
       opts.deniedHosts.push(value());
     } else if (arg === "--tcp-map") {
@@ -258,7 +264,10 @@ if (opts.prLoop) {
   const {spawn, execFileSync} = await import("node:child_process");
   const server = spawn(
     process.env.ECA_SANDBOX_RELAY || "sandbox-relay",
-    ["serve", "--workspace", workspace, "--guest-path", guestPath, "--listen", "127.0.0.1:0"],
+    [
+      "serve", "--workspace", workspace, "--guest-path", guestPath, "--listen", "127.0.0.1:0",
+      "--program", "pr-loop", "--program", "agent-plan",
+    ],
     {stdio: ["ignore", "pipe", "inherit"]},
   );
 
@@ -316,6 +325,18 @@ if (opts.prLoop) {
     ...(email ? {GIT_AUTHOR_EMAIL: email, GIT_COMMITTER_EMAIL: email} : {}),
     ...opts.env,
   };
+}
+
+// Agents write their plans here, at the path the config's `plans.dir' names.
+// A review-loop session logs only through the relay, so it gets no mount.
+if (opts.plans && !opts.prLoop) {
+  const plans = path.resolve(opts.plans);
+
+  if (fs.statSync(plans, {throwIfNoEntry: false})?.isDirectory()) {
+    mounts[plans] = new RealFSProvider(plans);
+  } else {
+    process.stderr.write(`eca-gondolin: --plans ${plans} does not exist; plans are not mounted\n`);
+  }
 }
 
 // The guest image has no copy of the server, so a Linux build is mounted
@@ -447,6 +468,22 @@ if (opts.prLoop) {
     },
   };
   fs.writeFileSync(file, JSON.stringify(config, null, 2));
+}
+
+// The file `agent-plan' and its guard read. Copied with links resolved, as the
+// ECA config is, because Home Manager makes it a link into the store.
+if (opts.guardConfig) {
+  const file = path.resolve(opts.guardConfig);
+
+  if (fs.existsSync(file)) {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "eca-gondolin-guard-"));
+
+    process.on("exit", () => fs.rmSync(dir, {recursive: true, force: true}));
+    fs.copyFileSync(file, path.join(dir, "config.json"));
+    mounts[`${GUEST_HOME}/.config/agent-tools`] = new ReadonlyProvider(new RealFSProvider(dir));
+  } else {
+    process.stderr.write(`eca-gondolin: --guard-config ${file} does not exist; it is not mounted\n`);
+  }
 }
 
 if (opts.state) {
