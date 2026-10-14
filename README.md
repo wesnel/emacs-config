@@ -448,6 +448,21 @@ headers are rewritten. Use it for services which do not speak HTTP.
 The workspace is mounted at the same path inside the guest, so no
 `eca-local-to-remote-prefix-map` is needed.
 
+### Running a command offline
+
+`--offline` runs the command given after `--`, such as a pull request's
+tests, with no network: Gondolin's guest has no network device, so it has
+no proxy and nothing is looked up on the host for it. The workspace is
+mounted read-only. Options that reach a host (`--allow-host`, `--observe`,
+`--deny-host`, `--http-map`, `--tcp-map`, `--secret`, `--pr-loop`,
+`--share-login` and `--log`) are refused, as are `--plans`, `--tools` and
+`--guard-config`, which serve an agent session.
+
+`--ro-mount HOST:GUEST` mounts the directory `HOST` read-only at `GUEST`,
+and may be repeated. `--state ''` and `--config ''` leave out the state and
+ECA config mounts. `--memory SIZE` (QEMU syntax, such as `4G`) and `--cpus N`
+size the VM.
+
 ### Remote hosts and backend differences
 
 Emacs running on another machine uses that machine's configured sandbox
@@ -478,6 +493,7 @@ The backends' flags are not interchangeable:
 | `--observe`, `--deny-host` | Supported | Unsupported |
 | `--share-login`, `--secret` | Supported | Unsupported |
 | `--http-map`, `--tcp-map` | Supported | Unsupported |
+| `--offline`, `--ro-mount`, `--memory`, `--cpus` | Supported | Unsupported |
 
 An unsupported option causes Bubblewrap to exit at startup. Choose arguments
 for the selected backend rather than copying the Gondolin examples wholesale.

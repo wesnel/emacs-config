@@ -48,7 +48,10 @@ const fixture = (t) => {
 
 test("a flag without its value is refused", (t) => {
   const {run} = fixture(t);
-  for (const flag of ["--allow-host", "--http-map", "--env", "--secret", "--workspace", "--plans", "--guard-config", "--tools"]) {
+  for (const flag of [
+    "--allow-host", "--http-map", "--env", "--secret", "--workspace", "--plans", "--guard-config", "--tools",
+    "--ro-mount", "--memory", "--cpus",
+  ]) {
     const result = run([flag]);
     assert.equal(result.status, 2, flag);
     assert.match(result.stderr, new RegExp(`${flag} needs a value`));
@@ -350,4 +353,131 @@ test("a guard config that does not exist is left out with a notice", (t) => {
   assert.equal(result.status, 0, result.stderr);
   assert.equal(result.report.guardConfig, null);
   assert.match(result.stderr, /--guard-config .*absent.json.* does not exist/);
+});
+
+test("without --offline the VM keeps its network and default size", (t) => {
+  const {run} = fixture(t);
+  const result = run();
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.hooksCreated, true);
+  assert.equal(result.report.httpHooks, true);
+  assert.deepEqual(result.report.dns, {mode: "synthetic"});
+  assert.deepEqual(result.report.sandbox, {imagePath: "/stub-image"});
+  assert.equal(result.report.memory, null);
+  assert.equal(result.report.cpus, null);
+});
+
+test("--offline gives the VM no network and the workspace read-only", (t) => {
+  const {dirs, run} = fixture(t);
+  const result = run(["--offline", "--", "go", "test", "./..."]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.sandbox, {imagePath: "/stub-image", netEnabled: false});
+  assert.equal(result.report.hooksCreated, false);
+  assert.equal(result.report.httpHooks, false);
+  assert.equal(result.report.dns, null);
+  assert.equal(result.report.tcp, null);
+  assert.deepEqual(result.report.mounts[dirs.workspace], {root: dirs.workspace, readonly: true});
+  assert.equal(result.report.command, "'go' 'test' './...'");
+});
+
+test("--offline mounts the workspace at --guest-path and runs there", (t) => {
+  const {dirs, run} = fixture(t);
+  const result = run(["--offline", "--guest-path", "/src", "--", "true"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(result.report.mounts["/src"], {root: dirs.workspace, readonly: true});
+  assert.equal(result.report.mounts[dirs.workspace], undefined);
+  assert.equal(result.report.cwd, "/src");
+});
+
+test("--offline refuses an agent's plans, tools and guard config", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const file = path.join(root, "guard.json");
+  fs.writeFileSync(file, "{}");
+  for (const [args, flag] of [
+    [["--plans", dirs.tmp], "--plans"],
+    [["--tools", dirs.tmp], "--tools"],
+    [["--guard-config", file], "--guard-config"],
+  ]) {
+    const result = run(["--offline", ...args, "--", "true"]);
+    assert.equal(result.status, 2, flag);
+    assert.match(result.stderr, new RegExp(`--offline runs no agent, so it cannot take ${flag}`), flag);
+    assert.equal(result.report, null, flag);
+  }
+});
+
+test("--offline refuses whatever needs the network, and a missing command", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const cases = [
+    [["--allow-host", "example.com"], "--allow-host"],
+    [["--observe"], "--observe"],
+    [["--deny-host", "example.com"], "--deny-host"],
+    [["--http-map", "a:80=127.0.0.1:8080"], "--http-map"],
+    [["--tcp-map", "a:22=127.0.0.1:22"], "--tcp-map"],
+    [["--secret", "TOKEN=example.com"], "--secret"],
+    [["--pr-loop", dirs.tmp], "--pr-loop"],
+    [["--share-login"], "--share-login"],
+    [["--log", path.join(root, "log.jsonl")], "--log"],
+  ];
+  for (const [args, flag] of cases) {
+    const result = run(["--offline", ...args, "--", "true"], {TOKEN: "s3cret"});
+    assert.equal(result.status, 2, flag);
+    assert.match(result.stderr, new RegExp(`--offline has no network, so it cannot take ${flag}`), flag);
+    assert.equal(result.report, null, flag);
+  }
+  const env = run(["--offline", "--", "true"], {ECA_SANDBOX_ALLOW_HOSTS: "example.com"});
+  assert.equal(env.status, 2);
+  assert.match(env.stderr, /cannot take --allow-host/);
+  const bare = run(["--offline"]);
+  assert.equal(bare.status, 2);
+  assert.match(bare.stderr, /--offline runs only a command given after --/);
+});
+
+test("--ro-mount mounts a host directory read-only, offline or not", (t) => {
+  const {root, run} = fixture(t);
+  const [a, b] = ["a", "b"].map((name) => {
+    const dir = path.join(root, name);
+    fs.mkdirSync(dir);
+    return dir;
+  });
+  for (const extra of [[], ["--offline"]]) {
+    const result = run([...extra, "--ro-mount", `${a}:/opt/a`, "--ro-mount", `${b}:/opt/b`, "--", "true"]);
+    assert.equal(result.status, 0, result.stderr);
+    assert.deepEqual(result.report.mounts["/opt/a"], {root: a, readonly: true});
+    assert.deepEqual(result.report.mounts["/opt/b"], {root: b, readonly: true});
+  }
+});
+
+test("a read-only mount needs a host directory and a guest path of its own", (t) => {
+  const {root, dirs, run} = fixture(t);
+  const dir = path.join(root, "a");
+  const file = path.join(root, "file");
+  fs.mkdirSync(dir);
+  fs.writeFileSync(file, "");
+  const cases = [
+    [["--ro-mount", dir], /--ro-mount expects HOST:GUEST/],
+    [["--ro-mount", `${dir}:relative`], /--ro-mount expects HOST:GUEST/],
+    [["--ro-mount", `${path.join(root, "absent")}:/opt/a`], /--ro-mount .*absent is not a directory/],
+    [["--ro-mount", `${file}:/opt/a`], /--ro-mount .*file is not a directory/],
+    [["--ro-mount", `${dir}:/opt/a`, "--ro-mount", `${dir}:/opt/a/`], /--ro-mount \/opt\/a is already mounted/],
+    [["--ro-mount", `${dir}:${dirs.workspace}`], /is already mounted/],
+  ];
+  for (const [args, message] of cases) {
+    const result = run(args);
+    assert.equal(result.status, 2, args.join(" "));
+    assert.match(result.stderr, message, args.join(" "));
+    assert.equal(result.report, null);
+  }
+});
+
+test("--memory and --cpus size the VM", (t) => {
+  const {run} = fixture(t);
+  for (const args of [["--memory", "lots"], ["--memory", "4X"], ["--cpus", "0"], ["--cpus", "1.5"], ["--cpus", "x"]]) {
+    const refused = run(args);
+    assert.equal(refused.status, 2, args.join(" "));
+    assert.equal(refused.report, null);
+  }
+  const result = run(["--memory", "4G", "--cpus", "4"]);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.report.memory, "4G");
+  assert.equal(result.report.cpus, 4);
 });
