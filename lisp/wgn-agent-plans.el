@@ -125,5 +125,122 @@ those files for that view alone."
     ((org-agenda-files (wgn/agent-plans-files))
      (org-agenda-overriding-header "Agent plans"))))
 
+;;;; Open-questions indicator
+
+(defgroup wgn/agent-plans nil
+  "Read agents' plan files."
+  :group 'tools)
+
+(defcustom wgn/agent-plans-questions-interval 30
+  "Seconds before `agent-plan statusline' runs again for a directory."
+  :type 'number)
+
+(defface wgn/agent-plans-questions
+  '((t :inherit (warning bold)))
+  "Face of the open-questions indicator.")
+
+(defvar wgn/agent-plans-questions--string ""
+  "The indicator, in `global-mode-string'; empty when nothing is open.")
+
+(defvar wgn/agent-plans-questions--cache (make-hash-table :test #'equal)
+  "Map a directory to (TIME . HINT), TIME being when its hint was requested.")
+
+(defvar wgn/agent-plans-questions--last-directory nil
+  "The directory the indicator currently describes.")
+
+(defvar wgn/agent-plans-questions--map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mode-line mouse-1] #'wgn/agent-plans)
+    map)
+  "Keymap of the indicator.")
+
+(defun wgn/agent-plans-questions--propertize (hint)
+  "Return HINT as the indicator, or the empty string when HINT is empty."
+  (if (string-empty-p hint)
+      ""
+    (propertize (concat " " hint)
+                'face 'wgn/agent-plans-questions
+                'mouse-face 'mode-line-highlight
+                'help-echo "mouse-1: choose an agent plan"
+                'local-map wgn/agent-plans-questions--map)))
+
+(defun wgn/agent-plans-questions--set (directory hint)
+  "Show HINT if DIRECTORY is the one the indicator describes."
+  (when (equal directory wgn/agent-plans-questions--last-directory)
+    (setq wgn/agent-plans-questions--string
+          (wgn/agent-plans-questions--propertize hint))
+    (force-mode-line-update t)))
+
+(defun wgn/agent-plans-questions--refresh (directory executable)
+  "Run EXECUTABLE's `statusline' for DIRECTORY, without waiting for it."
+  (let ((buffer (generate-new-buffer " *agent-plan statusline*"))
+        (default-directory directory))
+    (condition-case nil
+        (let ((process
+               (make-process
+                :name "agent-plan-statusline"
+                :buffer buffer
+                :command (list executable "statusline")
+                :connection-type 'pipe
+                :noquery t
+                :sentinel
+                (lambda (process _event)
+                  (unless (process-live-p process)
+                    (let ((hint (if (eq (process-exit-status process) 0)
+                                    (string-trim (with-current-buffer buffer
+                                                   (buffer-string)))
+                                  "")))
+                      (kill-buffer buffer)
+                      (puthash directory (cons (float-time) hint)
+                               wgn/agent-plans-questions--cache)
+                      (wgn/agent-plans-questions--set directory hint)))))))
+          (process-send-string process (json-serialize `((cwd . ,directory))))
+          (process-send-eof process))
+      (error (kill-buffer buffer)))))
+
+(defun wgn/agent-plans-questions--update ()
+  "Show the open questions of the selected buffer's directory.
+Never waits: a stale or missing hint is requested in the background.
+Remote directories are skipped."
+  (let ((directory (expand-file-name default-directory))
+        (executable (executable-find "agent-plan")))
+    (if (or (file-remote-p directory) (null executable))
+        (progn (setq wgn/agent-plans-questions--last-directory nil)
+               (wgn/agent-plans-questions--set nil ""))
+      (let ((entry (gethash directory wgn/agent-plans-questions--cache)))
+        (setq wgn/agent-plans-questions--last-directory directory)
+        (wgn/agent-plans-questions--set directory (or (cdr entry) ""))
+        (when (or (null entry)
+                  (>= (- (float-time) (car entry))
+                      wgn/agent-plans-questions-interval))
+          (puthash directory (cons (float-time) (or (cdr entry) ""))
+                   wgn/agent-plans-questions--cache)
+          (wgn/agent-plans-questions--refresh directory executable))))))
+
+(defun wgn/agent-plans-questions--post-command ()
+  "Update the indicator when the selected buffer's directory changed or aged."
+  (unless (minibufferp)
+    (wgn/agent-plans-questions--update)))
+
+;;;###autoload
+(define-minor-mode wgn/agent-plans-questions-mode
+  "Show a hint in the mode line when agent plans have open questions.
+The hint is `agent-plan statusline' for the selected buffer's directory,
+refreshed every `wgn/agent-plans-questions-interval' seconds.  Click it to
+choose a plan."
+  :global t
+  (if wgn/agent-plans-questions-mode
+      (progn
+        (unless (memq 'wgn/agent-plans-questions--string global-mode-string)
+          (setq global-mode-string
+                (append (or global-mode-string '(""))
+                        '(wgn/agent-plans-questions--string))))
+        (add-hook 'post-command-hook #'wgn/agent-plans-questions--post-command))
+    (remove-hook 'post-command-hook #'wgn/agent-plans-questions--post-command)
+    (setq global-mode-string
+          (delq 'wgn/agent-plans-questions--string global-mode-string)
+          wgn/agent-plans-questions--string ""
+          wgn/agent-plans-questions--last-directory nil)))
+
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here

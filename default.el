@@ -303,12 +303,14 @@
 
   :commands
   (wgn/agent-plans
-   wgn/agent-plans-insert-status)
+   wgn/agent-plans-insert-status
+   wgn/agent-plans-questions-mode)
 
   :preface
   @agent-plans-helper@
 
   :config
+  (wgn/agent-plans-questions-mode)
   (add-to-list 'org-agenda-custom-commands (wgn/agent-plans-agenda-command)))
 
 ;;;; Store encrypted information in org files.

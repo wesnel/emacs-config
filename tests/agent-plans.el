@@ -159,4 +159,142 @@ Its part and log files sit beside it."
       (should (equal org-agenda-files '("~/org")))
       (should (equal org-refile-targets '((nil :maxlevel . 9)))))))
 
+(defconst wgn-agent-plans-test--statusline-fake
+  "#!/bin/sh
+# Records its arguments and stdin in $RECORD, then prints $HINT_FILE.
+echo \"$@\" >> \"$RECORD.args\"
+cat >> \"$RECORD\"
+echo >> \"$RECORD\"
+cat \"$HINT_FILE\"
+"
+  "A stand-in for `agent-plan statusline'.")
+
+(defmacro wgn-agent-plans-test--with-statusline (&rest body)
+  "Run BODY with a fake `agent-plan statusline' on `exec-path'.
+Binds `record' to the file receiving its stdin and `hint' to the file whose
+content it prints.  The cache is empty on entry."
+  (declare (indent 0))
+  `(let* ((root (file-name-as-directory (make-temp-file "agent-plans-" t)))
+          (bin (expand-file-name "bin" root))
+          (record (expand-file-name "record" root))
+          (hint (expand-file-name "hint" root))
+          (dir (file-name-as-directory (expand-file-name "work" root)))
+          (exec-path (cons bin exec-path))
+          (process-environment
+           (append (list (concat "RECORD=" record) (concat "HINT_FILE=" hint))
+                   process-environment))
+          (wgn/agent-plans-questions-interval 30)
+          (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
+          (wgn/agent-plans-questions--string "")
+          (wgn/agent-plans-questions--last-directory nil))
+     (unwind-protect
+         (progn
+           (make-directory dir t)
+           (wgn-agent-plans-test--write hint "2 open questions · /questions")
+           (wgn-agent-plans-test--write
+            (expand-file-name "agent-plan" bin)
+            wgn-agent-plans-test--statusline-fake)
+           (set-file-modes (expand-file-name "agent-plan" bin) #o755)
+           ,@body)
+       (delete-directory root t))))
+
+(defun wgn-agent-plans-test--statusline (directory)
+  "Run the indicator's update in DIRECTORY and wait for its process."
+  (with-temp-buffer
+    (setq default-directory directory)
+    (wgn/agent-plans-questions--update))
+  (let ((deadline (+ (float-time) 5)))
+    (while (and (< (float-time) deadline)
+                (process-list)
+                (cl-some (lambda (p)
+                           (string-prefix-p "agent-plan-statusline" (process-name p)))
+                         (process-list)))
+      (accept-process-output nil 0.05))))
+
+(defun wgn-agent-plans-test--runs (record)
+  "Return how many times the fake ran, given its RECORD file."
+  (let ((file (concat record ".args")))
+    (if (file-exists-p file)
+        (with-temp-buffer
+          (insert-file-contents file)
+          (count-lines (point-min) (point-max)))
+      0)))
+
+(ert-deftest wgn-agent-plans-questions-indicator-shows-the-hint ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline dir)
+    (should (string-match-p "2 open questions · /questions"
+                            wgn/agent-plans-questions--string))
+    (should (get-text-property 0 'face wgn/agent-plans-questions--string))
+    (should (get-text-property 0 'local-map wgn/agent-plans-questions--string))
+    (with-temp-buffer
+      (insert-file-contents record)
+      (let ((json (json-parse-string (buffer-string))))
+        (should (equal (gethash "cwd" json) dir))))
+    (with-temp-buffer
+      (insert-file-contents (concat record ".args"))
+      (should (equal (string-trim (buffer-string)) "statusline")))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-clears-on-empty-output ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline dir)
+    (should-not (string-empty-p wgn/agent-plans-questions--string))
+    (wgn-agent-plans-test--write hint "")
+    (setq wgn/agent-plans-questions-interval 0)
+    (wgn-agent-plans-test--statusline dir)
+    (should (equal wgn/agent-plans-questions--string ""))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-is-cached-per-directory ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline dir)
+    (wgn-agent-plans-test--statusline dir)
+    (should (= (wgn-agent-plans-test--runs record) 1))
+    (should (string-match-p "open questions" wgn/agent-plans-questions--string))
+    (let ((other (file-name-as-directory (expand-file-name "other" root))))
+      (make-directory other)
+      (wgn-agent-plans-test--statusline other)
+      (should (= (wgn-agent-plans-test--runs record) 2))
+      (wgn-agent-plans-test--statusline dir)
+      (should (= (wgn-agent-plans-test--runs record) 2))
+      (should (string-match-p "open questions"
+                              wgn/agent-plans-questions--string)))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-refreshes-when-stale ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline dir)
+    (setq wgn/agent-plans-questions-interval 0)
+    (wgn-agent-plans-test--statusline dir)
+    (should (= (wgn-agent-plans-test--runs record) 2))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-skips-remote-directories ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline dir)
+    (wgn-agent-plans-test--statusline "/ssh:nowhere.invalid:/tmp/")
+    (should (= (wgn-agent-plans-test--runs record) 1))
+    (should (equal wgn/agent-plans-questions--string ""))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-needs-the-executable ()
+  (wgn-agent-plans-test--with-statusline
+    (let ((exec-path nil)
+          (process-environment (cons "PATH=/nonexistent" process-environment)))
+      (wgn-agent-plans-test--statusline dir))
+    (should (equal wgn/agent-plans-questions--string ""))
+    (should (= (wgn-agent-plans-test--runs record) 0))))
+
+(ert-deftest wgn-agent-plans-questions-mode-adds-and-removes-the-indicator ()
+  (let ((global-mode-string '("" display-time-string)))
+    (unwind-protect
+        (progn
+          (wgn/agent-plans-questions-mode 1)
+          (should (memq 'wgn/agent-plans-questions--string global-mode-string))
+          (should (memq 'display-time-string global-mode-string))
+          (wgn/agent-plans-questions-mode 1)
+          (should (= 1 (cl-count 'wgn/agent-plans-questions--string
+                                 global-mode-string)))
+          (wgn/agent-plans-questions-mode -1)
+          (should-not (memq 'wgn/agent-plans-questions--string
+                            global-mode-string))
+          (should (memq 'display-time-string global-mode-string)))
+      (wgn/agent-plans-questions-mode -1))))
+
 ;;; agent-plans.el ends here
