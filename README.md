@@ -451,17 +451,26 @@ The workspace is mounted at the same path inside the guest, so no
 ### Running a command offline
 
 `--offline` runs the command given after `--`, such as a pull request's
-tests, with no network: Gondolin's guest has no network device, so it has
-no proxy and nothing is looked up on the host for it. The workspace is
-mounted read-only. Options that reach a host (`--allow-host`, `--observe`,
+tests, with no network. Gondolin's guest has no network device, so it has
+no proxy and nothing is looked up on the host for it. Bubblewrap starts no
+proxy and leaves the sandbox only loopback. The workspace is mounted
+read-only. Options that reach a host (`--allow-host`, `--observe`,
 `--deny-host`, `--http-map`, `--tcp-map`, `--secret`, `--pr-loop`,
 `--share-login` and `--log`) are refused, as are `--plans`, `--tools` and
 `--guard-config`, which serve an agent session.
 
+Offline, Bubblewrap does not bind `/`. The sandbox sees only the closure
+of the tools `offlineTools` lists in `overlays/eca-bwrap/default.nix`,
+which are its `PATH`; a stub `/etc` with `passwd`, `group`, `nsswitch.conf`
+and `hosts`; and empty `/tmp`, `/run`, `/var/run` and `$HOME`. Anything
+else a command needs, such as a toolchain, has to be handed in with
+`--ro-mount`.
+
 `--ro-mount HOST:GUEST` mounts the directory `HOST` read-only at `GUEST`,
 and may be repeated. `--state ''` and `--config ''` leave out the state and
 ECA config mounts. `--memory SIZE` (QEMU syntax, such as `4G`) and `--cpus N`
-size the VM.
+size Gondolin's VM. How Bubblewrap applies them is described where it does,
+in `overlays/eca-bwrap/eca-bwrap.sh`.
 
 ### Remote hosts and backend differences
 
@@ -489,11 +498,13 @@ The backends' flags are not interchangeable:
 | Option | Gondolin | Bubblewrap |
 | --- | --- | --- |
 | `--allow-host`, `--log`, `--env`, `--pr-loop`, `--protect` | Supported | Supported |
-| `--image`, `--guest-path` | Configure the guest | Accepted and ignored |
+| `--image` | Configures the guest | Accepted and ignored |
+| `--guest-path` | Supported | With `--offline`, otherwise accepted and ignored |
 | `--observe`, `--deny-host` | Supported | Unsupported |
 | `--share-login`, `--secret` | Supported | Unsupported |
 | `--http-map`, `--tcp-map` | Supported | Unsupported |
-| `--offline`, `--ro-mount`, `--memory`, `--cpus` | Supported | Unsupported |
+| `--offline`, `--ro-mount` | Supported | Supported |
+| `--memory`, `--cpus` | Supported | See `eca-bwrap.sh` |
 
 An unsupported option causes Bubblewrap to exit at startup. Choose arguments
 for the selected backend rather than copying the Gondolin examples wholesale.
