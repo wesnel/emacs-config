@@ -140,42 +140,6 @@ final: prev: let
             }
           );
 
-        acp = let
-          rev = "661af51569acef7384a2801f07a582da5142a6d9";
-          sha256 = "sha256-x6KVBM1iEW24fkRVwM9ALRqd6EzBkjJDt3cnyykL4z4=";
-        in
-          ePrev.acp.overrideAttrs (old: {
-            version = "0.12.1";
-
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "acp.el";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
-
-        agent-shell = let
-          rev = "89bd6e136a08e1527dd630e4573639c838fd7e22";
-          sha256 = "sha256-ZSxCxiA+DH0tvIrGVhOUGOgrn1k0ilNr9WL4n3Aox+8=";
-        in
-          ePrev.agent-shell.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "agent-shell";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-
-            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ePkgs.acp];
-          });
-
         agent-shell-knockknock = let
           rev = "56732434067fe1874dcda62c491f7800bdc0a2f3";
           sha256 = "sha256-R7bvk2v9togbPiGKOXDAKCMStrL1bbRJoTdBtj0PdlU=";
@@ -515,24 +479,6 @@ final: prev: let
               url = "https://codeberg.org/wgn/scratch/archive/${rev}.tar.gz";
 
               inherit
-                sha256
-                ;
-            };
-          });
-
-        shell-maker = let
-          rev = "e8bdf6dca18f39d592728e8440118d9f57092e65";
-          sha256 = "sha256-tmhZ9WApwSjzAlXUcZy+aMpW/07bTpIaaDMCALXtyzI=";
-        in
-          ePrev.shell-maker.overrideAttrs (old: {
-            version = "0.91.2";
-
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "shell-maker";
-
-              inherit
-                rev
                 sha256
                 ;
             };
