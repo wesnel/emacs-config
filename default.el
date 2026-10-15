@@ -1584,7 +1584,9 @@ if USER is given, its username is USER.  The port is not matched."
 (use-package agent-shell-tramp
   :ensure t
 
-  :commands
+  :after agent-shell
+
+  :functions
   (agent-shell-tramp-mode)
 
   :config
