@@ -598,22 +598,6 @@ final: prev: let
                 ;
             };
           });
-
-        tramp = let
-          rev = "2.8.2.2";
-          sha256 = "sha256-aIIzkQUCkn7T5hkItQv1Aq8t7nw6RkAWIoLFlk72I7I=";
-        in
-          ePrev.tramp.overrideAttrs (old: {
-            version = "2.8.2.2";
-
-            src = pkgs.fetchurl {
-              url = "https://elpa.gnu.org/packages/tramp-${rev}.tar";
-
-              inherit
-                sha256
-                ;
-            };
-          });
       };
     };
 
