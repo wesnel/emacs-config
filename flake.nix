@@ -49,7 +49,6 @@
           inherit
             emacs-config
             emacs-config-dynamic
-            claude-agent-acp
             eca
             eca-guest
             eca-gondolin
