@@ -1107,7 +1107,9 @@ if USER is given, its username is USER.  The port is not matched."
 
   :preface
   (defun wgn/apply-eglot-format ()
-    (unless (or (and (fboundp 'magit-rebase-in-progress-p)
+    ;; Untrusted buffers have no server; formatting would fail every save.
+    (unless (or (not (eglot-managed-p))
+                (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
                 (and (fboundp 'magit-merge-in-progress-p)
                      (magit-merge-in-progress-p)))
@@ -1118,7 +1120,8 @@ if USER is given, its username is USER.  The port is not matched."
    eglot-workspace-configuration)
 
   :functions
-  (eglot--connect)
+  (eglot--connect
+   eglot-managed-p)
 
   :commands
   (eglot
@@ -1139,6 +1142,15 @@ if USER is given, its username is USER.  The port is not matched."
    ("C-c C-l r" . #'eglot-rename)
    ("C-c C-l i" . #'eglot-find-implementation)
    ("C-c C-l e" . #'eglot-code-actions)))
+
+;;;; Keep checkouts of other people's code from running through Emacs.
+;;
+;; Language servers run build scripts, direnv evaluates .envrc and
+;; flakes, and local variables can `eval'.  None of them start for
+;; files under `wgn/untrusted-directories'.
+@untrusted-helper@
+;; Home Manager's `home.programs.wgn.emacs.untrustedDirectories', if set.
+(load (expand-file-name "etc/untrusted.el" user-emacs-directory) t t)
 
 ;;;; Pop-up window instead of echo area for Eldoc documentation
 (when (display-graphic-p)
@@ -1771,7 +1783,9 @@ GUI notification retains its icon and duration."
 
   :preface
   (defun wgn/apply-gofmt ()
-    (unless (or (and (fboundp 'magit-rebase-in-progress-p)
+    ;; The magit checks run git, which untrusted buffers must not.
+    (unless (or (wgn/untrusted-buffer-p)
+                (and (fboundp 'magit-rebase-in-progress-p)
                      (magit-rebase-in-progress-p))
                 (and (fboundp 'magit-merge-in-progress-p)
                      (magit-merge-in-progress-p)))

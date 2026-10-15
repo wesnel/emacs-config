@@ -135,6 +135,19 @@
               codex = {
                 enable = lib.mkEnableOption "Enable Codex integration for Emacs";
               };
+
+              untrustedDirectories = lib.mkOption {
+                type = lib.types.nullOr (lib.types.listOf lib.types.str);
+                default = null;
+                example = ["/home/me/.cache/pr-review/"];
+                description = ''
+                  Directories whose files must not run code through Emacs:
+                  `wgn/untrusted-directories`. Give it the directory that
+                  pull requests are cloned into for review, from the value
+                  the reviewing tool uses. When null, Emacs keeps the
+                  variable's own default.
+                '';
+              };
             };
           };
 
@@ -169,6 +182,14 @@
                   };
 
                 ".emacs.d/etc/eshell/login".source = ./login.el;
+
+                ".emacs.d/etc/untrusted.el" = lib.mkIf (cfg.untrustedDirectories != null) {
+                  text = ''
+                    ;;; untrusted.el --- Untrusted directories -*- lexical-binding: t; -*-
+                    (setq wgn/untrusted-directories
+                          '(${lib.concatMapStringsSep " " builtins.toJSON cfg.untrustedDirectories}))
+                  '';
+                };
               };
             };
 
