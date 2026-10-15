@@ -171,7 +171,7 @@ content it prints.  The cache is empty on entry."
           (wgn/agent-plans-questions-interval 30)
           (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
           (wgn/agent-plans-questions--string "")
-          (wgn/agent-plans-questions--last-directory nil))
+          (wgn/agent-plans-questions--last-key nil))
      (unwind-protect
          (progn
            (make-directory dir t)
@@ -183,10 +183,12 @@ content it prints.  The cache is empty on entry."
            ,@body)
        (delete-directory root t))))
 
-(defun wgn-agent-plans-test--statusline (directory)
-  "Run the indicator's update in DIRECTORY and wait for its process."
+(defun wgn-agent-plans-test--statusline (directory &optional setup)
+  "Run the indicator's update in DIRECTORY and wait for its process.
+SETUP, a function, makes the buffer an agent's first."
   (with-temp-buffer
     (setq default-directory directory)
+    (when setup (funcall setup))
     (wgn/agent-plans-questions--update))
   (let ((deadline (+ (float-time) 5)))
     (while (and (< (float-time) deadline)
@@ -265,6 +267,77 @@ content it prints.  The cache is empty on entry."
       (wgn-agent-plans-test--statusline dir))
     (should (equal wgn/agent-plans-questions--string ""))
     (should (= (wgn-agent-plans-test--runs record) 0))))
+
+(defun wgn-agent-plans-test--sent (record)
+  "Return what the fake was sent, given its RECORD file, as parsed JSON."
+  (with-temp-buffer
+    (insert-file-contents record)
+    (mapcar (lambda (line) (json-parse-string line :object-type 'alist))
+            (split-string (buffer-string) "\n" t))))
+
+(defun wgn-agent-plans-test--agent-shell (identifier used size)
+  "Return a function making the buffer an agent-shell of IDENTIFIER.
+Its context is USED of SIZE tokens, as agent-shell keeps them from ACP's
+usage_update."
+  (lambda ()
+    (setq-local major-mode 'agent-shell-mode)
+    (setq-local agent-shell--state
+                `((:agent-config . ((:identifier . ,identifier)))
+                  (:usage . ((:total-tokens . 0)
+                             (:context-used . ,used)
+                             (:context-size . ,size)))))))
+
+(defun wgn-agent-plans-test--eca-chat (model tokens limit)
+  "Return a function making the buffer an ECA chat with MODEL.
+Its context is TOKENS of LIMIT, as eca.el keeps them."
+  (lambda ()
+    (setq-local major-mode 'eca-chat-mode)
+    (setq-local eca-chat--selected-model model)
+    (setq-local eca-chat--session-tokens tokens)
+    (setq-local eca-chat--session-limit-context limit)))
+
+(ert-deftest wgn-agent-plans-questions-indicator-sends-the-agent-session ()
+  (wgn-agent-plans-test--with-statusline
+    (wgn-agent-plans-test--statusline
+     dir (wgn-agent-plans-test--agent-shell 'claude-code 42000 100000))
+    (wgn-agent-plans-test--statusline
+     dir (wgn-agent-plans-test--eca-chat "openai/gpt-5.5" 52000 200000))
+    (wgn-agent-plans-test--statusline
+     dir (wgn-agent-plans-test--agent-shell 'gemini-cli 0 0))
+    (should (equal (wgn-agent-plans-test--sent record)
+                   `(((cwd . ,dir) (provider . "claude")
+                      (context_window . ((used_percentage . 42))))
+                     ((cwd . ,dir) (provider . "codex")
+                      (context_window . ((used_percentage . 26))))
+                     ((cwd . ,dir)))))))
+
+(ert-deftest wgn-agent-plans-questions-indicator-is-cached-per-session ()
+  (wgn-agent-plans-test--with-statusline
+    (let ((shell (wgn-agent-plans-test--agent-shell 'codex 1000 100000)))
+      (wgn-agent-plans-test--statusline dir shell)
+      (wgn-agent-plans-test--statusline dir shell)
+      (should (= (wgn-agent-plans-test--runs record) 1))
+      ;; Another session, or the same one further on, is asked about.
+      (wgn-agent-plans-test--statusline
+       dir (wgn-agent-plans-test--agent-shell 'codex 5000 100000))
+      (should (= (wgn-agent-plans-test--runs record) 2))
+      ;; A session before its first usage report sends no context.
+      (wgn-agent-plans-test--statusline
+       dir (wgn-agent-plans-test--eca-chat "anthropic/claude-opus-5-5" nil nil))
+      (should (equal (car (last (wgn-agent-plans-test--sent record)))
+                     `((cwd . ,dir) (provider . "claude")))))))
+
+(ert-deftest wgn-agent-plans-questions-cache-stays-bounded ()
+  (wgn-agent-plans-test--with-statusline
+    (dotimes (used 20)
+      (wgn-agent-plans-test--statusline
+       dir (wgn-agent-plans-test--agent-shell 'codex (1+ used) 7)))
+    (should (= (hash-table-count wgn/agent-plans-questions--cache) 1))
+    ;; A context that rounds to the same percentage asks nothing more.
+    (let ((runs (wgn-agent-plans-test--runs record)))
+      (wgn-agent-plans-test--statusline
+       dir (wgn-agent-plans-test--agent-shell 'codex 20.001 7))
+      (should (= (wgn-agent-plans-test--runs record) runs)))))
 
 (ert-deftest wgn-agent-plans-questions-mode-adds-and-removes-the-indicator ()
   (let ((global-mode-string '("" display-time-string)))
@@ -552,6 +625,15 @@ line counts only when its start is visible."
         (ert-fail (list args status (buffer-string))))
       (buffer-string))))
 
+(defun wgn-agent-plans-test--agent-plan-input (input &rest args)
+  "Run the real `agent-plan' with ARGS and INPUT on stdin; fail on error."
+  (with-temp-buffer
+    (insert input)
+    (let ((status (apply #'call-process-region (point-min) (point-max) "agent-plan" t t nil args)))
+      (unless (eq status 0)
+        (ert-fail (list args status (buffer-string))))
+      (buffer-string))))
+
 (ert-deftest wgn-agent-plans-views-read-what-agent-plan-writes ()
   (skip-unless (executable-find "agent-plan"))
   (let* ((root (file-name-as-directory (make-temp-file "agent-plans-real-" t)))
@@ -561,6 +643,7 @@ line counts only when its start is visible."
          (worktree (file-truename (expand-file-name "wt" root)))
          (process-environment
           (append (list (concat "AGENT_TOOLS_CONFIG=" config)
+                        (concat "XDG_STATE_HOME=" (expand-file-name "state" root))
                         "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
                         "CLAUDE_CODE_SESSION_ID")
                   process-environment))
@@ -568,7 +651,7 @@ line counts only when its start is visible."
          (wgn/agent-plans-questions-interval 30)
          (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
          (wgn/agent-plans-questions--string "")
-         (wgn/agent-plans-questions--last-directory nil))
+         (wgn/agent-plans-questions--last-key nil))
     (unwind-protect
         (wgn-agent-plans-test--protected
           (wgn-agent-plans-test--write
@@ -624,6 +707,17 @@ line counts only when its start is visible."
              (file-name-as-directory (expand-file-name "lisp" worktree)))
             (should (string-match-p "1 open question · /questions"
                                     wgn/agent-plans-questions--string))
+            ;; An agent-shell session's context, and the quota a Claude
+            ;; Code session on this host recorded.
+            (wgn-agent-plans-test--agent-plan-input
+             (format "{\"session_id\":\"other\",\"rate_limits\":{\"five_hour\":{\"used_percentage\":20,\"resets_at\":%d}}}"
+                     (+ (truncate (float-time)) 3600))
+             "statusline")
+            (wgn-agent-plans-test--statusline
+             (file-name-as-directory (expand-file-name "lisp" worktree))
+             (wgn-agent-plans-test--agent-shell 'claude-code 42000 100000))
+            (should (equal (substring-no-properties wgn/agent-plans-questions--string)
+                           " ctx 42% · 5h 20% · 1 open question · /questions"))
             (dolist (buffer (buffer-list))
               (when (and (buffer-file-name buffer)
                          (string-prefix-p root (buffer-file-name buffer)))

@@ -191,7 +191,7 @@ bound to the plan files for this view alone."
   :group 'tools)
 
 (defcustom wgn/agent-plans-questions-interval 30
-  "Seconds before `agent-plan statusline' runs again for a directory."
+  "Seconds before `agent-plan statusline' runs again for the same request."
   :type 'number)
 
 (defface wgn/agent-plans-questions
@@ -202,10 +202,13 @@ bound to the plan files for this view alone."
   "The indicator, in `global-mode-string'; empty when nothing is open.")
 
 (defvar wgn/agent-plans-questions--cache (make-hash-table :test #'equal)
-  "Map a directory to (TIME . HINT), TIME being when its hint was requested.")
+  "Map a key to (TIME HINT REQUEST), replacing the key's earlier entry.
+A request is the alist `agent-plan statusline' is sent: the directory,
+and an agent session's provider and whole-number context percentage.  Its
+key is the directory and provider; TIME is when HINT was requested.")
 
-(defvar wgn/agent-plans-questions--last-directory nil
-  "The directory the indicator currently describes.")
+(defvar wgn/agent-plans-questions--last-key nil
+  "The key the indicator currently describes.")
 
 (defvar wgn/agent-plans-questions--map
   (let ((map (make-sparse-keymap)))
@@ -223,17 +226,61 @@ bound to the plan files for this view alone."
                 'help-echo "mouse-1: choose an agent plan"
                 'local-map wgn/agent-plans-questions--map)))
 
-(defun wgn/agent-plans-questions--set (directory hint)
-  "Show HINT if DIRECTORY is the one the indicator describes."
-  (when (equal directory wgn/agent-plans-questions--last-directory)
+(defun wgn/agent-plans-questions--set (key hint)
+  "Show HINT if KEY is the request the indicator describes."
+  (when (equal key wgn/agent-plans-questions--last-key)
     (setq wgn/agent-plans-questions--string
           (wgn/agent-plans-questions--propertize hint))
     (force-mode-line-update t)))
 
-(defun wgn/agent-plans-questions--refresh (directory executable)
-  "Run EXECUTABLE's `statusline' for DIRECTORY, without waiting for it."
+(defconst wgn/agent-plans-questions--providers
+  '((claude-code . "claude") (codex . "codex")
+    ("anthropic" . "claude") ("openai" . "codex"))
+  "Map an agent-shell agent, or an ECA model's provider, to its quota.")
+
+(defvar agent-shell--state)
+(defvar eca-chat--selected-model)
+(defvar eca-chat--session-tokens)
+(defvar eca-chat--session-limit-context)
+
+(defun wgn/agent-plans-questions--session ()
+  "Return the current buffer's agent session as (PROVIDER . CONTEXT), or nil.
+PROVIDER is the quota it draws on, or nil; CONTEXT the percentage of its
+context window used, or nil before its first usage report.  Read from
+agent-shell's and eca.el's buffer state."
+  (let ((share (lambda (used size)
+                 (and (numberp used) (numberp size) (> size 0)
+                      (/ (* 100.0 used) size)))))
+    (cond
+     ((and (derived-mode-p 'agent-shell-mode) (boundp 'agent-shell--state))
+      (let ((usage (alist-get :usage agent-shell--state)))
+        (cons (alist-get (alist-get :identifier (alist-get :agent-config agent-shell--state))
+                         wgn/agent-plans-questions--providers)
+              (funcall share (alist-get :context-used usage) (alist-get :context-size usage)))))
+     ((and (derived-mode-p 'eca-chat-mode) (boundp 'eca-chat--selected-model))
+      (cons (and (stringp eca-chat--selected-model)
+                 (alist-get (car (split-string eca-chat--selected-model "/"))
+                            wgn/agent-plans-questions--providers nil nil #'equal))
+            (funcall share eca-chat--session-tokens eca-chat--session-limit-context))))))
+
+(defun wgn/agent-plans-questions--request (directory)
+  "Return what `agent-plan statusline' is sent for the buffer in DIRECTORY.
+The agent session's provider and context come with the directory."
+  (let ((session (wgn/agent-plans-questions--session)))
+    `((cwd . ,directory)
+      ,@(when (car session) `((provider . ,(car session))))
+      ,@(when (cdr session)
+          `((context_window . ((used_percentage . ,(round (cdr session))))))))))
+
+(defun wgn/agent-plans-questions--key (request)
+  "Return the cache key of REQUEST."
+  (list (alist-get 'cwd request) (alist-get 'provider request)))
+
+(defun wgn/agent-plans-questions--refresh (request executable)
+  "Run EXECUTABLE's `statusline' for REQUEST, without waiting for it."
   (let ((buffer (generate-new-buffer " *agent-plan statusline*"))
-        (default-directory directory))
+        (key (wgn/agent-plans-questions--key request))
+        (default-directory (alist-get 'cwd request)))
     (condition-case nil
         (let ((process
                (make-process
@@ -250,43 +297,48 @@ bound to the plan files for this view alone."
                                                    (buffer-string)))
                                   "")))
                       (kill-buffer buffer)
-                      (puthash directory (cons (float-time) hint)
+                      (puthash key (list (float-time) hint request)
                                wgn/agent-plans-questions--cache)
-                      (wgn/agent-plans-questions--set directory hint)))))))
-          (process-send-string process (json-serialize `((cwd . ,directory))))
+                      (wgn/agent-plans-questions--set key hint)))))))
+          (process-send-string process (json-serialize request))
           (process-send-eof process))
       (error (kill-buffer buffer)))))
 
 (defun wgn/agent-plans-questions--update ()
-  "Show the open questions of the selected buffer's directory.
+  "Show the selected buffer's context, quota and open questions.
 Never waits: a stale or missing hint is requested in the background.
 Remote directories are skipped."
   (let ((directory (expand-file-name default-directory))
         (executable (executable-find "agent-plan")))
     (if (or (file-remote-p directory) (null executable))
-        (progn (setq wgn/agent-plans-questions--last-directory nil)
+        (progn (setq wgn/agent-plans-questions--last-key nil)
                (wgn/agent-plans-questions--set nil ""))
-      (let ((entry (gethash directory wgn/agent-plans-questions--cache)))
-        (setq wgn/agent-plans-questions--last-directory directory)
-        (wgn/agent-plans-questions--set directory (or (cdr entry) ""))
+      (let* ((request (wgn/agent-plans-questions--request directory))
+             (key (wgn/agent-plans-questions--key request))
+             (entry (gethash key wgn/agent-plans-questions--cache)))
+        (setq wgn/agent-plans-questions--last-key key)
+        (wgn/agent-plans-questions--set key (or (nth 1 entry) ""))
         (when (or (null entry)
+                  (not (equal request (nth 2 entry)))
                   (>= (- (float-time) (car entry))
                       wgn/agent-plans-questions-interval))
-          (puthash directory (cons (float-time) (or (cdr entry) ""))
+          (puthash key (list (float-time) (or (nth 1 entry) "") request)
                    wgn/agent-plans-questions--cache)
-          (wgn/agent-plans-questions--refresh directory executable))))))
+          (wgn/agent-plans-questions--refresh request executable))))))
 
 (defun wgn/agent-plans-questions--post-command ()
-  "Update the indicator when the selected buffer's directory changed or aged."
+  "Update the indicator when the selected buffer's session changed or aged."
   (unless (minibufferp)
     (wgn/agent-plans-questions--update)))
 
 ;;;###autoload
 (define-minor-mode wgn/agent-plans-questions-mode
-  "Show a hint in the mode line when agent plans have open questions.
-The hint is `agent-plan statusline' for the selected buffer's directory,
-refreshed every `wgn/agent-plans-questions-interval' seconds.  Click it to
-choose a plan."
+  "Show a hint in the mode line with agents' context, quota and questions.
+The hint is `agent-plan statusline' for the selected buffer's directory
+and, in an agent-shell or ECA chat buffer, its session's provider and
+context, refreshed every `wgn/agent-plans-questions-interval' seconds.
+Quota is what this host's own sessions last recorded.  Click it to choose
+a plan."
   :global t
   (if wgn/agent-plans-questions-mode
       (progn
@@ -299,7 +351,7 @@ choose a plan."
     (setq global-mode-string
           (delq 'wgn/agent-plans-questions--string global-mode-string)
           wgn/agent-plans-questions--string ""
-          wgn/agent-plans-questions--last-directory nil)))
+          wgn/agent-plans-questions--last-key nil)))
 
 ;;;; Plan files in Org
 
