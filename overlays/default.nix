@@ -473,24 +473,6 @@ final: prev: let
   emacs-config = build-emacs-config final build-deps-static;
   emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
 
-  claude-agent-acp = final.buildNpmPackage (finalAttrs: {
-    pname = "claude-agent-acp";
-    version = "0.22.2";
-
-    src = final.fetchFromGitHub {
-      owner = "zed-industries";
-      repo = "claude-agent-acp";
-      tag = "v${finalAttrs.version}";
-      hash = "sha256-JkSE6fwtM1btfuxbwX7b04cbTDr5SdYEb7qwlZK9JYo=";
-    };
-
-    npmDepsHash = "sha256-9OhdDRQuekmt3JMs0oGVbvqWcQFoyk4ZZlm6DZCNazU=";
-
-    meta = {
-      mainProgram = "claude-agent-acp";
-    };
-  });
-
   emacs30-macport = prev.emacs30-macport.overrideAttrs (old: {
     postInstall = let
       icons = final.fetchFromGitHub {
@@ -579,7 +561,6 @@ in {
     emacs30-macport
     emacs-config
     emacs-config-dynamic
-    claude-agent-acp
     parinfer-rust-emacs
     wgn-emacs
     wgn-emacs-pgtk

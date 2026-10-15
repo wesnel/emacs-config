@@ -48,7 +48,6 @@
         inherit
           emacs-config
           emacs-config-dynamic
-          claude-agent-acp
           gondolin
           offline-run
           parinfer-rust-emacs
