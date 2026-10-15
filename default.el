@@ -1022,25 +1022,29 @@ if USER is given, its username is USER.  The port is not matched."
   :ensure t
 
   :preface
-  ;; HACK: bug#79930
-  (defun next-error-this-buffer-no-select (&optional n)
-    "Move point to the next error in the current buffer and highlight match.
+  ;; HACK: bug#79930.  Flymake's diagnostics buffer binds n and p to
+  ;; these only when they exist, and Emacs defines them from 31 on.
+  ;; Define them where Emacs lacks them, never over the built-ins.
+  (unless (fboundp 'next-error-this-buffer-no-select)
+    (defun next-error-this-buffer-no-select (&optional n)
+      "Move point to the next error in the current buffer and highlight match.
  Prefix arg N says how many error messages to move forwards (or
  backwards, if negative).
  Finds and highlights the source line like \\[next-error], but does not
  select the source buffer."
-    (interactive "p")
-    (next-error-select-buffer (current-buffer))
-    (next-error-no-select n))
-  (defun previous-error-this-buffer-no-select (&optional n)
-    "Move point to the previous error in the current buffer and highlight match.
+      (interactive "p")
+      (next-error-select-buffer (current-buffer))
+      (next-error-no-select n)))
+  (unless (fboundp 'previous-error-this-buffer-no-select)
+    (defun previous-error-this-buffer-no-select (&optional n)
+      "Move point to the previous error in the current buffer and highlight match.
  Prefix arg N says how many error messages to move forwards (or
  backwards, if negative).
  Finds and highlights the source line like \\[previous-error], but does not
  select the source buffer."
-    (interactive "p")
-    (next-error-select-buffer (current-buffer))
-    (previous-error-no-select n))
+      (interactive "p")
+      (next-error-select-buffer (current-buffer))
+      (previous-error-no-select n)))
 
   :hook
   (prog-mode . flymake-mode)
