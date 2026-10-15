@@ -56,7 +56,6 @@
           wgn-emacs-pgtk
           wgn-emacs-nox
           wgn-emacs-macport
-          wgn-emacs-macport-cross
           wgn-emacs-unstable
           wgn-emacs-unstable-nox
           wgn-emacs-git
