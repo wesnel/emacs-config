@@ -539,4 +539,96 @@ line counts only when its start is visible."
         (should (equal (with-temp-buffer (insert-file-contents mirror) (buffer-string))
                        before))))))
 
+;;;; Against the real agent-plan
+;;
+;; Skipped where `agent-plan' is not on `exec-path'; nix-config's
+;; `agent-plans' check runs it with the agent-plan of the same commit.
+
+(defun wgn-agent-plans-test--agent-plan (&rest args)
+  "Run the real `agent-plan' with ARGS and return its output; fail on error."
+  (with-temp-buffer
+    (let ((status (apply #'call-process "agent-plan" nil t nil args)))
+      (unless (eq status 0)
+        (ert-fail (list args status (buffer-string))))
+      (buffer-string))))
+
+(ert-deftest wgn-agent-plans-views-read-what-agent-plan-writes ()
+  (skip-unless (executable-find "agent-plan"))
+  (let* ((root (file-name-as-directory (make-temp-file "agent-plans-real-" t)))
+         (plans (expand-file-name "notes/agents" root))
+         (config (expand-file-name "config.json" root))
+         ;; git reports a worktree by its true name.
+         (worktree (file-truename (expand-file-name "wt" root)))
+         (process-environment
+          (append (list (concat "AGENT_TOOLS_CONFIG=" config)
+                        "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
+                        "CLAUDE_CODE_SESSION_ID")
+                  process-environment))
+         (org-agenda-custom-commands (list (wgn/agent-plans-agenda-command)))
+         (wgn/agent-plans-questions-interval 30)
+         (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
+         (wgn/agent-plans-questions--string "")
+         (wgn/agent-plans-questions--last-directory nil))
+    (unwind-protect
+        (wgn-agent-plans-test--protected
+          (wgn-agent-plans-test--write
+           config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
+          (make-directory (expand-file-name "lisp" worktree) t)
+          (let ((default-directory (file-name-as-directory worktree)))
+            (should (eq 0 (call-process "git" nil nil nil "init" "-q"))))
+          (let* ((plan (gethash "plan" (json-parse-string
+                                        (wgn-agent-plans-test--agent-plan
+                                         "new" "--title" "Real plan" "--slug" "real"
+                                         "--repo" "wesnel/emacs-config" "--worktree" worktree)))))
+            ;; Agents write steps by hand.
+            (with-temp-buffer
+              (insert-file-contents plan)
+              (goto-char (point-min))
+              (re-search-forward "^\\*\\* Steps\n")
+              (insert (wgn-agent-plans-test--entry "TODO" "First step" "S1")
+                      (wgn-agent-plans-test--entry "TODO" "Second step" "S2"))
+              (write-region nil nil plan))
+            (wgn-agent-plans-test--agent-plan
+             "ask" plan "--question" "Keep the old flag?" "--recommendation" "no")
+            (wgn-agent-plans-test--agent-plan
+             "ask" plan "--question" "Rename it too?" "--recommendation" "yes" "--after" "Q1")
+            (wgn-agent-plans-test--agent-plan
+             "ask" plan "--question" "Keep tests offline?" "--recommendation" "yes"
+             "--answer" "yes: CI has no network" "--role" "single")
+            (wgn-agent-plans-test--agent-plan
+             "followup" plan "--title" "Guard accepts --draft=false" "--found-in" "S1")
+            (wgn-agent-plans-test--agent-plan "log" plan "--item" "S1" "--kind" "done")
+            ;; The A view.
+            (let* ((blocks (unwind-protect (wgn-agent-plans-test--agenda-blocks)
+                             (org-agenda-quit)))
+                   (questions (or (cdr (assoc "Questions for the operator" blocks)) ""))
+                   (ready (or (cdr (assoc "Ready" blocks)) ""))
+                   (followups (or (cdr (assoc "Follow-ups" blocks)) "")))
+              (should (string-match-p "Keep the old flag" questions))
+              (should-not (string-match-p "Rename it too\\|Keep tests offline" questions))
+              (should (string-match-p "Second step" ready))
+              (should-not (string-match-p "First step" ready))
+              (should (string-match-p "Guard accepts --draft=false" followups)))
+            ;; The dynamic block.
+            (with-temp-buffer
+              (org-mode)
+              (insert (format "* Notes\n#+BEGIN: agent-plan :plan %S\n#+END:\n" plan))
+              (goto-char (point-min))
+              (re-search-forward "^#\\+BEGIN")
+              (beginning-of-line)
+              (org-update-dblock)
+              (should (string-match-p "^| S1 | First step | yes | no | |$" (buffer-string)))
+              (should (string-match-p "^- Steps ready: S2$" (buffer-string))))
+            ;; The indicator, given only a directory in the worktree.
+            (wgn-agent-plans-test--statusline
+             (file-name-as-directory (expand-file-name "lisp" worktree)))
+            (should (string-match-p "1 open question · /questions"
+                                    wgn/agent-plans-questions--string))
+            (dolist (buffer (buffer-list))
+              (when (and (buffer-file-name buffer)
+                         (string-prefix-p root (buffer-file-name buffer)))
+                (with-current-buffer buffer (set-buffer-modified-p nil))
+                (kill-buffer buffer)))))
+      (delete-directory root t))))
+
 ;;; agent-plans.el ends here
