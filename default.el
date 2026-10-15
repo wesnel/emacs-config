@@ -744,13 +744,15 @@ if USER is given, its username is USER.  The port is not matched."
 ;;;; arranges, and review it with a model whose comments can be edited and
 ;;;; forwarded to the pending review.  Requests go to `gptel-backend' and
 ;;;; `gptel-model' unless `review-guide-backend' and `review-guide-model'
-;;;; say otherwise.
+;;;; say otherwise.  `review-guide-loop' shows a review loop's fixups one
+;;;; commit to a chunk, without asking the model.
 (use-package review-guide
   :ensure t
 
   :commands
   (review-guide
-   review-guide-local))
+   review-guide-local
+   review-guide-loop))
 
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos

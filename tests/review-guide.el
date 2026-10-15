@@ -75,6 +75,20 @@ diff --git lib/a.el lib/a.el
   (should (equal (review-guide-hunk-format (nth 1 (review-guide-test--hunks)))
                  "### H2 lib/a.el\n@@ -10,2 +11,2 @@\nL10   |-ten\nR11   |+TEN\nR12   | eleven\n")))
 
+(ert-deftest review-guide-diff-records-each-hunks-commit ()
+  (let* ((one (make-string 40 ?1))
+         (two (make-string 40 ?2))
+         (hunks (review-guide-diff-parse
+                 (concat "commit " one "\n" review-guide-test--diff
+                         "commit " two "\n"
+                         "diff --git a/lib/a.el b/lib/a.el\n--- a/lib/a.el\n+++ b/lib/a.el\n"
+                         "@@ -1 +1 @@\n-a\n+b\n"))))
+    (should (equal (mapcar #'review-guide-hunk-commit hunks) (list one one one one two)))
+    (should (equal (review-guide-hunk-lines (nth 3 hunks)) '("-gone")))
+    (should (string-prefix-p "### H5 lib/a.el in commit 222222222222\n"
+                             (review-guide-hunk-format (nth 4 hunks))))
+    (should-not (review-guide-hunk-commit (car (review-guide-test--hunks))))))
+
 (ert-deftest review-guide-chunks-place-every-hunk-once ()
   (let* ((hunks (review-guide-test--hunks))
          (chunks (review-guide-ai-chunks
@@ -424,5 +438,254 @@ Git ignores the user's configuration, so it neither signs nor hooks."
 (ert-deftest review-guide-local-fences-code-holding-backticks ()
   (should (equal (review-guide-local--fence "+```elisp") "````"))
   (should (equal (review-guide-local--fence "+x") "```")))
+
+;;;; Review-loop fixups
+
+(require 'review-guide-loop)
+
+(defmacro review-guide-test--with-loop-repo (&rest body)
+  "Run BODY in `review-guide-test--with-repo' after a review loop's work.
+On top of the commit \"Shout two\", the loop fixed it in round 2 for
+Qodo, made an ordinary commit adding new.txt, and fixed it again in
+round 1 for Copilot.  BODY sees those fixups as `qodo' and `copilot'."
+  (declare (indent 0))
+  `(review-guide-test--with-repo
+     (let ((pr-commit (review-guide-test--head repo)))
+       (review-guide-test--git
+        repo "commit" "--quiet" "-a" (concat "--fixup=" pr-commit)
+        "--trailer" "Review-Thread: https://github.com/o/r/pull/1#discussion_r2"
+        "--trailer" "Review-Bot: Qodo" "--trailer" "Review-Round: 2")
+       (let ((qodo (review-guide-test--head repo)))
+         (review-guide-test--git repo "add" "new.txt")
+         (review-guide-test--git repo "commit" "--quiet" "-m" "Add new")
+         (review-guide-test--write repo "a.txt" "ONE\nTWO\nTHREE\n")
+         (review-guide-test--git
+          repo "commit" "--quiet" "-a" (concat "--fixup=" pr-commit)
+          "-m" "Copilot asked for it."
+          "--trailer" "Review-Thread: https://github.com/o/r/pull/1#discussion_r1"
+          "--trailer" "Review-Bot: Copilot" "--trailer" "Review-Round: 1")
+         (let ((copilot (review-guide-test--head repo)))
+           ,@body)))))
+
+(defun review-guide-test--head (repo)
+  (string-trim (review-guide-test--git repo "rev-parse" "HEAD")))
+
+(defun review-guide-test--loop (repo)
+  (review-guide-loop-create
+   :directory repo :base-label "main" :head "work"
+   :base (string-trim (review-guide-test--git repo "merge-base" "main" "work"))))
+
+(ert-deftest review-guide-loop-chunks-each-fixup-in-round-order ()
+  (review-guide-test--with-loop-repo
+    (let* ((source (review-guide-test--loop repo))
+           (chunks (review-guide-source-chunks
+                    source (review-guide-diff-parse (review-guide-source-diff source)))))
+      (should (equal (mapcar #'review-guide-chunk-title chunks)
+                     '("Round 1, Copilot: Shout two" "Round 2, Qodo: Shout two")))
+      (should (equal (mapcar #'review-guide-chunk-summary chunks)
+                     '("Copilot asked for it.\n\nhttps://github.com/o/r/pull/1#discussion_r1"
+                       "https://github.com/o/r/pull/1#discussion_r2")))
+      (should (equal (mapcar (lambda (chunk)
+                               (mapcar (lambda (hunk)
+                                         (list (review-guide-hunk-commit hunk)
+                                               (review-guide-hunk-path hunk)
+                                               (review-guide-hunk-lines hunk)))
+                                       (review-guide-chunk-hunks chunk)))
+                             chunks)
+                     `(((,copilot "a.txt" ("-one" "+ONE" " TWO" " THREE")))
+                       ((,qodo "a.txt" (" one" " TWO" "-three" "+THREE")))))))))
+
+(ert-deftest review-guide-loop-includes-fixups-for-local-findings ()
+  (review-guide-test--with-loop-repo
+    (review-guide-test--write repo "a.txt" "ONE\nTWO\nTHREE!\n")
+    (review-guide-test--git
+     repo "commit" "--quiet" "-a" (concat "--fixup=" pr-commit)
+     "-m" "The reviewer found the shout uneven."
+     "--trailer" "Review-Finding: 2.1")
+    (let* ((source (review-guide-test--loop repo))
+           (chunks (review-guide-source-chunks
+                    source (review-guide-diff-parse (review-guide-source-diff source)))))
+      (should (equal (mapcar #'review-guide-chunk-title chunks)
+                     '("Round 1, Copilot: Shout two" "Round 2, Qodo: Shout two"
+                       "Round 2, local review: Shout two")))
+      (should (equal (review-guide-chunk-summary (car (last chunks)))
+                     "The reviewer found the shout uneven.\n\nLocal review finding 2.1")))))
+
+(ert-deftest review-guide-loop-visits-the-fixup-and-its-parent ()
+  (review-guide-test--with-loop-repo
+    (let ((source (review-guide-test--loop repo)))
+      (pcase-dolist (`(,side ,line ,commit ,text)
+                     `(("LEFT" 3 ,qodo "three") ("RIGHT" 3 ,qodo "THREE")
+                       ("LEFT" 1 ,copilot "one") ("RIGHT" 1 ,copilot "ONE")))
+        (save-window-excursion
+          (review-guide-source-visit source "a.txt" side line commit)
+          (unwind-protect
+              (progn
+                (should buffer-read-only)
+                (should (equal (buffer-substring (point) (line-end-position)) text)))
+            (kill-buffer)))))))
+
+(ert-deftest review-guide-loop-defaults-to-the-branch-below-in-the-stack ()
+  (review-guide-test--with-loop-repo
+    (should (equal (review-guide-loop--default-base repo "work") "main"))
+    (review-guide-test--git repo "switch" "--quiet" "-c" "top")
+    (review-guide-test--git repo "commit" "--quiet" "--allow-empty" "-m" "On top")
+    (should (equal (review-guide-loop--default-base repo "top") "work"))
+    (let ((default-directory repo)
+          (current-prefix-arg nil))
+      (should (equal (review-guide-loop--read-args)
+                     (list (directory-file-name repo) "top"))))))
+
+(ert-deftest review-guide-loop-opens-without-the-model ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-loop-repo
+    (let ((source (review-guide-test--loop repo)))
+      (unwind-protect
+          (cl-letf (((symbol-function 'review-guide-ai-group)
+                     (lambda (&rest _) (error "The model was asked")))
+                    ((symbol-function 'review-guide-ai-review)
+                     (lambda (_title _desc hunks _buffer callback _errback)
+                       (pcase-let ((`(,findings . ,_)
+                                    (review-guide-ai-findings
+                                     '((comments ((hunk . "H2") (side . "RIGHT")
+                                                  (start_line . 3) (line . 3)
+                                                  (severity . "nit")
+                                                  (body . "Why shout?"))))
+                                     hunks)))
+                         (funcall callback "Fine." findings 0)))))
+            (save-window-excursion
+              (review-guide-open source)
+              (let ((text (buffer-string)))
+                (should (< (string-search "1. Round 1, Copilot: Shout two" text)
+                           (string-search "+ONE" text)
+                           (string-search "2. Round 2, Qodo: Shout two" text)
+                           (string-search "+THREE" text)))
+                (should-not (string-search "new.txt" text)))
+              (review-guide-test--goto "-three")
+              (save-window-excursion
+                (review-guide-visit)
+                (unwind-protect
+                    (should (equal (buffer-substring (point) (line-end-position)) "three"))
+                  (kill-buffer)))
+              (review-guide-review)
+              (review-guide-test--goto "AI nit on RIGHT 3")
+              (let ((guide (current-buffer)))
+                (save-window-excursion
+                  (review-guide-forward)
+                  (review-guide-comment-finish))
+                (set-buffer guide))
+              (should (equal (review-guide-source-threads source)
+                             `(((path . "a.txt") (line . 3) (side . "RIGHT")
+                                (commit . ,qodo) (body . "Why shout?")))))
+              ;; The thread is shown under its own commit's line 3 only.
+              (should (= (how-many "Pending comment on RIGHT 3" (point-min) (point-max))
+                         1))
+              (should (string-search
+                       (concat "## a.txt, line 3 in commit " (substring qodo 0 12)
+                               "\n\n```diff\n+THREE\n```\n\nWhy shout?\n")
+                       (review-guide-local-feedback
+                        "x" (review-guide-diff-parse (review-guide-source-diff source))
+                        (review-guide-source-threads source))))))
+        (when-let* ((guide (get-buffer
+                            (format "*review-guide %s*"
+                                    (car (review-guide-source-describe source))))))
+          (kill-buffer guide))))))
+
+(defmacro review-guide-test--with-loop-guide (&rest body)
+  "Run BODY in a guide opened on the loop repo's review-loop source.
+`source' is the source and `qodo' and `copilot' the fixups.  The model
+is not asked for anything."
+  (declare (indent 0))
+  `(review-guide-test--with-loop-repo
+     (let ((source (review-guide-test--loop repo)))
+       (unwind-protect
+           (cl-letf (((symbol-function 'review-guide-ai-group)
+                      (lambda (&rest _) (error "The model was asked"))))
+             (save-window-excursion
+               (review-guide-open source)
+               ,@body))
+         (when-let* ((guide (get-buffer
+                             (format "*review-guide %s*"
+                                     (car (review-guide-source-describe source))))))
+           (kill-buffer guide))))))
+
+(ert-deftest review-guide-loop-comment-records-its-commit ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-loop-guide
+    (review-guide-test--goto "+THREE")
+    (let ((guide (current-buffer)))
+      (save-window-excursion
+        (review-guide-comment (point) (point))
+        (insert "Mine.")
+        (review-guide-comment-finish))
+      (set-buffer guide))
+    (should (equal (review-guide-source-threads source)
+                   `(((path . "a.txt") (line . 3) (side . "RIGHT")
+                      (commit . ,qodo) (body . "Mine.")))))))
+
+(ert-deftest review-guide-loop-comment-refuses-a-range-across-commits ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-loop-guide
+    (review-guide-test--goto "+ONE")
+    (let ((beg (point)))
+      (review-guide-test--goto "+THREE")
+      (should-error (review-guide-comment beg (point)) :type 'user-error))
+    (should-not (review-guide-source-threads source))))
+
+(ert-deftest review-guide-loop-reopened-with-another-base-shows-that-base ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-loop-repo
+    (let ((wide (review-guide-test--loop repo))
+          (narrow (review-guide-loop-create
+                   :directory repo :base-label "qodo" :base qodo :head "work")))
+      (unwind-protect
+          (cl-letf (((symbol-function 'review-guide-ai-group)
+                     (lambda (&rest _) (error "The model was asked"))))
+            (save-window-excursion
+              (review-guide-open wide)
+              (should (string-search "Qodo: Shout two" (buffer-string)))
+              (review-guide-open narrow)
+              (let ((text (buffer-string)))
+                (should (string-search "Copilot: Shout two" text))
+                (should-not (string-search "Qodo: Shout two" text)))))
+        (dolist (source (list wide narrow))
+          (when-let* ((guide (get-buffer
+                              (format "*review-guide %s*"
+                                      (car (review-guide-source-describe source))))))
+            (kill-buffer guide)))))))
+
+(defconst review-guide-test--lisp
+  (expand-file-name "../lisp/review-guide"
+                    (file-name-directory (or load-file-name buffer-file-name)))
+  "The directory holding the package's sources.")
+
+(ert-deftest review-guide-loop-autoload-reaches-the-entry-point ()
+  "A fresh Emacs with only the generated autoloads can run the command."
+  ;; The sources are copied next to the generated loaddefs.el: Emacs 29
+  ;; records each autoload's file relative to the loaddefs file, and
+  ;; resolves it against `load-path' rather than that file's directory.
+  (let* ((scratch (make-temp-file "review-guide-autoloads" t))
+         (emacs (expand-file-name invocation-name invocation-directory)))
+    (unwind-protect
+        (with-temp-buffer
+          (dolist (source (directory-files review-guide-test--lisp t "\\.el\\'"))
+            (copy-file source (file-name-as-directory scratch)))
+          (let ((status (call-process
+                         emacs nil t nil "--batch" "-Q"
+                         "--eval" (format "(add-to-list 'load-path %S)" scratch)
+                         "--eval" (format "(loaddefs-generate %S %S)"
+                                          scratch (expand-file-name "loaddefs.el" scratch))
+                         "--eval" (format "(load %S nil t)"
+                                          (expand-file-name "loaddefs.el" scratch))
+                         "--eval" "(unless (autoloadp (symbol-function 'review-guide-loop)) (error \"review-guide-loop is not autoloaded\"))"
+                         "--eval" "(autoload-do-load (symbol-function 'review-guide-loop) 'review-guide-loop)"
+                         "--eval" "(unless (fboundp 'review-guide-open) (error \"void-function review-guide-open\"))")))
+            (ert-info ((buffer-string))
+              (should (zerop status)))))
+      (delete-directory scratch t))))
 
 ;;; review-guide.el ends here

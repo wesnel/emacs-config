@@ -116,6 +116,7 @@ a fine answer."
                                     (:copier nil))
   "A comment the model proposes, anchored to a line or range of the diff."
   hunk path side start-line line severity body
+  (commit nil :documentation "The `review-guide-hunk-commit' of its hunk.")
   (state 'proposed :documentation "One of `proposed', `forwarded' or `dismissed'."))
 
 (defun review-guide-ai-prompt (title description hunks)
@@ -190,6 +191,7 @@ A start line after the end line is swapped with it."
                    (review-guide-hunk-covers-p hunk .side end))
               (push (review-guide-finding-create
                      :hunk .hunk :path (review-guide-hunk-path hunk) :side .side
+                     :commit (review-guide-hunk-commit hunk)
                      :start-line start :line end
                      :severity (intern (or .severity "suggestion"))
                      :body (string-trim .body))
@@ -200,15 +202,19 @@ A start line after the end line is swapped with it."
 (defun review-guide-finding-thread (finding)
   "Return the draft review thread for FINDING, without a body.
 The alist carries GitHub's names for a draft review thread's fields,
-which is also the form `pr-review' keeps pending threads in."
+which is also the form `pr-review' keeps pending threads in, and a
+commit field when the finding's hunk has one."
   (let ((side (review-guide-finding-side finding))
         (start (review-guide-finding-start-line finding))
-        (line (review-guide-finding-line finding)))
+        (line (review-guide-finding-line finding))
+        (commit (review-guide-finding-commit finding)))
     (append (when (< start line)
               `((startLine . ,start) (startSide . ,side)))
             `((path . ,(review-guide-finding-path finding))
               (line . ,line)
-              (side . ,side)))))
+              (side . ,side))
+            (when commit
+              `((commit . ,commit))))))
 
 (defun review-guide-ai--request (prompt system schema buffer on-reply on-error)
   "Send PROMPT with SYSTEM and SCHEMA, calling ON-REPLY with the parsed reply.

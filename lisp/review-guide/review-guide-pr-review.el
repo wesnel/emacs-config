@@ -42,7 +42,7 @@
 (cl-defmethod review-guide-source-threads ((source buffer))
   (buffer-local-value 'pr-review--pending-review-threads source))
 
-(cl-defmethod review-guide-source-visit ((source buffer) path side line)
+(cl-defmethod review-guide-source-visit ((source buffer) path side line &optional _commit)
   (pop-to-buffer source)
   (unless (pr-review--goto-diff-line path side line)
     (message "Line %s:%s of %s is not shown in %s" side line path (buffer-name source))))
