@@ -549,7 +549,17 @@ if USER is given, its username is USER.  The port is not matched."
   (add-to-list 'tramp-remote-path "/opt/ngrok/scripts")
   (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/go/bin")
   (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/home/bin")
-  (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/ngrok-devenv-home/bin"))
+  (add-to-list 'tramp-remote-path "/opt/ngrok/.cache/ngrok-devenv-home/bin")
+
+  ;; Start devbox processes with their own ssh invocation instead of
+  ;; through the TRAMP shell.  `:machine' matches the host name
+  ;; exactly, so other aliases of the same host are not covered.
+  (connection-local-set-profile-variables
+   'wgn/tramp-direct-async-process
+   '((tramp-direct-async-process . t)))
+  (connection-local-set-profiles
+   '(:application tramp :machine "devbox")
+   'wgn/tramp-direct-async-process))
 
 (use-package vc
   :after tramp
