@@ -619,16 +619,6 @@ final: prev: let
     final
     build-deps-static
     (pkgs: pkgs.emacs30-macport);
-
-  # FIXME: My goal is to build a MacOS executable from Linux.
-  #        Unfortunately this currently fails with the error:
-  #
-  # error: don't yet have a `targetPackages.darwin.LibsystemCross for x86_64-apple-darwin`
-  wgn-emacs-macport-cross =
-    build-emacs
-    final.pkgsCross.x86_64-darwin
-    build-deps-static
-    (pkgs: pkgs.emacs30-macport);
 in {
   # Pin host and guest ECA servers together. Home Manager selects which
   # sandbox backend to install alongside the Emacs integration.
@@ -648,7 +638,6 @@ in {
     wgn-emacs-pgtk
     wgn-emacs-nox
     wgn-emacs-macport
-    wgn-emacs-macport-cross
     wgn-emacs-unstable
     wgn-emacs-unstable-nox
     wgn-emacs-git
