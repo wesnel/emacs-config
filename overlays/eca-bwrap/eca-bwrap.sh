@@ -18,6 +18,9 @@ eca="${ECA_SANDBOX_ECA:-eca}"
 # Empty means no host is reachable.
 allow="${ECA_SANDBOX_ALLOW_HOSTS:-}"
 pr_loop="${ECA_SANDBOX_PR_LOOP:-}"
+plans=""
+tools=""
+guard_config=""
 env_args=()
 protect=()
 command=()
@@ -25,7 +28,7 @@ command=()
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --) shift; command=("$@"); break ;;
-        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop|--protect)
+        --workspace|--config|--state|--log|--eca|--allow-host|--env|--image|--guest-path|--pr-loop|--protect|--plans|--tools|--guard-config)
             if [[ $# -lt 2 ]]; then
                 printf 'eca-bwrap: %s needs a value\n' "$1" >&2
                 exit 2
@@ -39,6 +42,9 @@ while [[ $# -gt 0 ]]; do
                 --allow-host) allow="$allow,$2" ;;
                 --pr-loop) pr_loop="$2" ;;
                 --protect) protect+=("${2#/}") ;;
+                --plans) plans="$2" ;;
+                --tools) tools="$2" ;;
+                --guard-config) guard_config="$2" ;;
                 --env)
                     if [[ "$2" != *=* ]]; then
                         printf 'eca-bwrap: --env expects KEY=VALUE, got %s\n' "$2" >&2
@@ -223,13 +229,46 @@ if [[ -d "$config" ]]; then
     bwrap_args+=(--ro-bind "$config" "$HOME/.config/eca")
 fi
 
+# The file `agent-plan' and its guard read.
+if [[ -n "$guard_config" ]]; then
+    if [[ -f "$guard_config" ]]; then
+        bwrap_args+=(--ro-bind "$guard_config" "$HOME/.config/agent-tools/config.json")
+    else
+        printf 'eca-bwrap: --guard-config %s does not exist; it is not mounted\n' "$guard_config" >&2
+    fi
+fi
+
+# Agents write their plans here, at the path the config's `plans.dir' names. A
+# review-loop session logs only through the relay, so it gets no mount.
+if [[ -n "$plans" && -z "$pr_loop" ]]; then
+    if [[ -d "$plans" ]]; then
+        plans="$(cd "$plans" && pwd)"
+        bwrap_args+=(--bind "$plans" "$plans")
+    else
+        printf 'eca-bwrap: --plans %s does not exist; plans are not mounted\n' "$plans" >&2
+    fi
+fi
+
+# An ordinary session runs `agent-plan' and the plan guard itself, so it gets
+# the client directory on PATH, read-only, and no relay. A review-loop session
+# has the same directory through --pr-loop.
+if [[ -n "$tools" && -z "$pr_loop" ]]; then
+    if [[ -d "$tools" ]]; then
+        tools="$(cd "$tools" && pwd)"
+        bwrap_args+=(--ro-bind "$tools" "$tools" --setenv PATH "$tools:$PATH")
+    else
+        printf 'eca-bwrap: --tools %s does not exist; it is not on PATH\n' "$tools" >&2
+    fi
+fi
+
 # The sandbox gets a `pr-loop' client and no GitHub credentials, so every write
 # the review loop makes to GitHub passes through `sandbox-relay serve' out
 # here, which runs `pr-loop' with the login, and `pr-loop' enforces the loop's
 # branch policy. Its socket sits in the relay directory, which the sandbox
 # already sees.
 if [[ -n "$pr_loop" ]]; then
-    sandbox-relay serve --workspace "$workspace" --socket "$relay/sandbox-relay.sock" >/dev/null &
+    sandbox-relay serve --workspace "$workspace" --socket "$relay/sandbox-relay.sock" \
+        --program pr-loop --program agent-plan >/dev/null &
     pr_loop_pid=$!
 
     for _ in $(seq 1 100); do

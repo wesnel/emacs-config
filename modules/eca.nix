@@ -14,6 +14,13 @@
   # Shared by activation and sessions, which must agree on it.
   imageCache = "${config.xdg.cacheHome}/gondolin/eca-images";
 
+  # Every session gets these, a review-loop session too: the sandbox itself
+  # withholds the plans mount from that one.
+  planArgs =
+    lib.optionals (cfg.sandbox.plansDir != null) ["--plans" cfg.sandbox.plansDir]
+    ++ lib.optionals (cfg.sandbox.guardConfig != null) ["--guard-config" cfg.sandbox.guardConfig]
+    ++ lib.optionals (cfg.sandbox.tools != null) ["--tools" cfg.sandbox.tools];
+
   # Carries the configured arguments, so that a TRAMP session from another
   # machine, which finds this on PATH, runs with them as well.
   launcher = pkgs.writeShellScriptBin "eca-sandbox" ''
@@ -23,7 +30,7 @@
         export ${name}
       '')
       cfg.sandbox.secretFiles)}
-    exec ${lib.getExe backend} ${lib.escapeShellArgs cfg.sandbox.args} "$@"
+    exec ${lib.getExe backend} ${lib.escapeShellArgs (planArgs ++ cfg.sandbox.args)} "$@"
   '';
 
   managedImage = cfg.sandbox.enable && gondolin && !(builtins.elem "--image" cfg.sandbox.args);
@@ -61,6 +68,43 @@ in {
           the sandbox, for `--secret NAME=HOST` in {option}`args` to take
           their values from. The files are read on this machine; the guest
           sees only Gondolin's placeholder.
+        '';
+      };
+
+      plansDir = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "${config.home.homeDirectory}/git/notes/agents";
+        defaultText = lib.literalExpression ''"''${config.home.homeDirectory}/git/notes/agents"'';
+        description = ''
+          Where agents keep their plans: the `plans.dir` of `agent-plan`'s
+          config. Ordinary sessions get it read-write at this path; the bot
+          review loop gets no mount and logs through `sandbox-relay`. Set it
+          to the same value as the plans directory in the agent-tools
+          config, or null to mount nothing. A directory that does not exist
+          is skipped with a notice.
+        '';
+      };
+
+      guardConfig = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = "${config.xdg.configHome}/agent-tools/config.json";
+        defaultText = lib.literalExpression ''"''${config.xdg.configHome}/agent-tools/config.json"'';
+        description = ''
+          The agent-tools config, which `agent-plan` and the guard read.
+          Every session sees it read-only at `~/.config/agent-tools/config.json`.
+          Null mounts nothing.
+        '';
+      };
+
+      tools = lib.mkOption {
+        type = lib.types.nullOr lib.types.str;
+        default = cfg.sandbox.prLoop;
+        defaultText = lib.literalExpression "config.home.programs.wgn.emacs.eca.sandbox.prLoop";
+        description = ''
+          Directory holding the Linux `pr-loop` and `agent-plan` clients.
+          Ordinary sessions get it read-only on the guest's PATH, so the plan
+          guard hook runs and `agent-plan` works there; they start no relay and
+          run both directly. Null puts nothing on PATH.
         '';
       };
 

@@ -57,6 +57,7 @@ export class VM {
   exec(command, options) {
     const {mounts} = this.options.vfs;
     const config = mounts["/root/.config/eca"];
+    const guard = mounts["/root/.config/agent-tools"];
     const probes = JSON.parse(process.env.STUB_PROBES || "{}");
 
     fs.writeFileSync(
@@ -69,6 +70,7 @@ export class VM {
           Object.entries(mounts).map(([guest, p]) => [guest, {root: p.root, readonly: !!p.readonly}]),
         ),
         config: config ? tree(config.root) : null,
+        guardConfig: guard ? tree(guard.root) : null,
         allowedHosts: hooks.allowedHosts ?? null,
         secrets: hooks.secrets ?? null,
         allowedInternalHosts: hooks.allowedInternalHosts,

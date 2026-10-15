@@ -62,12 +62,50 @@ stdenvNoCC.mkDerivation (finalAttrs: {
         sleep 0.1
       done
 
+      mkdir -p "$HOME/notes/agents" "$TMPDIR/bin" "$TMPDIR/client" "$TMPDIR/tools"
+      printf '{"plans": {}}' > "$TMPDIR/guard.json"
+
+      # Stands in for `sandbox-relay serve': records its arguments and
+      # listens on the socket it is given.
+      cat > "$TMPDIR/bin/sandbox-relay" <<EOF
+      #!${lib.getExe bash}
+      printf '%s\n' "\$@" > "$TMPDIR/relay-args"
+      while [ \$# -gt 0 ]; do
+        if [ "\$1" = --socket ]; then sock="\$2"; fi
+        shift
+      done
+      exec python3 -c 'import socket, sys, time; s = socket.socket(socket.AF_UNIX); s.bind(sys.argv[1]); s.listen(1); time.sleep(60)' "\$sock"
+      EOF
+      chmod +x "$TMPDIR/bin/sandbox-relay"
+
       cd "$HOME/project"
-      ${finalAttrs.finalPackage}/bin/eca-bwrap \
+
+      # A review-loop session logs through the relay and cannot write plans.
+      PATH="$TMPDIR/bin:$PATH" ${finalAttrs.finalPackage}/bin/eca-bwrap \
+        --plans "$HOME/notes/agents" \
+        --guard-config "$TMPDIR/guard.json" \
+        --pr-loop "$TMPDIR/client" \
+        -- ${lib.getExe bash} ${../../tests/bwrap-guest.sh} "$port" "$HOME/notes/agents" loop
+      [ ! -e "$HOME/notes/agents/written" ]
+      grep -qx -- '--program' "$TMPDIR/relay-args"
+      grep -qx pr-loop "$TMPDIR/relay-args"
+      grep -qx agent-plan "$TMPDIR/relay-args"
+
+      # An ordinary session gets the tools and starts no relay.
+      rm "$TMPDIR/relay-args"
+      printf '#!${lib.getExe bash}\necho tool\n' > "$TMPDIR/tools/agent-plan"
+      chmod +x "$TMPDIR/tools/agent-plan"
+
+      PATH="$TMPDIR/bin:$PATH" ${finalAttrs.finalPackage}/bin/eca-bwrap \
         --allow-host 127.0.0.1 \
         --log "$TMPDIR/log.jsonl" \
         --env TEST_VAR=ok \
-        -- ${lib.getExe bash} ${../../tests/bwrap-guest.sh} "$port"
+        --plans "$HOME/notes/agents" \
+        --guard-config "$TMPDIR/guard.json" \
+        --tools "$TMPDIR/tools" \
+        -- ${lib.getExe bash} ${../../tests/bwrap-guest.sh} "$port" "$HOME/notes/agents" "" "$TMPDIR/tools"
+      [ -f "$HOME/notes/agents/written" ]
+      [ ! -e "$TMPDIR/relay-args" ]
 
       grep -q '"dir": "response", "status": 200, "url": "http://127.0.0.1:'"$port"'/hello"' "$TMPDIR/log.jsonl"
       grep -q '"url": "http://blocked.invalid/"' "$TMPDIR/log.jsonl"

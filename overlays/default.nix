@@ -83,6 +83,7 @@ final: prev: let
     # use-package forms in order to guarantee that packages are loaded
     # in the correct order regardless of location in final file.
     pkgs.replaceVars ../default.el {
+      agent-plans-helper = builtins.readFile ../lisp/wgn-agent-plans.el;
       eca-helper = builtins.readFile ../lisp/wgn-eca.el;
       inherit
         (deps)

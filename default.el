@@ -294,6 +294,30 @@
 (use-package citeproc
   :ensure t)
 
+;;;; Read the plans that agents keep with `agent-plan'.
+;;
+;; The plans stay out of `org-agenda-files' and `org-refile-targets'; only
+;; the "A" agenda view reads them.
+(use-package org-agenda
+  :after org
+
+  :commands
+  (wgn/agent-plans
+   wgn/agent-plans-insert-status
+   wgn/agent-plans-questions-mode)
+
+  :preface
+  @agent-plans-helper@
+
+  :init
+  ;; Before any plan file is visited: `:after org' runs this once Org is
+  ;; loaded, ahead of the visiting buffer's `find-file-hook'.
+  (wgn/agent-plans-protect-mode)
+
+  :config
+  (wgn/agent-plans-questions-mode)
+  (add-to-list 'org-agenda-custom-commands (wgn/agent-plans-agenda-command)))
+
 ;;;; Store encrypted information in org files.
 (use-package org-crypt
   :commands
