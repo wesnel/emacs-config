@@ -12,6 +12,14 @@
 
 (declare-function org-create-dblock "org" (plist))
 (declare-function org-update-dblock "org" ())
+(declare-function org-back-to-heading "org" (&optional invisible-ok))
+(declare-function org-entry-get "org" (epom property &optional inherit literal-nil))
+(declare-function org-entry-is-done-p "org" ())
+(declare-function org-mode "org" ())
+(declare-function org-mode-restart "org" ())
+(defvar org-block-entry-blocking)
+(defvar org-done-keywords)
+(defvar org-inhibit-startup)
 
 (defconst wgn/agent-plans--plan-regexp
   "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[^.]+\\.[^.]+\\.org\\'"
@@ -241,6 +249,154 @@ choose a plan."
           (delq 'wgn/agent-plans-questions--string global-mode-string)
           wgn/agent-plans-questions--string ""
           wgn/agent-plans-questions--last-directory nil)))
+
+;;;; Plan files in Org
+
+;; The keywords, and which are done, come from each file's own #+TODO
+;; lines, so nothing here names one.  Entries are told apart by their ID
+;; patterns, the contract with `agent-plan' that the plan-work skill
+;; documents:
+
+(defconst wgn/agent-plans-question-id "^\\(P[0-9]+\\.\\)?Q[0-9]+$"
+  "Match the ID of a question for Wesley.")
+
+(defconst wgn/agent-plans-ready-id "^\\(P[0-9]+\\|\\(P[0-9]+\\.\\)?S[0-9]+\\)$"
+  "Match the ID of a part or a step.")
+
+(defconst wgn/agent-plans-followup-id "^\\(P[0-9]+\\.\\)?F[0-9]+$"
+  "Match the ID of a follow-up.")
+
+(defconst wgn/agent-plans--file-regexp
+  (concat "\\`\\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
+          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)\\(?:\\.\\(P[0-9]+\\|log\\)\\)?\\.org\\'")
+  "Match a plan's, a part's or a log's file name, as `agent-plan' names them.
+Group 1 is the plan's name, 2 its host, and 3 the part or \"log\".")
+
+(defun wgn/agent-plans--config-value (key)
+  "Return \"plans\".KEY in `agent-plan''s config file, or nil."
+  (let ((file (wgn/agent-plans--config-file)))
+    (when (file-readable-p file)
+      (with-temp-buffer
+        (insert-file-contents file)
+        (let ((plans (gethash "plans" (json-parse-buffer))))
+          (and (hash-table-p plans) (gethash key plans)))))))
+
+(defun wgn/agent-plans-host ()
+  "Return this host's name in plan file names, as `agent-plan' takes it.
+It is \"plans.host\" in its config file, else `system-name' up to the
+first dot."
+  (let ((host (wgn/agent-plans--config-value "host")))
+    (if (and (stringp host) (not (string-empty-p host)))
+        host
+      (car (split-string (system-name) "\\.")))))
+
+(defun wgn/agent-plans--file-parts (file)
+  "Return (NAME HOST PART) of FILE in the plans directory, or nil.
+PART is a part's ID, \"log\", or nil for the plan's own file."
+  (when (and file
+             (file-equal-p (file-name-directory file)
+                           (file-name-as-directory (wgn/agent-plans-directory))))
+    (let ((base (file-name-nondirectory file)))
+      (when (string-match wgn/agent-plans--file-regexp base)
+        (list (match-string 1 base) (match-string 2 base) (match-string 3 base))))))
+
+(defun wgn/agent-plans--mirror-host (file)
+  "Return the host whose plan FILE is, if not this host's."
+  (let ((host (nth 1 (wgn/agent-plans--file-parts file))))
+    (and host (not (equal host (wgn/agent-plans-host))) host)))
+
+(defun wgn/agent-plans--own-files (file)
+  "Return the plan's and parts' files of the plan FILE belongs to."
+  (let ((parts (wgn/agent-plans--file-parts file)))
+    (directory-files (file-name-directory file) t
+                     (concat "\\`" (regexp-quote (concat (nth 0 parts) "." (nth 1 parts)))
+                             "\\(\\.P[0-9]+\\)?\\.org\\'"))))
+
+(defun wgn/agent-plans--settled-p (file id)
+  "Return non-nil when ID is settled in the plan FILE belongs to.
+Settled is Org's rule: the entry's keyword is a done one of its file.  An
+ID the plan does not hold never settles."
+  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+    (seq-some
+     (lambda (f)
+       (let ((visiting (find-buffer-visiting f)))
+         (with-current-buffer (or visiting (generate-new-buffer " *agent-plan*" t))
+           (unwind-protect
+               (progn
+                 (unless visiting
+                   (insert-file-contents f)
+                   (let ((org-inhibit-startup t)) (delay-mode-hooks (org-mode))))
+                 (save-excursion
+                   (save-restriction
+                     (widen)
+                     (goto-char (point-min))
+                     (and (re-search-forward pattern nil t)
+                          (progn (org-back-to-heading t) (org-entry-is-done-p))
+                          t))))
+             (unless visiting (kill-buffer))))))
+     (wgn/agent-plans--own-files file))))
+
+(defun wgn/agent-plans-blocker (change)
+  "Refuse the Org state CHANGE where a plan does not allow it.
+In another host's plan, every change, since only that host writes it;
+elsewhere in a plan, a change to done while an ID in the entry's :AFTER:
+is not settled.  Outside plan files, allow everything.  The agenda's dim
+check, whose :from is the symbol `todo', is answered for :AFTER: alone,
+so another host's entries stay listed."
+  (let ((file (buffer-file-name (buffer-base-buffer)))
+        (to (plist-get change :to)))
+    (cond
+     ((not (wgn/agent-plans--file-parts file)) t)
+     ((and (wgn/agent-plans--mirror-host file)
+           (not (eq (plist-get change :from) 'todo)))
+      (setq org-block-entry-blocking
+            (format "%s's plan; answer it there" (wgn/agent-plans--mirror-host file)))
+      nil)
+     ((not (or (eq to 'done) (member to org-done-keywords))) t)
+     (t
+      (let ((open (seq-remove (lambda (id) (wgn/agent-plans--settled-p file id))
+                              (split-string
+                               (or (org-entry-get (plist-get change :position) "AFTER") "")))))
+        (when open
+          (setq org-block-entry-blocking (string-join open " ")))
+        (null open))))))
+
+(defun wgn/agent-plans--refuse-save ()
+  "Refuse to save another host's plan file."
+  (user-error "%s is %s's plan; answer it there"
+              (file-name-nondirectory buffer-file-name)
+              (wgn/agent-plans--mirror-host buffer-file-name)))
+
+(defun wgn/agent-plans--protect-mirror ()
+  "Make the buffer of another host's plan read-only, and refuse its saves."
+  (when (wgn/agent-plans--mirror-host buffer-file-name)
+    (read-only-mode 1)
+    (add-hook 'write-contents-functions #'wgn/agent-plans--refuse-save nil t)))
+
+(defun wgn/agent-plans--after-revert ()
+  "Read a reverted plan file's keyword lines again.
+A revert that keeps the buffer's modes, as auto-revert's does, keeps the
+keywords Org read before; `org-mode-restart' wipes buffer-local hooks,
+so this one is global."
+  (when (and (derived-mode-p 'org-mode) (wgn/agent-plans--file-parts buffer-file-name))
+    (org-mode-restart)
+    (wgn/agent-plans--protect-mirror)))
+
+;;;###autoload
+(define-minor-mode wgn/agent-plans-protect-mode
+  "Hold plan files to what `agent-plan' expects of them.
+Another host's plans are read-only and refuse every state change and
+save; an entry is not done while an item in its :AFTER: is open; and a
+reverted plan buffer reads its keyword lines again."
+  :global t
+  (if wgn/agent-plans-protect-mode
+      (progn
+        (add-hook 'org-blocker-hook #'wgn/agent-plans-blocker)
+        (add-hook 'find-file-hook #'wgn/agent-plans--protect-mirror)
+        (add-hook 'after-revert-hook #'wgn/agent-plans--after-revert))
+    (remove-hook 'org-blocker-hook #'wgn/agent-plans-blocker)
+    (remove-hook 'find-file-hook #'wgn/agent-plans--protect-mirror)
+    (remove-hook 'after-revert-hook #'wgn/agent-plans--after-revert)))
 
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here
