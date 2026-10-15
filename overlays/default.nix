@@ -135,42 +135,6 @@ final: prev: let
             }
           );
 
-        acp = let
-          rev = "661af51569acef7384a2801f07a582da5142a6d9";
-          sha256 = "sha256-x6KVBM1iEW24fkRVwM9ALRqd6EzBkjJDt3cnyykL4z4=";
-        in
-          ePrev.acp.overrideAttrs (old: {
-            version = "0.12.1";
-
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "acp.el";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
-
-        agent-shell = let
-          rev = "89bd6e136a08e1527dd630e4573639c838fd7e22";
-          sha256 = "sha256-ZSxCxiA+DH0tvIrGVhOUGOgrn1k0ilNr9WL4n3Aox+8=";
-        in
-          ePrev.agent-shell.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "agent-shell";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-
-            propagatedBuildInputs = (old.propagatedBuildInputs or []) ++ [ePkgs.acp];
-          });
-
         agent-shell-knockknock = let
           rev = "56732434067fe1874dcda62c491f7800bdc0a2f3";
           sha256 = "sha256-R7bvk2v9togbPiGKOXDAKCMStrL1bbRJoTdBtj0PdlU=";
@@ -318,22 +282,6 @@ final: prev: let
               passthru = old.passthru // {inherit module;};
             })
           else ePrev.ghostel;
-
-        gptel = let
-          rev = "5c82ff85be0beed57a923935e18b9c4d1a8d0858";
-          sha256 = "sha256-4L6D2QOl/qUNWfPEv9nbZGGuFU14kebXrOU1LoJWeG8=";
-        in
-          ePrev.gptel.overrideAttrs (old: {
-            src = pkgs.fetchFromGitHub {
-              owner = "karthink";
-              repo = "gptel";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
 
         gptel-quick = let
           rev = "018ff2be8f860a1e8fe3966eec418ad635620c38";
@@ -497,47 +445,11 @@ final: prev: let
                 ;
             };
           });
-
-        shell-maker = let
-          rev = "e8bdf6dca18f39d592728e8440118d9f57092e65";
-          sha256 = "sha256-tmhZ9WApwSjzAlXUcZy+aMpW/07bTpIaaDMCALXtyzI=";
-        in
-          ePrev.shell-maker.overrideAttrs (old: {
-            version = "0.91.2";
-
-            src = pkgs.fetchFromGitHub {
-              owner = "xenodium";
-              repo = "shell-maker";
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          });
       };
     };
 
   emacs-config = build-emacs-config final build-deps-static;
   emacs-config-dynamic = build-emacs-config final build-deps-dynamic;
-
-  claude-agent-acp = final.buildNpmPackage (finalAttrs: {
-    pname = "claude-agent-acp";
-    version = "0.22.2";
-
-    src = final.fetchFromGitHub {
-      owner = "zed-industries";
-      repo = "claude-agent-acp";
-      tag = "v${finalAttrs.version}";
-      hash = "sha256-JkSE6fwtM1btfuxbwX7b04cbTDr5SdYEb7qwlZK9JYo=";
-    };
-
-    npmDepsHash = "sha256-9OhdDRQuekmt3JMs0oGVbvqWcQFoyk4ZZlm6DZCNazU=";
-
-    meta = {
-      mainProgram = "claude-agent-acp";
-    };
-  });
 
   emacs30-macport = prev.emacs30-macport.overrideAttrs (old: {
     postInstall = let
@@ -632,7 +544,6 @@ in {
     emacs30-macport
     emacs-config
     emacs-config-dynamic
-    claude-agent-acp
     parinfer-rust-emacs
     wgn-emacs
     wgn-emacs-pgtk
