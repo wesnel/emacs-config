@@ -21,9 +21,29 @@
 (defvar org-done-keywords)
 (defvar org-inhibit-startup)
 
-(defconst wgn/agent-plans--plan-regexp
-  "\\`[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[^.]+\\.[^.]+\\.org\\'"
-  "Match the name of a plan file, not of a part or a log.")
+(defconst wgn/agent-plans--file-regexp
+  (concat "\\`\\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
+          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)\\(?:\\.\\(P[0-9]+\\|log\\)\\)?\\.org\\'")
+  "Match a plan's, a part's or a log's file name, as `agent-plan' names them.
+Group 1 is the plan's name, 2 its host, and 3 the part or \"log\".
+A plan's own file has no group 3.")
+
+;; The keywords, and which are done, come from each file's own #+TODO
+;; lines, so nothing here names one.  Entries are told apart by their ID
+;; patterns, the contract with `agent-plan' that the plan-work skill
+;; documents:
+
+(defconst wgn/agent-plans-question-id "^\\(P[0-9]+\\.\\)?Q[0-9]+$"
+  "Match the ID of a question for the operator.")
+
+(defconst wgn/agent-plans-part-id "^P[0-9]+$"
+  "Match the ID of a part.")
+
+(defconst wgn/agent-plans-step-id "^\\(P[0-9]+\\.\\)?S[0-9]+$"
+  "Match the ID of a step.")
+
+(defconst wgn/agent-plans-followup-id "^\\(P[0-9]+\\.\\)?F[0-9]+$"
+  "Match the ID of a follow-up.")
 
 (defun wgn/agent-plans--config-file ()
   "Return the file `agent-plan' reads its settings from."
@@ -50,8 +70,12 @@ It is \"plans.dir\" in `agent-plan''s config file, or ~/git/notes/agents."
 Other hosts' plans, which are mirrors, are included.  Part and log files
 are not."
   (sort (when (file-directory-p (wgn/agent-plans-directory))
-          (directory-files (wgn/agent-plans-directory) t
-                           wgn/agent-plans--plan-regexp))
+          (seq-filter (lambda (file)
+                        (let ((base (file-name-nondirectory file)))
+                          (and (string-match wgn/agent-plans--file-regexp base)
+                               (not (match-string 3 base)))))
+                      (directory-files (wgn/agent-plans-directory) t
+                                       wgn/agent-plans--file-regexp)))
         (lambda (a b)
           (string> (file-name-nondirectory a) (file-name-nondirectory b)))))
 
@@ -125,13 +149,40 @@ Refresh it later with `org-update-dblock', \\[org-update-all-dblocks] for all."
   (org-create-dblock (list :name "agent-plan" :plan plan))
   (org-update-dblock))
 
+(defun wgn/agent-plans-agenda-files (&optional own)
+  "Return every plan's and part's file, newest plan first; with OWN, this host's.
+Logs are not."
+  (seq-filter
+   (lambda (file)
+     (let ((parts (wgn/agent-plans--file-parts file)))
+       (and parts
+            (not (equal (nth 2 parts) "log"))
+            (or (not own) (equal (nth 1 parts) (wgn/agent-plans-host))))))
+   (when (file-directory-p (wgn/agent-plans-directory))
+     (sort (directory-files (wgn/agent-plans-directory) t "\\.org\\'")
+           (lambda (a b)
+             (string> (file-name-nondirectory a) (file-name-nondirectory b)))))))
+
 (defun wgn/agent-plans-agenda-command ()
   "Return the `org-agenda-custom-commands' entry for key \"A\".
-It lists TODO entries in every plan file, with `org-agenda-files' bound to
-those files for that view alone."
-  '("A" "Agent plans" alltodo ""
-    ((org-agenda-files (wgn/agent-plans-files))
-     (org-agenda-overriding-header "Agent plans"))))
+Its blocks are the questions the operator can answer, in this host's plans
+alone since another host's are answered there; the parts and steps ready
+to work on; and the open follow-ups.  An entry waiting on an :AFTER: item
+is hidden, as is one scheduled for a later day.  `org-agenda-files' is
+bound to the plan files for this view alone."
+  `("A" "Agent plans"
+    ((tags-todo ,(concat "ID={" wgn/agent-plans-question-id "}")
+                ((org-agenda-overriding-header "Questions for the operator")
+                 (org-agenda-files (wgn/agent-plans-agenda-files t))))
+     ;; Two matches rather than one regexp: the matcher splits at `|'.
+     (tags-todo ,(concat "ID={" wgn/agent-plans-part-id "}|ID={" wgn/agent-plans-step-id "}")
+                ((org-agenda-overriding-header "Ready")))
+     (tags-todo ,(concat "ID={" wgn/agent-plans-followup-id "}")
+                ((org-agenda-overriding-header "Follow-ups"))))
+    ((org-agenda-files (wgn/agent-plans-agenda-files))
+     (org-agenda-dim-blocked-tasks 'invisible)
+     (org-agenda-todo-ignore-scheduled 'future)
+     (org-agenda-tags-todo-honor-ignore-options t))))
 
 ;;;; Open-questions indicator
 
@@ -251,26 +302,6 @@ choose a plan."
           wgn/agent-plans-questions--last-directory nil)))
 
 ;;;; Plan files in Org
-
-;; The keywords, and which are done, come from each file's own #+TODO
-;; lines, so nothing here names one.  Entries are told apart by their ID
-;; patterns, the contract with `agent-plan' that the plan-work skill
-;; documents:
-
-(defconst wgn/agent-plans-question-id "^\\(P[0-9]+\\.\\)?Q[0-9]+$"
-  "Match the ID of a question for Wesley.")
-
-(defconst wgn/agent-plans-ready-id "^\\(P[0-9]+\\|\\(P[0-9]+\\.\\)?S[0-9]+\\)$"
-  "Match the ID of a part or a step.")
-
-(defconst wgn/agent-plans-followup-id "^\\(P[0-9]+\\.\\)?F[0-9]+$"
-  "Match the ID of a follow-up.")
-
-(defconst wgn/agent-plans--file-regexp
-  (concat "\\`\\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
-          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)\\(?:\\.\\(P[0-9]+\\|log\\)\\)?\\.org\\'")
-  "Match a plan's, a part's or a log's file name, as `agent-plan' names them.
-Group 1 is the plan's name, 2 its host, and 3 the part or \"log\".")
 
 (defun wgn/agent-plans--config-value (key)
   "Return \"plans\".KEY in `agent-plan''s config file, or nil."

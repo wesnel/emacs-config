@@ -143,21 +143,6 @@ Its part and log files sit beside it."
           (should (string-match-p "^#\\+BEGIN: agent-plan :plan " text))
           (should (string-match-p "^| S1 | Do it | yes | no | |$" text)))))))
 
-(ert-deftest wgn-agent-plans-agenda-reads-plans-without-global-changes ()
-  (wgn-agent-plans-test--with-plans
-    (let ((a (wgn-agent-plans-test--plan plans "mac" "2026-10-01-a" "A" "working" 0 1))
-          (org-agenda-files '("~/org"))
-          (org-refile-targets '((nil :maxlevel . 9)))
-          (command (wgn/agent-plans-agenda-command)))
-      (should (equal (car command) "A"))
-      (let ((org-agenda-custom-commands (list command)))
-        (should (equal (eval (cadr (assq 'org-agenda-files (nth 4 command))) t)
-                       (list a)))
-        (let ((out (with-output-to-string (org-batch-agenda "A"))))
-          (should (string-match-p "Do it" out))
-          (should-not (string-match-p "Part" out))))
-      (should (equal org-agenda-files '("~/org")))
-      (should (equal org-refile-targets '((nil :maxlevel . 9)))))))
 
 (defconst wgn-agent-plans-test--statusline-fake
   "#!/bin/sh
@@ -451,5 +436,107 @@ S2 waits for the part's P1.S1, and Q2 for Q1."
           (revert-buffer t t t)
           (wgn-agent-plans-test--goto "Q1")
           (should (equal (org-get-todo-state) "ASK")))))))
+
+;;;; The A view
+
+(defun wgn-agent-plans-test--agenda-plans (plans)
+  "Make an own plan, its part and another host's plan under PLANS.
+Return the other host's plan file."
+  (wgn-agent-plans-test--write
+   (expand-file-name "2026-10-14-x.mac.org" plans)
+   (wgn-agent-plans-test--plan-text
+    "Ours"
+    :Steps (concat (wgn-agent-plans-test--entry "TODO" "First step" "S1")
+                   (wgn-agent-plans-test--entry "TODO" "After the first" "S2" "S1")
+                   "*** TODO Postponed step\nSCHEDULED: <2099-01-01 Thu>\n:PROPERTIES:\n:ID: S3\n:END:\n"
+                   (wgn-agent-plans-test--entry "DONE" "Finished step" "S4"))
+    :Distribution (wgn-agent-plans-test--entry "TODO" "Part one" "P1")
+    :Questions (concat (wgn-agent-plans-test--entry "ASK" "Keep it?" "Q1")
+                       (wgn-agent-plans-test--entry "ASK" "Rename it?" "Q2" "Q1")
+                       (wgn-agent-plans-test--entry "DECIDED" "Settled question?" "Q3"))
+    :Follow-ups (wgn-agent-plans-test--entry "TODO" "Guard accepts --draft=false" "F1")))
+  (wgn-agent-plans-test--write
+   (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+   (wgn-agent-plans-test--plan-text
+    "Part one" :Steps (wgn-agent-plans-test--entry "TODO" "The part's step" "P1.S1")))
+  (wgn-agent-plans-test--write (expand-file-name "2026-10-14-x.mac.log.org" plans)
+                               "* TODO Not an entry\n:PROPERTIES:\n:ID: S9\n:END:\n")
+  (let ((mirror (expand-file-name "2026-10-13-y.devbox.org" plans)))
+    (wgn-agent-plans-test--write
+     mirror
+     (wgn-agent-plans-test--plan-text
+      "Theirs"
+      :Steps (wgn-agent-plans-test--entry "TODO" "Their step" "S1")
+      :Questions (wgn-agent-plans-test--entry "ASK" "Their question?" "Q1")))
+    mirror))
+
+(defun wgn-agent-plans-test--agenda-blocks ()
+  "Build the A view and return its visible lines, by block header.
+An entry hidden as blocked stays in the buffer as invisible text, so a
+line counts only when its start is visible."
+  (let ((org-agenda-custom-commands (list (wgn/agent-plans-agenda-command)))
+        (org-agenda-sticky nil)
+        blocks)
+    (org-agenda nil "A")
+    (with-current-buffer org-agenda-buffer
+      (goto-char (point-min))
+      (while (not (eobp))
+        (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
+          (cond
+           ((invisible-p (line-beginning-position)))
+           ((member line '("Questions for the operator" "Ready" "Follow-ups"))
+            (push (list line) blocks))
+           (blocks (push line (cdar blocks)))))
+        (forward-line 1)))
+    (mapcar (lambda (block) (cons (car block) (string-join (cdr block) "\n"))) blocks)))
+
+(ert-deftest wgn-agent-plans-agenda-lists-what-is-ready ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (wgn-agent-plans-test--agenda-plans plans)
+      (let* ((org-agenda-files '("~/org"))
+             (org-refile-targets '((nil :maxlevel . 9)))
+             (blocks (unwind-protect (wgn-agent-plans-test--agenda-blocks)
+                       (org-agenda-quit)))
+             (questions (or (cdr (assoc "Questions for the operator" blocks)) ""))
+             (ready (or (cdr (assoc "Ready" blocks)) ""))
+             (followups (or (cdr (assoc "Follow-ups" blocks)) "")))
+        (should (string-match-p "Keep it\\?" questions))
+        ;; Waits for Q1, settled, and another host's to answer there.
+        (should-not (string-match-p "Rename it\\|Settled question\\|Their question" questions))
+        (dolist (title '("First step" "Part one" "The part's step" "Their step"))
+          (should (string-match-p (regexp-quote title) ready)))
+        ;; Waits for S1, scheduled for later, done, and in a log.
+        (should-not (string-match-p "After the first\\|Postponed step\\|Finished step\\|Not an entry" ready))
+        (should (string-match-p "Guard accepts --draft=false" followups))
+        (should-not (string-match-p "step" followups))
+        (should (equal org-agenda-files '("~/org")))
+        (should (equal org-refile-targets '((nil :maxlevel . 9))))))))
+
+(ert-deftest wgn-agent-plans-agenda-refuses-changes-to-mirrors ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (let* ((mirror (wgn-agent-plans-test--agenda-plans plans))
+             (before (with-temp-buffer (insert-file-contents mirror) (buffer-string)))
+             (org-agenda-custom-commands (list (wgn/agent-plans-agenda-command))))
+        (unwind-protect
+            (progn
+              (org-agenda nil "A")
+              (with-current-buffer org-agenda-buffer
+                (goto-char (point-min))
+                (re-search-forward "Their step")
+                (ignore-errors (org-agenda-todo "DONE"))
+                (ignore-errors (org-agenda-priority ?A)))
+              (with-current-buffer (find-buffer-visiting mirror)
+                (wgn-agent-plans-test--goto "S1")
+                (should (equal (org-get-todo-state) "TODO"))
+                (should-error (save-buffer) :type 'user-error)))
+          (org-agenda-quit)
+          (let ((buffer (find-buffer-visiting mirror)))
+            (when buffer
+              (with-current-buffer buffer (set-buffer-modified-p nil))
+              (kill-buffer buffer))))
+        (should (equal (with-temp-buffer (insert-file-contents mirror) (buffer-string))
+                       before))))))
 
 ;;; agent-plans.el ends here
