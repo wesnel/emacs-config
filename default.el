@@ -1496,7 +1496,8 @@ if USER is given, its username is USER.  The port is not matched."
 
   :functions
   (agent-shell-cwd
-   agent-shell-interrupt)
+   agent-shell-interrupt
+   agent-shell-submit)
 
   :defines
   (agent-shell-mode-map)
@@ -1507,7 +1508,7 @@ if USER is given, its username is USER.  The port is not matched."
   :bind
   (:map agent-shell-mode-map
    ("RET" . #'newline)
-   ("C-c C-c" . #'shell-maker-submit)
+   ("C-c C-c" . #'agent-shell-submit)
    ("C-c C-k" . #'agent-shell-interrupt)))
 
 ;;;; Tramp support for `agent-shell'.
