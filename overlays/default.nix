@@ -299,25 +299,6 @@ final: prev: let
             };
           };
 
-        flymake-hledger = let
-          rev = "3dd9d58ccd8e4c22c14553ebfac0ca1be3efebc5";
-          sha256 = "sha256-XKkvkteyaYlADX1dpMpsJiAG00pJQw1Z2Oy1Mg122jc=";
-        in
-          ePkgs.trivialBuild rec {
-            pname = "flymake-hledger";
-            version = rev;
-
-            src = pkgs.fetchFromGitHub {
-              owner = "DamienCassou";
-              repo = pname;
-
-              inherit
-                rev
-                sha256
-                ;
-            };
-          };
-
         # Ghostel is a thin Emacs veneer over libghostty, so it needs a
         # dynamic module built with Zig.  Left to itself, `ghostel.el`
         # downloads or compiles that module at runtime; building it here
