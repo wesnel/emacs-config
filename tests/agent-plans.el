@@ -297,4 +297,159 @@ content it prints.  The cache is empty on entry."
           (should (memq 'display-time-string global-mode-string)))
       (wgn/agent-plans-questions-mode -1))))
 
+;;;; Plan files in Org: the blocker, mirrors and reverts
+
+(defconst wgn-agent-plans-test--header
+  "#+TODO: TODO STARTED | DONE VERIFIED ABANDONED
+#+TODO: ASK | DECIDED(@) DROPPED(@) SUPERSEDED
+"
+  "The keyword lines `agent-plan new' writes.")
+
+(defun wgn-agent-plans-test--plan-text (title &rest sections)
+  "Return a plan file's text titled TITLE with SECTIONS' entries.
+SECTIONS alternate a section name and its entries' text."
+  (concat "#+title: " title "\n" wgn-agent-plans-test--header "\n* Plan\n"
+          (mapconcat (lambda (name)
+                       (concat "** " name "\n"
+                               (or (plist-get sections (intern (concat ":" name))) "")))
+                     '("Goal" "Steps" "Distribution" "Questions" "Follow-ups" "Verification")
+                     "")))
+
+(defun wgn-agent-plans-test--entry (keyword title id &optional after)
+  "Return an entry heading KEYWORD TITLE with ID, waiting for AFTER."
+  (concat "*** " keyword " " title "\n:PROPERTIES:\n:ID: " id "\n"
+          (if after (concat ":AFTER: " after "\n") "")
+          ":END:\n"))
+
+(defmacro wgn-agent-plans-test--visiting (file &rest body)
+  "Run BODY in a buffer visiting FILE, then kill the buffer unsaved."
+  (declare (indent 1))
+  `(let ((buffer (find-file-noselect ,file)))
+     (unwind-protect
+         (with-current-buffer buffer ,@body)
+       (with-current-buffer buffer (set-buffer-modified-p nil))
+       (kill-buffer buffer))))
+
+(defun wgn-agent-plans-test--goto (id)
+  "Move to the heading whose ID is ID."
+  (goto-char (point-min))
+  (re-search-forward (format "^:ID: %s$" (regexp-quote id)))
+  (org-back-to-heading t))
+
+(defun wgn-agent-plans-test--try (id state)
+  "Try to change entry ID to STATE, as the agenda does; return its state."
+  (wgn-agent-plans-test--goto id)
+  (let ((inhibit-read-only t)
+        (org-inhibit-logging t))
+    (org-todo state))
+  (org-get-todo-state))
+
+(defmacro wgn-agent-plans-test--protected (&rest body)
+  "Run BODY with `wgn/agent-plans-protect-mode' on, and off again after."
+  (declare (indent 0))
+  `(let ((org-blocker-hook nil)
+         (find-file-hook nil)
+         (after-revert-hook nil))
+     (unwind-protect
+         (progn (wgn/agent-plans-protect-mode 1) ,@body)
+       (wgn/agent-plans-protect-mode -1))))
+
+(defun wgn-agent-plans-test--waiting-plan (plans)
+  "Make plan 2026-10-14-x.mac under PLANS, with a part P1, and return it.
+S2 waits for the part's P1.S1, and Q2 for Q1."
+  (let ((plan (expand-file-name "2026-10-14-x.mac.org" plans)))
+    (wgn-agent-plans-test--write
+     plan
+     (wgn-agent-plans-test--plan-text
+      "Waiting"
+      :Steps (concat (wgn-agent-plans-test--entry "TODO" "First" "S1")
+                     (wgn-agent-plans-test--entry "TODO" "After the part" "S2" "P1.S1"))
+      :Distribution (wgn-agent-plans-test--entry "TODO" "Part one" "P1")
+      :Questions (concat (wgn-agent-plans-test--entry "ASK" "Keep it?" "Q1")
+                         (wgn-agent-plans-test--entry "ASK" "Rename it?" "Q2" "Q1"))))
+    (wgn-agent-plans-test--write
+     (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+     (wgn-agent-plans-test--plan-text
+      "Part one" :Steps (wgn-agent-plans-test--entry "TODO" "The part's step" "P1.S1")))
+    plan))
+
+(ert-deftest wgn-agent-plans-host-follows-agent-plan ()
+  (wgn-agent-plans-test--with-plans
+    (should (equal (wgn/agent-plans-host) "mac"))
+    (wgn-agent-plans-test--write config (format "{\"plans\": {\"dir\": %S}}" plans))
+    (should (equal (wgn/agent-plans-host)
+                   (car (split-string (system-name) "\\."))))))
+
+(ert-deftest wgn-agent-plans-blocker-waits-for-after-items ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--waiting-plan plans)))
+        (wgn-agent-plans-test--visiting plan
+          (should (equal (wgn-agent-plans-test--try "S2" "DONE") "TODO"))
+          (should (equal (wgn-agent-plans-test--try "Q2" "DECIDED") "ASK"))
+          (should (equal (wgn-agent-plans-test--try "S2" "STARTED") "STARTED"))
+          (should (equal (wgn-agent-plans-test--try "Q1" "DECIDED") "DECIDED"))
+          (should (equal (wgn-agent-plans-test--try "Q2" "DECIDED") "DECIDED")))
+        ;; The part's step, settled in its own file, unblocks S2.
+        (wgn-agent-plans-test--visiting (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+          (should (equal (wgn-agent-plans-test--try "P1.S1" "ABANDONED") "ABANDONED"))
+          (save-buffer))
+        (wgn-agent-plans-test--visiting plan
+          (should (equal (wgn-agent-plans-test--try "S2" "DONE") "DONE")))))))
+
+(ert-deftest wgn-agent-plans-blocker-leaves-other-files-alone ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (let ((other (expand-file-name "notes.org" root)))
+        (wgn-agent-plans-test--write
+         other (concat "* TODO Waits for nothing here\n:PROPERTIES:\n:ID: S1\n:AFTER: S9\n:END:\n"))
+        (wgn-agent-plans-test--visiting other
+          (should (equal (wgn-agent-plans-test--try "S1" "DONE") "DONE")))))))
+
+(ert-deftest wgn-agent-plans-mirrors-are-read-only ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (let* ((mirror (expand-file-name "2026-10-14-y.devbox.org" plans))
+             (text (wgn-agent-plans-test--plan-text
+                    "Theirs"
+                    :Steps (wgn-agent-plans-test--entry "TODO" "Their step" "S1")
+                    :Questions (wgn-agent-plans-test--entry "ASK" "Their question?" "Q1"))))
+        (wgn-agent-plans-test--write mirror text)
+        (wgn-agent-plans-test--visiting mirror
+          (should buffer-read-only)
+          (should (equal (wgn-agent-plans-test--try "Q1" "DECIDED") "ASK"))
+          (should (equal (wgn-agent-plans-test--try "S1" "STARTED") "TODO"))
+          (let ((inhibit-read-only t))
+            (goto-char (point-max))
+            (insert "edited\n"))
+          (should-error (save-buffer) :type 'user-error))
+        (should (equal (with-temp-buffer (insert-file-contents mirror) (buffer-string))
+                       text))))))
+
+;; The operator's Emacs reverts a buffer agent-plan rewrote, and the rewrite may
+;; change the file's keyword lines.
+(ert-deftest wgn-agent-plans-revert-reads-new-keywords ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (let ((plan (expand-file-name "2026-10-14-x.mac.org" plans)))
+        (wgn-agent-plans-test--write
+         plan "#+TODO: TODO NEXT | DONE\n* Plan\n** Steps\n*** TODO Step\n:PROPERTIES:\n:ID: S1\n:END:\n")
+        (wgn-agent-plans-test--visiting plan
+          (should-not (member "VERIFIED" org-todo-keywords-1))
+          (wgn-agent-plans-test--write
+           plan (wgn-agent-plans-test--plan-text
+                 "Rewritten" :Steps (wgn-agent-plans-test--entry "VERIFIED" "Step" "S1")))
+          ;; As auto-revert does: the buffer keeps its modes.
+          (revert-buffer t t t)
+          (should (member "VERIFIED" org-todo-keywords-1))
+          (wgn-agent-plans-test--goto "S1")
+          (should (equal (org-get-todo-state) "VERIFIED"))
+          ;; A second revert is handled as the first.
+          (wgn-agent-plans-test--write
+           plan (wgn-agent-plans-test--plan-text
+                 "Rewritten" :Questions (wgn-agent-plans-test--entry "ASK" "Keep it?" "Q1")))
+          (revert-buffer t t t)
+          (wgn-agent-plans-test--goto "Q1")
+          (should (equal (org-get-todo-state) "ASK")))))))
+
 ;;; agent-plans.el ends here

@@ -309,6 +309,11 @@
   :preface
   @agent-plans-helper@
 
+  :init
+  ;; Before any plan file is visited: `:after org' runs this once Org is
+  ;; loaded, ahead of the visiting buffer's `find-file-hook'.
+  (wgn/agent-plans-protect-mode)
+
   :config
   (wgn/agent-plans-questions-mode)
   (add-to-list 'org-agenda-custom-commands (wgn/agent-plans-agenda-command)))
