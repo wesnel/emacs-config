@@ -37,7 +37,9 @@
             alejandra
             delve
             go
+            golangci-lint
             gopls
+            jq
             gotools
             go-tools
             nil
