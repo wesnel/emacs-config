@@ -39,6 +39,7 @@
             go
             golangci-lint
             gopls
+            govulncheck
             jq
             gotools
             go-tools

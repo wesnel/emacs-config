@@ -12,9 +12,14 @@ Run from the module root, inside `nix develop` (or via direnv).
 | `go vet ./...` | exits 0 |
 | `go test -race -count=1 ./...` | exits 0 |
 | `golangci-lint run` | exits 0 |
+| `govulncheck ./...` | exits 0 (needs network for its database) |
 | `go mod tidy` | leaves `go.mod` and `go.sum` unchanged |
 | `go generate ./...` | leaves generated files unchanged (only if the repo uses it) |
 | `nix flake check` | exits 0 |
+
+govulncheck fails only on vulnerabilities the code can reach. One in the
+standard library is fixed by the Go that `nix flake update nixpkgs` brings
+in, when nixpkgs has a patched release.
 
 Lint and test under every target the module builds for, not just the host:
 `GOOS=linux GOARCH=amd64 go vet ./...`, and likewise for each other GOOS/GOARCH pair.
