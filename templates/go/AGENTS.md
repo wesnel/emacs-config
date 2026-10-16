@@ -17,6 +17,11 @@ Run from the module root, inside `nix develop` (or via direnv).
 | `go generate ./...` | leaves generated files unchanged (only if the repo uses it) |
 | `nix flake check` | exits 0 |
 
+CI (`.github/workflows/go.yml`) runs the gofmt, vet, test, golangci-lint and
+govulncheck checks in the dev shell on each push and pull request, with
+`GOTOOLCHAIN=local`. Commit `flake.lock`, or CI resolves the flake's inputs
+afresh and checks with tools other than yours.
+
 govulncheck fails only on vulnerabilities the code can reach. One in the
 standard library is fixed by the Go that `nix flake update nixpkgs` brings
 in, when nixpkgs has a patched release.

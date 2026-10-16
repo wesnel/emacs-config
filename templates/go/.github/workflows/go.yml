@@ -1,0 +1,53 @@
+name: Go
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    # Every step runs with the tools the flake's dev shell pins, as
+    # `nix develop` gives them locally.
+    defaults:
+      run:
+        shell: nix develop --command bash -euo pipefail {0}
+    env:
+      # Check with the Go the flake pins: a go.mod that asks for a newer one
+      # fails here instead of downloading it.
+      GOTOOLCHAIN: local
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@13d8dd58da0234aa297dedd986986ccb8e7f3e24 # v31.11.1
+      - name: Build the dev shell
+        id: shell
+        run: go version
+      # Each check below runs even when one before it failed, so one run
+      # reports every failure.
+      - name: gofmt
+        if: ${{ !cancelled() && steps.shell.outcome == 'success' }}
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            printf '%s\n' "$unformatted"
+            exit 1
+          fi
+      - name: go vet
+        if: ${{ !cancelled() && steps.shell.outcome == 'success' }}
+        run: go vet ./...
+      - name: go test
+        if: ${{ !cancelled() && steps.shell.outcome == 'success' }}
+        run: go test -race -count=1 ./...
+      - name: golangci-lint
+        if: ${{ !cancelled() && steps.shell.outcome == 'success' }}
+        run: golangci-lint run
+      - name: govulncheck
+        if: ${{ !cancelled() && steps.shell.outcome == 'success' }}
+        run: govulncheck ./...
