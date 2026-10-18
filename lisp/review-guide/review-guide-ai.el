@@ -117,7 +117,10 @@ a fine answer."
   "A comment the model proposes, anchored to a line or range of the diff."
   hunk path side start-line line severity body
   (commit nil :documentation "The `review-guide-hunk-commit' of its hunk.")
-  (state 'proposed :documentation "One of `proposed', `forwarded' or `dismissed'."))
+  (state 'proposed :documentation "One of `proposed', `forwarded' or `dismissed'.")
+  (id nil :documentation "Its id in a review record, such as \"1.F2\", or nil.")
+  (outcome nil :documentation "How a review record's triage settled it, as
+text shown with it, or nil."))
 
 (defun review-guide-ai-prompt (title description hunks)
   "Return the user prompt for a pull request with TITLE and DESCRIPTION.

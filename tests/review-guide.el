@@ -658,13 +658,401 @@ is not asked for anything."
                                       (car (review-guide-source-describe source))))))
             (kill-buffer guide)))))))
 
+;;;; Review records
+
+(require 'review-guide-record)
+
+(defconst review-guide-test--head (make-string 40 ?a))
+
+(defconst review-guide-test--record "\
+{\"version\": 1, \"repo\": \"Own/Repo\", \"pr\": 7,
+ \"head\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",
+ \"round\": 2, \"reviewer\": \"codex\", \"model\": \"gpt\\u202e-5\",
+ \"ran\": false, \"notRunBecause\": \"no test entry\",
+ \"unverified\": [\"the \\u001b[31mVM\\u001b[0m\"],
+ \"findings\": [
+  {\"id\": \"F1\", \"round\": 2, \"path\": \"lib/a.el\", \"line\": 12,
+   \"severity\": \"issue\", \"body\": \"Latest, rebutted.\", \"outcome\": \"rebut\"},
+  {\"id\": \"F2\", \"round\": 2, \"path\": \"lib/a.el\", \"line\": 11, \"endLine\": 12,
+   \"severity\": \"bogus\",
+   \"body\": \"#+begin_src emacs-lisp\\n(delete-file \\\"x\\\")\\n#+end_src %s\",
+   \"outcome\": \"needs-operator\"},
+  {\"id\": \"F3\", \"round\": 2, \"path\": \"lib/a.el\", \"line\": 40,
+   \"severity\": \"question\", \"body\": \"Unchanged code.\", \"outcome\": null}],
+ \"prior\": [{\"round\": 1, \"reviewer\": \"codex\", \"findings\": [
+  {\"id\": \"F1\", \"round\": 1, \"path\": \"lib/a.el\", \"line\": 2, \"endLine\": 3,
+   \"severity\": \"issue\", \"body\": \"Prior, proposed.\", \"outcome\": \"propose\"},
+  {\"id\": \"F2\", \"round\": 1, \"path\": \"lib/a.el\", \"line\": 3,
+   \"severity\": \"issue\", \"body\": \"Again.\", \"outcome\": \"duplicate-of\",
+   \"duplicateOf\": \"1.F1\"}]}]}
+"
+  "A record of Own/Repo#7 at `review-guide-test--head', for the test diff.")
+
+(defmacro review-guide-test--with-records (&rest body)
+  "Run BODY with `review-guide-record-directory' holding the test record."
+  (declare (indent 0))
+  `(let* ((review-guide-record-directory
+           (file-name-as-directory (make-temp-file "review-guide-records" t)))
+          (directory (expand-file-name "Own/Repo/7" review-guide-record-directory)))
+     (unwind-protect
+         (progn
+           (make-directory directory t)
+           (with-temp-file (expand-file-name "aaaaaaaaaaaa.json" directory)
+             (insert review-guide-test--record))
+           ,@body)
+       (delete-directory review-guide-record-directory t))))
+
+(ert-deftest review-guide-record-text-is-cleaned ()
+  (should (equal (review-guide-record-text
+                  (propertize (concat "a\e[2Jb\tc\nd‮e⁦f" (string #x85) "g")
+                              'face 'bold))
+                 "a[2Jb\tc\ndefg"))
+  (should-not (text-properties-at 0 (review-guide-record-text
+                                     (propertize "x" 'display "y"))))
+  (should (equal (review-guide-record-text "abcdef" 3) "abc\n[cut]"))
+  (should-not (review-guide-record-text '(eval . t))))
+
+(ert-deftest review-guide-record-loads-every-round-in-proposal-order ()
+  (review-guide-test--with-records
+    ;; The URL gave the owner and name in another case.
+    (let ((record (review-guide-record-load "own" "repo" 7 review-guide-test--head)))
+      (should (equal (review-guide-record-key record) "own/repo#7"))
+      (should (equal (mapcar #'review-guide-finding-id (review-guide-record-findings record))
+                     '("1.F1" "2.F2" "2.F3" "2.F1" "1.F2")))
+      (should (equal (mapcar #'review-guide-finding-outcome
+                             (review-guide-record-findings record))
+                     '("propose" "needs-operator" nil "rebut" "duplicate-of 1.F1")))
+      (should (equal (mapcar #'review-guide-finding-state
+                             (review-guide-record-findings record))
+                     '(proposed proposed proposed dismissed dismissed)))
+      (let ((odd (nth 1 (review-guide-record-findings record))))
+        (should (eq (review-guide-finding-severity odd) 'suggestion))
+        (should (equal (list (review-guide-finding-start-line odd)
+                             (review-guide-finding-line odd))
+                       '(11 12))))
+      (should (equal (review-guide-record-model record) "gpt-5"))
+      (should (equal (review-guide-record-unverified record) '("the [31mVM[0m")))
+      (should-not (review-guide-record-ran record))
+      (should (equal (review-guide-record-not-run-because record) "no test entry")))))
+
+(ert-deftest review-guide-record-anchors-findings-in-the-diff ()
+  (review-guide-test--with-records
+    (let* ((record (review-guide-record-load "Own" "Repo" 7 review-guide-test--head))
+           (anchored (review-guide-record-anchor record (review-guide-test--hunks))))
+      (should (equal (mapcar (lambda (finding)
+                               (list (review-guide-finding-id finding)
+                                     (review-guide-finding-hunk finding)))
+                             anchored)
+                     '(("1.F1" "H1") ("2.F2" "H2") ("2.F1" "H2") ("1.F2" "H1"))))
+      (should (equal (review-guide-finding-thread (car anchored))
+                     '((startLine . 2) (startSide . "RIGHT")
+                       (path . "lib/a.el") (line . 3) (side . "RIGHT"))))
+      (should-not (review-guide-finding-hunk (nth 2 (review-guide-record-findings record)))))))
+
+(ert-deftest review-guide-record-refuses-another-head-or-pull-request ()
+  (review-guide-test--with-records
+    (let ((err (should-error (review-guide-record-load "Own" "Repo" 7 (make-string 40 ?b))
+                             :type 'user-error)))
+      (should (string-search "reviewed at aaaaaaaaaaaa" (cadr err))))
+    (should-error (review-guide-record-load "Own" "Repo" 8 review-guide-test--head)
+                  :type 'user-error)
+    (should-error (review-guide-record-load ".." "Repo" 7 review-guide-test--head)
+                  :type 'user-error)
+    (should-error (review-guide-record-load "Own" "Repo" 7 "aaaaaaaaaaaa")
+                  :type 'user-error)
+    ;; A record whose own fields name another pull request.
+    (make-directory (expand-file-name "Own/Other/7" review-guide-record-directory) t)
+    (copy-file (expand-file-name "aaaaaaaaaaaa.json" directory)
+               (expand-file-name "Own/Other/7/" review-guide-record-directory))
+    (should-error (review-guide-record-load "Own" "Other" 7 review-guide-test--head)
+                  :type 'user-error)))
+
+(ert-deftest review-guide-record-lists-pull-requests-with-records ()
+  (review-guide-test--with-records
+    (make-directory (expand-file-name "Own/Repo/9" review-guide-record-directory))
+    (let ((hidden (expand-file-name ".x/Repo/1" review-guide-record-directory)))
+      (make-directory hidden t)
+      (copy-file (expand-file-name "aaaaaaaaaaaa.json" directory) (file-name-as-directory hidden)))
+    (should (equal (review-guide-record--keys) '("Own/Repo#7")))))
+
+(ert-deftest review-guide-record-proposes-its-findings-in-the-guide ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-records
+    (let* ((source (make-review-guide-test-source))
+           (seen nil)
+           (review-guide-record-section-functions
+            (list (lambda (record) (push (review-guide-record-key record) seen)))))
+      (unwind-protect
+          (cl-letf (((symbol-function 'review-guide-pr-review-head)
+                     (lambda (_) (list "Own" "Repo" 7 review-guide-test--head)))
+                    ((symbol-function 'review-guide-ai-group)
+                     (lambda (&rest _) nil)))
+            (save-window-excursion
+              (review-guide-record source)
+              (let ((text (buffer-string)))
+                (should (string-search "Review record of Own/Repo#7 at aaaaaaaaaaaa" text))
+                (should (string-search "Round 2 by codex (gpt-5)." text))
+                (should (string-search "did not run: no test entry" text))
+                (should (string-search
+                         "1 to propose, 1 for the operator, 1 not triaged, 2 settled; 1 outside the diff."
+                         text))
+                (should (string-search
+                         "Outside the diff: question 2.F3 on lib/a.el 40 [not triaged]" text))
+                (should (< (string-search "AI issue 1.F1 on RIGHT 2-3 [propose]" text)
+                           (string-search "AI issue 1.F2 on RIGHT 3 [duplicate-of 1.F1] (dismissed)"
+                                          text)))
+                (should (string-search "AI issue 2.F1 on RIGHT 12 [rebut] (dismissed)" text))
+                ;; Text from the record is shown as it is, not read.
+                (should (string-search "#+begin_src emacs-lisp" text))
+                (should (string-search "#+end_src %s" text))
+                (should-not (string-search "\e" text))
+                (should-not (string-search "‮" text)))
+              (should (equal seen '("Own/Repo#7")))
+              (review-guide-test--goto "AI suggestion 2.F2 on RIGHT 11-12 [needs-operator]")
+              (review-guide-forward)
+              (should (equal (review-guide-test-source-added source)
+                             '((((startLine . 11) (startSide . "RIGHT")
+                                 (path . "lib/a.el") (line . 12) (side . "RIGHT"))
+                                . "#+begin_src emacs-lisp\n(delete-file \"x\")\n#+end_src %s"))))
+              ;; Opening the record again keeps what was forwarded.
+              (review-guide-record source)
+              (should (string-search "AI suggestion 2.F2 on RIGHT 11-12 [needs-operator] (forwarded)"
+                                     (buffer-string)))))
+        (when-let* ((guide (get-buffer "*review-guide o/r#1*")))
+          (kill-buffer guide))))))
+
+(defun review-guide-test--write-record (directory &rest fields)
+  "Write a record of Own/Repo#7 into DIRECTORY with FIELDS, JSON text."
+  (with-temp-file (expand-file-name "aaaaaaaaaaaa.json" directory)
+    (insert "{\"version\": 1, \"repo\": \"Own/Repo\", \"pr\": 7, \"head\": \""
+            review-guide-test--head "\""
+            (mapconcat (lambda (field) (concat ", " field)) fields "")
+            "}\n")))
+
+(defun review-guide-test--finding-json (outcome &optional line path)
+  "Return finding 1.F1's JSON with OUTCOME, a JSON value as text."
+  (format "{\"id\": \"F1\", \"round\": 1, \"path\": %s, \"line\": %d, \"severity\": \"issue\", \"body\": \"record body\", \"outcome\": %s}"
+          (substring (json-serialize (vector (or path "lib/a.el"))) 1 -1)
+          (or line 12) outcome))
+
+(defmacro review-guide-test--with-record-guide (fields &rest body)
+  "Run BODY in the guide `review-guide-record' opens on a record of FIELDS.
+`source' is the guide's source and `directory' the record's."
+  (declare (indent 1))
+  `(review-guide-test--with-records
+     (apply #'review-guide-test--write-record directory ,fields)
+     (let ((source (make-review-guide-test-source)))
+       (unwind-protect
+           (cl-letf (((symbol-function 'review-guide-pr-review-head)
+                      (lambda (_) (list "Own" "Repo" 7 review-guide-test--head)))
+                     ((symbol-function 'review-guide-ai-group)
+                      (lambda (&rest _) nil)))
+             (save-window-excursion
+               (review-guide-record source)
+               ,@body))
+         (when-let* ((guide (get-buffer "*review-guide o/r#1*")))
+           (kill-buffer guide))))))
+
+(defun review-guide-test--one-finding (outcome &optional line path)
+  "Return the fields of a round 1 record with one finding, settled OUTCOME."
+  (list "\"round\": 1" "\"reviewer\": \"codex\"" "\"ran\": true"
+        (format "\"findings\": [%s]" (review-guide-test--finding-json outcome line path))))
+
+(ert-deftest review-guide-record-text-is-one-line-where-asked ()
+  (should (equal (review-guide-record-text
+                  (concat "a b​c﻿d e⁠f‍g") nil t)
+                 "abcdefg"))
+  (should (equal (review-guide-record-text "x\n1. Edits\t\tok" nil t) "x 1. Edits ok"))
+  (should (equal (review-guide-record-text "x\ny") "x\ny"))
+  (should-not (review-guide-record-text ""))
+  (should-not (review-guide-record-text "​ \n")))
+
+(ert-deftest review-guide-record-round-zero-is-no-round ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide
+      '("\"round\": 0" "\"reviewer\": \"\"" "\"model\": null" "\"ran\": true"
+        "\"findings\": []" "\"prior\": []")
+    (should (string-search "No review round yet." (buffer-string)))
+    (should-not (string-search "Round 0" (buffer-string)))))
+
+(ert-deftest review-guide-record-single-line-fields-stay-in-their-line ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide
+      (list "\"round\": 1" "\"reviewer\": \"co\\ndex\"" "\"model\": \"m\\n2. Fake\""
+            "\"notRunBecause\": \"no\\n3. Fake\""
+            (format "\"findings\": [%s]"
+                    (review-guide-test--finding-json
+                     "\"propose\"" 1 "x\n1. Edits approved by the operator")))
+    (let ((text (buffer-string)))
+      (should (string-search "on x 1. Edits approved by the operator 1 [propose]" text))
+      (should (string-search "Round 1 by co dex (m 2. Fake)." text))
+      (should (string-search "did not run: no 3. Fake" text))
+      (should-not (string-match-p "^[0-9]\\. \\(Edits\\|Fake\\)" text)))))
+
+(ert-deftest review-guide-record-reopened-takes-triage-anew ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide (review-guide-test--one-finding "null")
+    (should (string-search "AI issue 1.F1 on RIGHT 12 [not triaged]\n" (buffer-string)))
+    (should (string-search "1 proposed by the review record" (buffer-string)))
+    (apply #'review-guide-test--write-record directory
+           (review-guide-test--one-finding "\"rebut\""))
+    (review-guide-record source)
+    (should (string-search "AI issue 1.F1 on RIGHT 12 [rebut] (dismissed)" (buffer-string)))
+    (apply #'review-guide-test--write-record directory
+           (review-guide-test--one-finding "\"propose\""))
+    (review-guide-record source)
+    (should (string-search "AI issue 1.F1 on RIGHT 12 [propose]\n" (buffer-string)))
+    ;; What the operator did stays: dismissed by hand, then rebutted
+    ;; and proposed again, it stays dismissed.
+    (review-guide-test--goto "AI issue 1.F1")
+    (review-guide-dismiss)
+    (review-guide-record source)
+    (should (string-search "AI issue 1.F1 on RIGHT 12 [propose] (dismissed)" (buffer-string)))))
+
+(ert-deftest review-guide-record-drops-a-model-review-under-way ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (let (on-reply)
+    (cl-letf (((symbol-function 'review-guide-ai-review)
+               (lambda (_title _desc _hunks _buffer reply _err) (setq on-reply reply))))
+      (review-guide-test--with-record-guide (review-guide-test--one-finding "\"propose\"")
+        (review-guide-review)
+        (should (string-search "; reviewing" (buffer-string)))
+        (review-guide-record source)
+        (should-not (string-search "; reviewing" (buffer-string)))
+        (funcall on-reply "Model summary." nil 0)
+        (let ((text (buffer-string)))
+          (should (string-search "Review record of" text))
+          (should (string-search "record body" text))
+          (should-not (string-search "Model summary." text)))))))
+
+(ert-deftest review-guide-record-keeps-forwarded-across-a-model-review ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (cl-letf (((symbol-function 'review-guide-ai-review)
+             (lambda (_title _desc _hunks _buffer reply _err) (funcall reply "s" nil 0))))
+    (review-guide-test--with-record-guide (review-guide-test--one-finding "\"propose\"")
+      (review-guide-test--goto "AI issue 1.F1")
+      (review-guide-forward)
+      (review-guide-review)
+      (should-not (string-search "Review record of" (buffer-string)))
+      (review-guide-record source)
+      (should (string-search "AI issue 1.F1 on RIGHT 12 [propose] (forwarded)" (buffer-string)))
+      (review-guide-test--goto "AI issue 1.F1")
+      (should-error (review-guide-forward) :type 'user-error)
+      (should (= 1 (length (review-guide-test-source-added source)))))))
+
+(ert-deftest review-guide-record-outside-the-diff-dismisses-but-not-forwards ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide (review-guide-test--one-finding "\"propose\"" 40)
+    (review-guide-test--goto "Outside the diff: issue")
+    (should-error (review-guide-forward) :type 'user-error)
+    (review-guide-dismiss)
+    (should (string-search "Outside the diff: issue 1.F1 on lib/a.el 40 [propose] (dismissed)"
+                           (buffer-string)))
+    (review-guide-record source)
+    (should (string-search "(dismissed)" (buffer-string)))
+    (review-guide-test--goto "Outside the diff: issue")
+    (review-guide-dismiss)
+    (should-not (string-search "(dismissed)" (buffer-string)))
+    (should-not (review-guide-test-source-added source))))
+
+(ert-deftest review-guide-record-refuses-malformed-records ()
+  (review-guide-test--with-records
+    (dolist (fields '(("\"findings\": {\"id\": \"F1\"}")
+                      ("\"findings\": [1]")
+                      ("\"prior\": [{\"findings\": \"x\"}]")
+                      ("\"unverified\": \"x\"")))
+      (apply #'review-guide-test--write-record directory fields)
+      (should-error (review-guide-record-load "Own" "Repo" 7 review-guide-test--head)
+                    :type 'user-error))
+    (with-temp-file (expand-file-name "aaaaaaaaaaaa.json" directory)
+      (insert "[1, 2]"))
+    (should-error (review-guide-record-load "Own" "Repo" 7 review-guide-test--head)
+                  :type 'user-error)))
+
+(ert-deftest review-guide-record-text-drops-invisible-characters ()
+  (should (equal (review-guide-record-text
+                  (concat "a" (string #xe0041 #xe007f) "b" (string #xfe0f) "c"
+                          (string #x34f) "d" (string #x3164) "e" (string #xad) "f"
+                          (string #x2064) "g" (string #x115f) "h"))
+                 "abcdefgh")))
+
+(ert-deftest review-guide-record-names-what-is-malformed ()
+  (review-guide-test--with-records
+    (review-guide-test--write-record directory "\"findings\": {\"id\": \"F1\"}")
+    (let ((err (should-error (review-guide-record-load "Own" "Repo" 7 review-guide-test--head)
+                             :type 'user-error)))
+      (should (string-search "its findings field is not an array" (cadr err))))))
+
+(ert-deftest review-guide-record-rerun-names-the-earlier-round ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide
+      (list "\"round\": 0" "\"reviewer\": \"\"" "\"model\": null" "\"ran\": true"
+            "\"findings\": []"
+            (format "\"prior\": [{\"round\": 1, \"reviewer\": \"codex\", \"model\": \"gpt\", \"findings\": [%s]}]"
+                    (review-guide-test--finding-json "\"propose\"")))
+    (let ((text (buffer-string)))
+      (should (string-search
+               "Round 1 by codex (gpt).  A later run at this head has not finished a round yet."
+               text))
+      (should-not (string-search "No review round yet." text))
+      (should (string-search "AI issue 1.F1 on RIGHT 12 [propose]" text)))))
+
+(ert-deftest review-guide-record-refresh-drops-a-model-review-under-way ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (let (on-reply)
+    (cl-letf (((symbol-function 'review-guide-ai-review)
+               (lambda (_title _desc _hunks _buffer reply _err) (setq on-reply reply))))
+      (review-guide-test--with-record-guide (review-guide-test--one-finding "\"propose\"")
+        (review-guide-review)
+        (should (string-search "; reviewing" (buffer-string)))
+        ;; The source's diff differs from the one the guide holds.
+        (setq review-guide--diff "")
+        (review-guide-refresh)
+        (should-not (string-search "; reviewing" (buffer-string)))
+        (funcall on-reply "Model summary." nil 0)
+        (should-not (string-search "Model summary." (buffer-string)))))))
+
+(ert-deftest review-guide-record-forward-finishing-after-a-reopen-counts ()
+  (skip-unless (require 'magit-section nil t))
+  (require 'review-guide)
+  (review-guide-test--with-record-guide (review-guide-test--one-finding "\"propose\"")
+    (let (on-add)
+      (cl-letf (((symbol-function 'review-guide-source-add-thread)
+                 (lambda (_source _thread _initial callback) (setq on-add callback))))
+        (review-guide-test--goto "AI issue 1.F1")
+        (review-guide-forward)
+        ;; The record is opened again while the comment is edited.
+        (review-guide-record source)
+        (funcall on-add)
+        (should (string-search "AI issue 1.F1 on RIGHT 12 [propose] (forwarded)" (buffer-string)))
+        (review-guide-test--goto "AI issue 1.F1")
+        (should-error (review-guide-forward) :type 'user-error)))))
+
+(ert-deftest review-guide-record-ignores-a-dangling-link ()
+  (review-guide-test--with-records
+    (delete-file (expand-file-name "aaaaaaaaaaaa.json" directory))
+    (make-symbolic-link "/nonexistent/x" (expand-file-name "aaaaaaaaaaaa.json" directory))
+    (let ((err (should-error (review-guide-record-load "Own" "Repo" 7 review-guide-test--head)
+                             :type 'user-error)))
+      (should-not (string-search "reviewed at" (cadr err))))
+    (should-not (review-guide-record--keys))))
+
 (defconst review-guide-test--lisp
   (expand-file-name "../lisp/review-guide"
                     (file-name-directory (or load-file-name buffer-file-name)))
   "The directory holding the package's sources.")
 
-(ert-deftest review-guide-loop-autoload-reaches-the-entry-point ()
-  "A fresh Emacs with only the generated autoloads can run the command."
+(defun review-guide-test--autoload-reaches-the-entry-point (command)
+  "Check that a fresh Emacs with only the generated autoloads can run COMMAND."
   ;; The sources are copied next to the generated loaddefs.el: Emacs 29
   ;; records each autoload's file relative to the loaddefs file, and
   ;; resolves it against `load-path' rather than that file's directory.
@@ -681,11 +1069,19 @@ is not asked for anything."
                                           scratch (expand-file-name "loaddefs.el" scratch))
                          "--eval" (format "(load %S nil t)"
                                           (expand-file-name "loaddefs.el" scratch))
-                         "--eval" "(unless (autoloadp (symbol-function 'review-guide-loop)) (error \"review-guide-loop is not autoloaded\"))"
-                         "--eval" "(autoload-do-load (symbol-function 'review-guide-loop) 'review-guide-loop)"
+                         "--eval" (format "(unless (autoloadp (symbol-function '%s)) (error \"%s is not autoloaded\"))"
+                                          command command)
+                         "--eval" (format "(autoload-do-load (symbol-function '%s) '%s)"
+                                          command command)
                          "--eval" "(unless (fboundp 'review-guide-open) (error \"void-function review-guide-open\"))")))
             (ert-info ((buffer-string))
               (should (zerop status)))))
       (delete-directory scratch t))))
+
+(ert-deftest review-guide-loop-autoload-reaches-the-entry-point ()
+  (review-guide-test--autoload-reaches-the-entry-point 'review-guide-loop))
+
+(ert-deftest review-guide-record-autoload-reaches-the-entry-point ()
+  (review-guide-test--autoload-reaches-the-entry-point 'review-guide-record))
 
 ;;; review-guide.el ends here

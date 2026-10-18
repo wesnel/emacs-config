@@ -71,15 +71,33 @@ and write its top-level comment, in `pr-review'."
 (declare-function forge-current-pullreq "forge-pullreq")
 (declare-function forge-get-url "forge-commands")
 
-(defun review-guide-pr-review--read-source ()
+(defun review-guide-pr-review--read-source (&optional read-url)
   "Return the `pr-review' buffer to guide, opening one if needed.
 Use the current buffer when it is one, the forge pull request at
-point when there is one, and otherwise ask for a URL."
+point when there is one, and otherwise the URL that READ-URL, a
+function of no arguments, returns, or else one read from the
+minibuffer."
   (cond
    ((derived-mode-p 'pr-review-mode) (current-buffer))
    ((and (fboundp 'forge-current-pullreq) (forge-current-pullreq))
     (review-guide-pr-review--open (forge-get-url (forge-current-pullreq))))
-   (t (review-guide-pr-review--open (read-string "Pull request URL: ")))))
+   (t (review-guide-pr-review--open
+       (if read-url
+           (funcall read-url)
+         (read-string "Pull request URL: "))))))
+
+(defun review-guide-pr-review-head (source)
+  "Return (OWNER NAME NUMBER HEAD) for the pull request in SOURCE.
+SOURCE is a `pr-review' buffer showing a GitHub pull request.  NUMBER
+is an integer, and HEAD the commit SOURCE's diff ends at: the pull
+request's head, unless only some of its commits are selected."
+  (with-current-buffer source
+    (pcase-let ((`(,owner ,name ,number) pr-review--pr-path))
+      (unless (alist-get 'headRefOid pr-review--pr-info)
+        (user-error "%s is not a GitHub pull request" (buffer-name)))
+      (list owner name
+            (if (stringp number) (string-to-number number) number)
+            (pr-review--current-commit-head)))))
 
 ;;;###autoload
 (defun review-guide (source)
