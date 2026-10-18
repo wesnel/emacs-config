@@ -285,6 +285,13 @@ and tools such as Git, Python, Node and ripgrep. Builds are verified before a
 complete image is made available to sessions. The standalone wrapper also
 prepares a missing image when it starts.
 
+Commands run as root in the guest. The image also has an unprivileged user,
+`runner`, for code that must not reach what a root process in the guest
+holds, such as a marker a review script prints its results under; `setpriv`
+runs a command as that user, and Gondolin's mounts are root's alone unless
+an overlay opens them. `overlays/eca-gondolin/guest-user.sh` gives the
+commands.
+
 To use your own image, add `--image` followed by an image directory or Gondolin
 image selector to `sandbox.args`. Home Manager skips managed-image preparation
 when an explicit image is selected.

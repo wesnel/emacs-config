@@ -20,7 +20,8 @@
       "gcompat",
       "git",
       "ripgrep",
-      "libstdc++"
+      "libstdc++",
+      "setpriv"
     ],
     "initramfsPackages": [],
     "krunfwVersion": "v5.2.1"

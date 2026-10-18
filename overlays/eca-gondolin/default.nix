@@ -18,7 +18,11 @@
 }: let
   imageConfig = writeText "eca-gondolin-image.json" (builtins.toJSON (
     (builtins.fromJSON (builtins.readFile ./build-config.json))
-    // {arch = stdenvNoCC.hostPlatform.parsed.cpu.name;}
+    // {
+      arch = stdenvNoCC.hostPlatform.parsed.cpu.name;
+      # A store path, so the image's cache key changes with the script.
+      init.rootfsInitExtra = "${./guest-user.sh}";
+    }
   ));
 in
   stdenvNoCC.mkDerivation (finalAttrs: {
