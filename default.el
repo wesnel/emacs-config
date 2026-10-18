@@ -2214,6 +2214,9 @@ GUI notification retains its icon and duration."
   (add-hook 'LaTeX-mode-hook #'wgn/latex-mode-eglot-setup))
 
 ;;;; Markdown support.
+@markdown-helper@
+(wgn/markdown-guard-code-block-modes)
+
 (use-package markdown-mode
   :ensure t
 

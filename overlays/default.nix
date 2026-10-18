@@ -88,6 +88,7 @@ final: prev: let
     # in the correct order regardless of location in final file.
     pkgs.replaceVars ../default.el {
       agent-plans-helper = builtins.readFile ../lisp/wgn-agent-plans.el;
+      markdown-helper = builtins.readFile ../lisp/wgn-markdown.el;
       inherit
         (deps)
         ensure
