@@ -1,0 +1,53 @@
+name: Markdown tests
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ert:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      # elpa-markdown-mode lets the fontification test run rather than skip.
+      - name: Install Emacs
+        run: |
+          sudo apt-get update
+          sudo apt-get install --no-install-recommends -y emacs-nox elpa-markdown-mode
+      - name: Run Markdown tests
+        run: |
+          emacsclient --alternate-editor="" --socket-name=markdown-tests --eval '
+          (progn
+            (package-initialize)
+            (load (expand-file-name "tests/run-markdown.el" (getenv "GITHUB_WORKSPACE")) nil t)
+            (wgn-markdown-run-tests))
+          '
+      # A failed run's error carries only the summary.  The test server
+      # started in the step above, so RUNNER_TEMP is in its environment.
+      - name: Show the full report
+        if: failure()
+        run: |
+          report="$RUNNER_TEMP/markdown-report.txt"
+          if emacsclient --socket-name=markdown-tests --eval '
+          (when (stringp (bound-and-true-p wgn-markdown-report))
+            (write-region wgn-markdown-report nil
+                          (expand-file-name "markdown-report.txt" (getenv "RUNNER_TEMP")))
+            t)
+          ' && test -f "$report"; then
+            cat "$report"
+          else
+            echo "No full report: the test server stopped, or the run ended before the tests did."
+          fi
+      - name: Stop test server
+        if: always()
+        run: |
+          emacsclient --socket-name=markdown-tests --eval '
+          (kill-emacs)
+          '
