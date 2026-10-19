@@ -1839,6 +1839,15 @@ GUI notification retains its icon and duration."
   ;; Set up eglot for rust-ts-mode.
   (add-hook 'rust-ts-mode-hook #'wgn/rust-ts-mode-eglot-setup))
 
+;;;; Lua support.
+(use-package lua-ts-mode
+  :defer t
+
+  :init
+  ;; Open Lua files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(lua-mode . lua-ts-mode)))
+
 ;;;; Python support.
 ;;
 ;; NOTE: `:pylsp' needs to be configured using a directory-local

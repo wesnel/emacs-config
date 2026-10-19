@@ -30,17 +30,21 @@ final: prev: let
           tree-sitter-gomod
           tree-sitter-gowork
           tree-sitter-graphql
+          tree-sitter-hcl
           tree-sitter-html
           tree-sitter-java
           tree-sitter-javascript
           tree-sitter-json
           tree-sitter-kotlin
           tree-sitter-latex
+          tree-sitter-lua
           tree-sitter-make
           tree-sitter-markdown
           tree-sitter-nix
+          tree-sitter-proto
           tree-sitter-python
           tree-sitter-regex
+          tree-sitter-rust
           tree-sitter-sql
           tree-sitter-toml
           tree-sitter-tsx
