@@ -715,6 +715,16 @@ if USER is given, its username is USER.  The port is not matched."
   :custom
   (magit-tbdiff-subcommand "range-diff"))
 
+;;;; Structural diffs with difftastic: `M-d' and `M-c' in magit's diff
+;;;; menu, `M-d' in its file menu and `M-RET' in blame.  The Nix package
+;;;; points `difftastic-executable' at its own `difft'; elsewhere `difft'
+;;;; has to be on PATH.
+(use-package difftastic-bindings
+  :ensure difftastic
+
+  :config
+  (difftastic-bindings-mode +1))
+
 ;;;; Pull requests, issues and review threads in magit.  Forge reads its
 ;;;; GitHub token from auth-source, under the host `api.github.com' and the
 ;;;; user `USERNAME^forge'.
