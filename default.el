@@ -1126,6 +1126,9 @@ if USER is given, its username is USER.  The port is not matched."
    eglot-ensure
    eglot-rename
    eglot-find-implementation
+   eglot-find-typeDefinition
+   eglot-show-call-hierarchy
+   eglot-show-type-hierarchy
    eglot-code-actions
    eglot-format-buffer)
 
@@ -1138,6 +1141,9 @@ if USER is given, its username is USER.  The port is not matched."
    ("C-c C-l ?" . #'xref-find-references)
    ("C-c C-l r" . #'eglot-rename)
    ("C-c C-l i" . #'eglot-find-implementation)
+   ("C-c C-l t" . #'eglot-find-typeDefinition)
+   ("C-c C-l c" . #'eglot-show-call-hierarchy)
+   ("C-c C-l h" . #'eglot-show-type-hierarchy)
    ("C-c C-l e" . #'eglot-code-actions)))
 
 ;;;; Pop-up window instead of echo area for Eldoc documentation
