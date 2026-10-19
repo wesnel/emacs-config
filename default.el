@@ -960,6 +960,7 @@ if USER is given, its username is USER.  The port is not matched."
 
   :hook
   ((python-ts-mode . combobulate-mode)
+   (go-ts-mode . combobulate-mode)
    (js-ts-mode . combobulate-mode)
    (css-ts-mode . combobulate-mode)
    (yaml-ts-mode . combobulate-mode)
