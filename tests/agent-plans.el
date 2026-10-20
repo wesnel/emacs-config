@@ -4,6 +4,9 @@
 (require 'cl-lib)
 (require 'org)
 (require 'org-agenda)
+;; Loaded now, so that `wgn-agent-plans-test--with-plans' binds its
+;; variables dynamically.
+(require 'org-id)
 (require 'autorevert)
 ;; Loaded now, so that its autoload does not undo a test's stand-in.  It
 ;; provides no feature to require.
@@ -39,12 +42,17 @@ esac
 (defmacro wgn-agent-plans-test--with-plans (&rest body)
   "Run BODY with a plans directory and a fake `agent-plan' under a temp dir.
 Binds `root' to the temp dir, whose plans directory is configured through
-AGENT_TOOLS_CONFIG, and `agent-plan' is found on `exec-path'."
+AGENT_TOOLS_CONFIG, and `agent-plan' is found on `exec-path'.  The IDs
+Org records, and saves with every Org buffer, stay under the temp dir
+too, out of `user-emacs-directory', which the Nix build sandbox lacks."
   (declare (indent 0))
   `(let* ((root (file-name-as-directory (make-temp-file "agent-plans-" t)))
           (plans (expand-file-name "plans" root))
           (bin (expand-file-name "bin" root))
           (config (expand-file-name "config.json" root))
+          (org-id-locations-file (expand-file-name "org-id-locations" root))
+          (org-id-locations nil)
+          (org-id-files nil)
           (exec-path (cons bin exec-path))
           (process-environment
            (cons (concat "AGENT_TOOLS_CONFIG=" config)
@@ -1238,11 +1246,17 @@ Return non-nil when it wrote."
           (revert-buffer t t t)
           (should (wgn/agent-plans--seen-current-p plan))
           (should (wgn-agent-plans-test--agent-writes plan))
+          ;; Turning the mode on reverts the buffer through
+          ;; `auto-revert-handler', which from Emacs 31 reverts a file's
+          ;; buffer only while an auto-revert mode is on in it.
           (let ((auto-revert-use-notify nil))
-            (auto-revert-handler))
-          (should (string-match-p "Written by agent-plan\n\\* Written by agent-plan\n\\'"
-                                  (buffer-string)))
-          (should (wgn/agent-plans--seen-current-p plan)))))))
+            (auto-revert-mode 1))
+          (unwind-protect
+              (progn
+                (should (string-match-p "Written by agent-plan\n\\* Written by agent-plan\n\\'"
+                                        (buffer-string)))
+                (should (wgn/agent-plans--seen-current-p plan)))
+            (auto-revert-mode -1)))))))
 
 (defmacro wgn-agent-plans-test--recovering (&rest body)
   "Run BODY confirming every prompt, recovering an auto-save file too.
