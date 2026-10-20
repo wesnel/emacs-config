@@ -26,10 +26,13 @@ refuses Emacs's own writes and copies onto plan files."
 
 (defconst wgn-agent-plans-test--fake
   "#!/bin/sh
-# Answers `status --format FORMAT PLAN-FILE' from PLAN-FILE.status-FORMAT.
-[ \"$1\" = status ] || exit 2
-for last; do :; done
-cat \"$last.status-$3\"
+# Answers `status --format FORMAT PLAN-FILE' from PLAN-FILE.status-FORMAT,
+# and `questions PLAN-FILE ...' from PLAN-FILE.questions or with none.
+case \"$1\" in
+  status) for last; do :; done; cat \"$last.status-$3\" ;;
+  questions) if [ -f \"$2.questions\" ]; then cat \"$2.questions\"; else echo '[]'; fi ;;
+  *) exit 2 ;;
+esac
 "
   "A stand-in for `agent-plan'.")
 
@@ -519,6 +522,16 @@ S2 waits for the part's P1.S1, and Q2 for Q1."
 
 ;;;; The A view
 
+(defun wgn-agent-plans-test--sign-event (kind sign &optional branches worktree base)
+  "Return a log event of KIND for sign-pass SIGN, as agent-plan logs it.
+Its pass signs BRANCHES, comma-separated, in WORKTREE from BASE."
+  (concat "* " kind " 2026-10-14-x.mac — " sign "\n:PROPERTIES:\n:EVENT: e-" kind "-" sign
+          "\n:ITEM: 2026-10-14-x.mac\n:KIND: " kind "\n"
+          (if branches (concat ":BRANCH: " branches "\n") "")
+          (if worktree (concat ":WORKTREE: " worktree "\n") "")
+          (if base (concat ":BASE: " base "\n") "")
+          ":SIGN: " sign "\n:END:\n[2026-10-14 Tue 12:00]\n"))
+
 (defun wgn-agent-plans-test--agenda-plans (plans)
   "Make an own plan, its part and another host's plan under PLANS.
 Return the other host's plan file."
@@ -539,8 +552,18 @@ Return the other host's plan file."
    (expand-file-name "2026-10-14-x.mac.P1.org" plans)
    (wgn-agent-plans-test--plan-text
     "Part one" :Steps (wgn-agent-plans-test--entry "TODO" "The part's step" "P1.S1")))
-  (wgn-agent-plans-test--write (expand-file-name "2026-10-14-x.mac.log.org" plans)
-                               "* TODO Not an entry\n:PROPERTIES:\n:ID: S9\n:END:\n")
+  ;; As agent-plan questions gives them: Q2 waits for Q1.
+  (wgn-agent-plans-test--write
+   (expand-file-name "2026-10-14-x.mac.org.questions" plans)
+   (format "[{\"id\": \"Q1\", \"file\": %S, \"question\": \"Keep it?\", \"recommendation\": \"yes\"}]"
+           (expand-file-name "2026-10-14-x.mac.org" plans)))
+  (wgn-agent-plans-test--write
+   (expand-file-name "2026-10-14-x.mac.log.org" plans)
+   (concat "* TODO Not an entry\n:PROPERTIES:\n:ID: S9\n:END:\n"
+           (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000aaaa" "signed-one")
+           (wgn-agent-plans-test--sign-event "signed" "2026-10-14-x.mac.0000aaaa")
+           (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000bbbb"
+                                             "pending-one,pending-two")))
   (let ((mirror (expand-file-name "2026-10-13-y.devbox.org" plans)))
     (wgn-agent-plans-test--write
      mirror
@@ -548,6 +571,10 @@ Return the other host's plan file."
       "Theirs"
       :Steps (wgn-agent-plans-test--entry "TODO" "Their step" "S1")
       :Questions (wgn-agent-plans-test--entry "ASK" "Their question?" "Q1")))
+    (wgn-agent-plans-test--write
+     (concat mirror ".questions")
+     (format "[{\"id\": \"Q1\", \"file\": %S, \"question\": \"Their question?\", \"recommendation\": \"no\"}]"
+             mirror))
     mirror))
 
 (defun wgn-agent-plans-test--agenda-blocks ()
@@ -564,7 +591,7 @@ line counts only when its start is visible."
         (let ((line (buffer-substring-no-properties (line-beginning-position) (line-end-position))))
           (cond
            ((invisible-p (line-beginning-position)))
-           ((member line '("Questions for the operator" "Ready" "Follow-ups"))
+           ((member line '("Waiting on you" "Ready" "Follow-ups"))
             (push (list line) blocks))
            (blocks (push line (cdar blocks)))))
         (forward-line 1)))
@@ -578,12 +605,22 @@ line counts only when its start is visible."
              (org-refile-targets '((nil :maxlevel . 9)))
              (blocks (unwind-protect (wgn-agent-plans-test--agenda-blocks)
                        (org-agenda-quit)))
-             (questions (or (cdr (assoc "Questions for the operator" blocks)) ""))
+             (waiting (or (cdr (assoc "Waiting on you" blocks)) ""))
              (ready (or (cdr (assoc "Ready" blocks)) ""))
              (followups (or (cdr (assoc "Follow-ups" blocks)) "")))
-        (should (string-match-p "Keep it\\?" questions))
-        ;; Waits for Q1, settled, and another host's to answer there.
-        (should-not (string-match-p "Rename it\\|Settled question\\|Their question" questions))
+        (should (string-match-p "^  2026-10-14-x\\.mac Q1 Keep it\\?  (recommended: yes)$" waiting))
+        (should (string-match-p
+                 "^    answer it with /questions in a Claude session on 2026-10-14-x\\.mac$" waiting))
+        ;; Another host's question is answered there.
+        (should-not (string-match-p "Their question" waiting))
+        (should (string-match-p
+                 "^    git sign-pass --notify 2026-10-14-x\\.mac\\.0000bbbb pending-one pending-two$"
+                 waiting))
+        (should (string-match-p
+                 "^  2026-10-14-x\\.mac 2026-10-14-x\\.mac\\.0000bbbb sign-pass of pending-one pending-two, in a worktree its event does not name$"
+                 waiting))
+        ;; That pass has its result.
+        (should-not (string-match-p "0000aaaa" waiting))
         (dolist (title '("First step" "Part one" "The part's step" "Their step"))
           (should (string-match-p (regexp-quote title) ready)))
         ;; Waits for S1, scheduled for later, done, and in a log.
@@ -1758,6 +1795,186 @@ refused still."
           (should-error (insert "x")))
         (should (equal (with-temp-buffer (insert-file-contents log) (buffer-string)) "* done S1\n"))))))
 
+;;;; A stand-in agent-plan that records its calls
+
+(defconst wgn-agent-plans-test--cli-fake
+  "#!/bin/sh
+# Records each call's arguments in $RECORD, one per line, then a line \"--\".
+for a; do printf '%s\\n' \"$a\" >> \"$RECORD\"; done
+echo -- >> \"$RECORD\"
+if [ -n \"$REFUSE\" ]; then
+  echo \"agent-plan: refused: $REFUSE\" >&2
+  exit 2
+fi
+case \"$1\" in
+  questions) cat \"$QUESTIONS\" ;;
+  *) echo '{}' ;;
+esac
+"
+  "A stand-in for `agent-plan' that records what it is asked to do.
+`questions' prints $QUESTIONS; with $REFUSE set, every call is refused.")
+
+(defmacro wgn-agent-plans-test--with-cli (&rest body)
+  "Run BODY as `wgn-agent-plans-test--with-plans' does, with a recording CLI.
+Also binds `record', the file of its calls, and `questions', the file its
+`questions' prints, which holds no question on entry."
+  (declare (indent 0))
+  `(wgn-agent-plans-test--with-plans
+     (let* ((record (expand-file-name "record" root))
+            (questions (expand-file-name "questions.json" root))
+            (process-environment
+             (append (list (concat "RECORD=" record) (concat "QUESTIONS=" questions))
+                     process-environment)))
+       (wgn-agent-plans-test--write questions "[]")
+       (wgn-agent-plans-test--write
+        (expand-file-name "agent-plan" bin) wgn-agent-plans-test--cli-fake)
+       (unwind-protect
+           (progn ,@body)
+         (dolist (buffer (buffer-list))
+           (when (and (buffer-file-name buffer)
+                      (string-prefix-p root (buffer-file-name buffer)))
+             (with-current-buffer buffer (set-buffer-modified-p nil))
+             (kill-buffer buffer)))))))
+
+(defun wgn-agent-plans-test--calls (record)
+  "Return the calls RECORD holds, each a list of its arguments."
+  (when (file-exists-p record)
+    (mapcar (lambda (call) (split-string call "\n" t))
+            (split-string (with-temp-buffer (insert-file-contents record) (buffer-string))
+                          "^--\n" t))))
+
+(defun wgn-agent-plans-test--question-plan (plans)
+  "Make plan 2026-10-14-x.mac under PLANS with questions Q1 and, in part P1, P1.Q1.
+Return the plan file."
+  (let ((plan (expand-file-name "2026-10-14-x.mac.org" plans)))
+    (wgn-agent-plans-test--write
+     plan
+     (wgn-agent-plans-test--plan-text
+      "Questions"
+      :Steps (wgn-agent-plans-test--entry "TODO" "First" "S1")
+      :Distribution (wgn-agent-plans-test--entry "TODO" "Part one" "P1")
+      :Questions (concat (wgn-agent-plans-test--entry "ASK" "Use ghostel?" "Q1")
+                         "Commands need a TTY.\n- a compile buffer\n- vterm\n")))
+    (wgn-agent-plans-test--write
+     (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+     (wgn-agent-plans-test--plan-text
+      "Part one" :Questions (wgn-agent-plans-test--entry "ASK" "Split it?" "P1.Q1")))
+    plan))
+
+(defun wgn-agent-plans-test--questions-json (plans)
+  "Return what `agent-plan questions --json' prints for the question plan under PLANS."
+  (format "[{\"id\": \"Q1\", \"file\": %S, \"question\": \"Use ghostel?\",
+             \"context\": \"Commands need a TTY.\", \"recommendation\": \"yes: the operator's terminal\",
+             \"alternatives\": [\"a compile buffer\", \"vterm\"]},
+            {\"id\": \"P1.Q1\", \"file\": %S, \"question\": \"Split it?\", \"recommendation\": \"no\"}]"
+          (expand-file-name "2026-10-14-x.mac.org" plans)
+          (expand-file-name "2026-10-14-x.mac.P1.org" plans)))
+
+(ert-deftest wgn-agent-plans-pending-signs-carry-their-command ()
+  (wgn-agent-plans-test--with-plans
+    (let* ((worktree (file-name-as-directory (expand-file-name "wt" root)))
+           (plan (expand-file-name "2026-10-14-x.mac.org" plans)))
+      (make-directory worktree t)
+      (wgn-agent-plans-test--write
+       plan (concat "* Plan\n:PROPERTIES:\n:ID: 2026-10-14-x.mac\n"
+                    ":BRANCHES: main..pending-one pending-one..pending-two\n"
+                    ":WORKTREES: /nonexistent " worktree "\n:END:\n"))
+      (wgn-agent-plans-test--write
+       (expand-file-name "2026-10-14-x.mac.log.org" plans)
+       (concat (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000bbbb"
+                                                 "pending-one,pending-two" worktree)
+               (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000cccc"
+                                                 "pending-two" worktree "pending-one")
+               ;; The plan's BRANCHES and WORKTREES are not the pass's.
+               (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000eeee"
+                                                 "pending-one")
+               (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000ffff"
+                                                 "pending-one" "/nonexistent")
+               (wgn-agent-plans-test--sign-event "sign-refused" "2026-10-14-x.mac.0000dddd")))
+      (should (equal (wgn/agent-plans-pending-signs plan)
+                     `((:id "2026-10-14-x.mac.0000bbbb" :branches ("pending-one" "pending-two")
+                        :directory ,worktree
+                        :command "git sign-pass --notify 2026-10-14-x.mac.0000bbbb pending-one pending-two")
+                       (:id "2026-10-14-x.mac.0000cccc" :branches ("pending-two")
+                        :directory ,worktree
+                        :command "git sign-pass --base pending-one --notify 2026-10-14-x.mac.0000cccc pending-two")
+                       (:id "2026-10-14-x.mac.0000eeee" :branches ("pending-one")
+                        :directory nil
+                        :command "git sign-pass --notify 2026-10-14-x.mac.0000eeee pending-one")
+                       (:id "2026-10-14-x.mac.0000ffff" :branches ("pending-one")
+                        :directory nil
+                        :command "git sign-pass --notify 2026-10-14-x.mac.0000ffff pending-one")))))))
+
+(ert-deftest wgn-agent-plans-waiting-asks-agent-plan-once-per-change ()
+  (wgn-agent-plans-test--with-cli
+    (let ((plan (wgn-agent-plans-test--question-plan plans))
+          (halted (expand-file-name "2026-10-13-h.mac.org" plans))
+          (wgn/agent-plans--questions-cache (make-hash-table :test #'equal)))
+      (wgn-agent-plans-test--write
+       halted "* Plan\n:PROPERTIES:\n:ID: 2026-10-13-h.mac\n:STATUS: halted\n:END:\n")
+      (wgn-agent-plans-test--write questions (wgn-agent-plans-test--questions-json plans))
+      (wgn/agent-plans-waiting)
+      (wgn/agent-plans-waiting)
+      (should (equal (mapcar #'cadr (wgn-agent-plans-test--calls record)) (list plan)))
+      ;; Nothing it lists stays visited.
+      (should-not (find-buffer-visiting plan))
+      ;; agent-plan changed a part.
+      (set-file-times (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+                      (time-add (current-time) 10))
+      (wgn/agent-plans-waiting)
+      (should (equal (length (wgn-agent-plans-test--calls record)) 2)))))
+
+(defun wgn-agent-plans-test--waiting-line (pattern)
+  "Build the A view and move to the line matching PATTERN in its agenda buffer."
+  (org-agenda nil "A")
+  (set-buffer org-agenda-buffer)
+  (goto-char (point-min))
+  (re-search-forward pattern)
+  (beginning-of-line))
+
+(ert-deftest wgn-agent-plans-waiting-is-a-list-to-read ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let* ((plan (wgn-agent-plans-test--question-plan plans))
+             (before (with-temp-buffer (insert-file-contents plan) (buffer-string)))
+             (org-agenda-custom-commands (list (wgn/agent-plans-agenda-command)))
+             (org-agenda-sticky nil))
+        (wgn-agent-plans-test--write questions (wgn-agent-plans-test--questions-json plans))
+        (wgn-agent-plans-test--write
+         (expand-file-name "2026-10-14-x.mac.log.org" plans)
+         (wgn-agent-plans-test--sign-event "sign-requested" "2026-10-14-x.mac.0000bbbb" "one"))
+        (unwind-protect
+            (save-current-buffer
+              (wgn-agent-plans-test--waiting-line "git sign-pass --notify")
+              ;; Nothing runs from here: a key does no more than visit.
+              (should-not (commandp (lookup-key (get-text-property (point) 'keymap)
+                                                (kbd "C-c C-c"))))
+              ;; Nor are links in agents' text opened from here.
+              (should (eq (lookup-key (get-text-property (point) 'keymap) (kbd "C-c C-o"))
+                          #'wgn/agent-plans-waiting-visit))
+              (should-error (org-agenda-todo "DONE"))
+              (wgn-agent-plans-test--waiting-line "P1\\.Q1 Split it")
+              (should (looking-at-p (concat "  2026-10-14-x\\.mac P1\\.Q1 Split it\\?  (recommended: no)\n"
+                                            "    answer it with /questions in a Claude session"
+                                            " on 2026-10-14-x\\.mac$")))
+              (should-error (org-agenda-todo "DECIDED"))
+              ;; RET visits it.
+              (call-interactively (lookup-key (get-text-property (point) 'keymap) (kbd "RET")))
+              (should (equal (buffer-file-name) (expand-file-name "2026-10-14-x.mac.P1.org" plans)))
+              (should (equal (org-entry-get nil "ID") "P1.Q1")))
+          (org-agenda-quit))
+        ;; agent-plan was asked for its questions, and nothing else.
+        (should (equal (mapcar #'car (wgn-agent-plans-test--calls record)) '("questions")))
+        (should (equal (with-temp-buffer (insert-file-contents plan) (buffer-string)) before))))))
+
+(ert-deftest wgn-agent-plans-waiting-shows-a-plan-agent-plan-refused ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (wgn-agent-plans-test--question-plan plans)
+      (let ((process-environment (cons "REFUSE=no questions today" process-environment)))
+        (should (equal (mapcar (lambda (item) (plist-get item :title)) (wgn/agent-plans-waiting))
+                       '("agent-plan: refused: no questions today")))))))
+
 ;;;; Against the real agent-plan
 ;;
 ;; Skipped where `agent-plan' is not on `exec-path'; nix-config's
@@ -1820,7 +2037,7 @@ refused still."
             ;; The A view.
             (let* ((blocks (unwind-protect (wgn-agent-plans-test--agenda-blocks)
                              (org-agenda-quit)))
-                   (questions (or (cdr (assoc "Questions for the operator" blocks)) ""))
+                   (questions (or (cdr (assoc "Waiting on you" blocks)) ""))
                    (ready (or (cdr (assoc "Ready" blocks)) ""))
                    (followups (or (cdr (assoc "Follow-ups" blocks)) "")))
               (should (string-match-p "Keep the old flag" questions))

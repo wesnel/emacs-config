@@ -172,15 +172,13 @@ Refresh it later with `org-update-dblock', \\[org-update-all-dblocks] for all."
   (org-create-dblock (list :name "agent-plan" :plan plan))
   (org-update-dblock))
 
-(defun wgn/agent-plans-agenda-files (&optional own)
-  "Return every plan's and part's file, newest plan first; with OWN, this host's.
+(defun wgn/agent-plans-agenda-files ()
+  "Return every plan's and part's file, newest plan first.
 Logs are not."
   (seq-filter
    (lambda (file)
      (let ((parts (wgn/agent-plans--file-parts file)))
-       (and parts
-            (not (equal (nth 2 parts) "log"))
-            (or (not own) (equal (nth 1 parts) (wgn/agent-plans-host))))))
+       (and parts (not (equal (nth 2 parts) "log")))))
    (when (file-directory-p (wgn/agent-plans-directory))
      (sort (directory-files (wgn/agent-plans-directory) t "\\.org\\'")
            (lambda (a b)
@@ -188,15 +186,13 @@ Logs are not."
 
 (defun wgn/agent-plans-agenda-command ()
   "Return the `org-agenda-custom-commands' entry for key \"A\".
-Its blocks are the questions the operator can answer, in this host's plans
-alone since another host's are answered there; the parts and steps ready
-to work on; and the open follow-ups.  An entry waiting on an :AFTER: item
-is hidden, as is one scheduled for a later day.  `org-agenda-files' is
-bound to the plan files for this view alone."
+Its blocks are what waits on the operator, `wgn/agent-plans-agenda-waiting',
+in this host's plans alone since another host's are answered there; the
+parts and steps ready to work on; and the open follow-ups.  An entry
+waiting on an :AFTER: item is hidden, as is one scheduled for a later
+day.  `org-agenda-files' is bound to the plan files for this view alone."
   `("A" "Agent plans"
-    ((tags-todo ,(concat "ID={" wgn/agent-plans-question-id "}")
-                ((org-agenda-overriding-header "Questions for the operator")
-                 (org-agenda-files (wgn/agent-plans-agenda-files t))))
+    ((wgn/agent-plans-agenda-waiting "")
      ;; Two matches rather than one regexp: the matcher splits at `|'.
      (tags-todo ,(concat "ID={" wgn/agent-plans-part-id "}|ID={" wgn/agent-plans-step-id "}")
                 ((org-agenda-overriding-header "Ready")))
@@ -1141,6 +1137,228 @@ and guard from plan buffers and leaves them read-only."
     (remove-hook 'after-save-hook #'wgn/agent-plans--after-save)
     (remove-hook 'after-set-visited-file-name-hook #'wgn/agent-plans--revisit)
     (wgn/agent-plans--unprotect-all)))
+
+;;;; Calling agent-plan
+
+(defun wgn/agent-plans--call (&rest args)
+  "Run `agent-plan' with ARGS and return its output.
+Its refusal, on standard error, is signalled as a `user-error'."
+  (unless (executable-find "agent-plan")
+    (user-error "agent-plan is not on `exec-path'"))
+  (let ((stderr (make-temp-file "agent-plan-stderr"))
+        (default-directory (if (file-directory-p (wgn/agent-plans-directory))
+                               (file-name-as-directory (wgn/agent-plans-directory))
+                             (expand-file-name "~/"))))
+    (unwind-protect
+        (with-temp-buffer
+          (let ((status (apply #'call-process "agent-plan" nil (list t stderr) nil args)))
+            (unless (eq status 0)
+              (user-error "%s" (string-trim
+                                (with-temp-buffer
+                                  (insert-file-contents stderr)
+                                  (if (zerop (buffer-size))
+                                      (format "agent-plan %s exited with %s" (car args) status)
+                                    (buffer-string))))))
+            (buffer-string)))
+      (delete-file stderr))))
+
+;;;; What waits on the operator
+;;
+;; Two things in a plan wait on the operator in a form a program can
+;; read: an open question, which `agent-plan questions' lists, and a
+;; sign-pass an agent handed over, which `agent-plan sign-id' logs as
+;; sign-requested and `git sign-pass --notify' settles with a result
+;; event of the same SIGN.
+
+(defconst wgn/agent-plans--sign-results '("signed" "sign-refused" "sign-failed")
+  "The kinds of the event that ends a sign-pass.")
+
+(defun wgn/agent-plans--log-events (log)
+  "Return the events of the log file LOG, oldest first.
+Each is an alist from a drawer property's name to its value."
+  (when (file-readable-p log)
+    (with-temp-buffer
+      (insert-file-contents log)
+      (goto-char (point-min))
+      (let (events)
+        (while (re-search-forward "^\\* " nil t)
+          (let ((end (save-excursion
+                       (if (re-search-forward "^\\* " nil t) (match-beginning 0) (point-max))))
+                properties)
+            (while (re-search-forward "^:\\([A-Z_]+\\):[ \t]*\\(.*?\\)[ \t]*$" end t)
+              (unless (member (match-string 1) '("PROPERTIES" "END"))
+                (push (cons (match-string 1) (match-string 2)) properties)))
+            (push properties events)
+            (goto-char end)))
+        (nreverse events)))))
+
+(defun wgn/agent-plans--plan-property (plan name)
+  "Return the words of property NAME of PLAN's \"* Plan\" entry."
+  (with-temp-buffer
+    (insert-file-contents plan)
+    (goto-char (point-min))
+    (when (re-search-forward (format "^:%s:[ \t]*\\(.*\\)$" (regexp-quote name)) nil t)
+      (split-string (match-string 1)))))
+
+(defun wgn/agent-plans--log-file (plan)
+  "Return the log file of the plan file PLAN."
+  (concat (file-name-sans-extension plan) ".log.org"))
+
+(defun wgn/agent-plans-pending-signs (plan)
+  "Return the sign-passes handed over in PLAN that have no result yet.
+Each is a plist of the pass's :id, its :branches, and the :command and
+:directory to run it with.  The pass's own event names them: BRANCH,
+WORKTREE where `git sign-pass' runs, and BASE for its --base; :directory
+is nil when the event names no worktree that exists."
+  (let* ((events (wgn/agent-plans--log-events (wgn/agent-plans--log-file plan)))
+         (finished (delq nil (mapcar (lambda (event)
+                                       (and (member (cdr (assoc "KIND" event))
+                                                    wgn/agent-plans--sign-results)
+                                            (cdr (assoc "SIGN" event))))
+                                     events))))
+    (delq nil
+          (mapcar
+           (lambda (event)
+             (let ((id (cdr (assoc "SIGN" event))))
+               (when (and (equal (cdr (assoc "KIND" event)) "sign-requested")
+                          id (not (member id finished)))
+                 (let ((branches (split-string (or (cdr (assoc "BRANCH" event)) "") "," t))
+                       (worktree (cdr (assoc "WORKTREE" event)))
+                       (base (cdr (assoc "BASE" event))))
+                   (list :id id :branches branches
+                         :directory (and worktree (file-directory-p worktree)
+                                         (file-name-as-directory (expand-file-name worktree)))
+                         :command (mapconcat
+                                   #'shell-quote-argument
+                                   (append '("git" "sign-pass")
+                                           (and base (list "--base" base))
+                                           (list "--notify" id)
+                                           branches)
+                                   " "))))))
+           events))))
+
+(defvar wgn/agent-plans--questions-cache (make-hash-table :test #'equal)
+  "Map a plan file to (STAMP . QUESTIONS), `agent-plan questions' at STAMP.
+STAMP is the modification times of the plan's and its parts' files.")
+
+(defun wgn/agent-plans--open-questions (plan)
+  "Return the open questions of PLAN and its parts, from `agent-plan questions'.
+Its answer is kept until one of their files changes."
+  (let ((stamp (mapcar (lambda (file)
+                         (cons file (file-attribute-modification-time (file-attributes file))))
+                       (wgn/agent-plans--own-files plan)))
+        (cached (gethash plan wgn/agent-plans--questions-cache)))
+    (if (equal (car cached) stamp)
+        (cdr cached)
+      (let ((questions (append (json-parse-string
+                                (wgn/agent-plans--call "questions" plan "--all" "--json"))
+                               nil)))
+        (puthash plan (cons stamp questions) wgn/agent-plans--questions-cache)
+        questions))))
+
+(defun wgn/agent-plans--id-marker (file id)
+  "Return a marker at the heading whose ID is ID in FILE, or nil."
+  (when (and (stringp file) (file-readable-p file))
+    (with-current-buffer (find-file-noselect file)
+      (save-excursion
+        (save-restriction
+          (widen)
+          (goto-char (point-min))
+          (when (re-search-forward (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id)) nil t)
+            (org-back-to-heading t)
+            (point-marker)))))))
+
+(defun wgn/agent-plans-waiting ()
+  "Return what waits on the operator in this host's plans, newest plan first.
+Each is a plist of its :plan file, :kind (`question', `command' or
+`error'), :id, :title and the :command it shows.  A question has the
+:file of its entry; a command its :directory, or nil; an error is a
+plan whose questions `agent-plan' did not give.  A halted plan waits on
+nothing."
+  (mapcan
+   (lambda (plan)
+     (let ((name (file-name-base plan)))
+       (append
+        (condition-case err
+            (mapcar
+             (lambda (question)
+               (let ((qid (gethash "id" question)))
+                 (list :plan plan :kind 'question :id qid :file (gethash "file" question)
+                       :title (gethash "question" question)
+                       :recommendation (gethash "recommendation" question)
+                       :command (format "answer it with /questions in a Claude session on %s"
+                                        name))))
+             (wgn/agent-plans--open-questions plan))
+          (error (list (list :plan plan :kind 'error :id "" :title (error-message-string err)
+                             :command ""))))
+        (mapcar (lambda (sign)
+                  (list :plan plan :kind 'command :id (plist-get sign :id)
+                        :title (concat "sign-pass of " (string-join (plist-get sign :branches) " ")
+                                       ", in " (if (plist-get sign :directory)
+                                                   (abbreviate-file-name (plist-get sign :directory))
+                                                 "a worktree its event does not name"))
+                        :command (plist-get sign :command)
+                        :directory (plist-get sign :directory)))
+                (wgn/agent-plans-pending-signs plan)))))
+   (seq-remove (lambda (plan)
+                 (or (wgn/agent-plans--mirror-host plan)
+                     (member "halted" (wgn/agent-plans--plan-property plan "STATUS"))))
+               (wgn/agent-plans-files))))
+
+(declare-function org-fold-show-context "org-fold" (&optional key))
+(declare-function org-agenda-prepare "org-agenda" (&optional name))
+
+(defun wgn/agent-plans-waiting-visit ()
+  "Visit the plan entry of the \"Waiting on you\" line at point."
+  (interactive)
+  (let* ((item (or (get-text-property (point) 'wgn/agent-plans-item)
+                   (user-error "Nothing waits on you here")))
+         (marker (and (eq (plist-get item :kind) 'question)
+                      (wgn/agent-plans--id-marker (plist-get item :file) (plist-get item :id)))))
+    (if (null marker)
+        (find-file (plist-get item :plan))
+      (pop-to-buffer-same-window (marker-buffer marker))
+      (widen)
+      (goto-char marker)
+      (org-fold-show-context 'agenda))))
+
+(defvar wgn/agent-plans-waiting-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map (kbd "RET") #'wgn/agent-plans-waiting-visit)
+    ;; The agenda's would open any link in the line's text, which agents wrote.
+    (define-key map (kbd "C-c C-o") #'wgn/agent-plans-waiting-visit)
+    map)
+  "Keys of the lines of the \"Waiting on you\" agenda block.
+The lines carry no entry marker, so the agenda's own commands, which
+would edit the plan, find nothing to act on there.")
+
+(defun wgn/agent-plans-agenda-waiting (&optional _match)
+  "Insert the \"Waiting on you\" block of the agenda: `wgn/agent-plans-waiting'.
+It is a list to read: each line shows what to run, and where, as text;
+questions are answered with /questions in a Claude session, and
+\\<wgn/agent-plans-waiting-map>\\[wgn/agent-plans-waiting-visit] visits the entry."
+  (org-agenda-prepare "Waiting on you")
+  (insert (propertize "Waiting on you" 'face 'org-agenda-structure) "\n")
+  (let ((items (wgn/agent-plans-waiting)))
+    (unless items
+      (insert "  nothing\n"))
+    (dolist (item items)
+      (let ((start (point)))
+        (insert (format "  %s %s %s%s\n"
+                        (file-name-base (plist-get item :plan))
+                        (plist-get item :id)
+                        (plist-get item :title)
+                        (if (plist-get item :recommendation)
+                            (format "  (recommended: %s)" (plist-get item :recommendation))
+                          "")))
+        (unless (string-empty-p (plist-get item :command))
+          (insert (propertize (concat "    " (plist-get item :command)) 'face 'shadow) "\n"))
+        (add-text-properties
+         start (point)
+         `(wgn/agent-plans-item ,item
+           keymap ,wgn/agent-plans-waiting-map
+           help-echo ,(substitute-command-keys
+                       "\\<wgn/agent-plans-waiting-map>\\[wgn/agent-plans-waiting-visit]: visit")))))))
 
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here
