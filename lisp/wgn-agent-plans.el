@@ -51,16 +51,39 @@ A plan's own file has no group 3.")
       (expand-file-name "agent-tools/config.json"
                         (or (getenv "XDG_CONFIG_HOME") "~/.config"))))
 
+(defvar wgn/agent-plans--config-cache nil
+  "(FILE ATTRIBUTES PLANS): the \"plans\" object of FILE, read when it had ATTRIBUTES.")
+
+(defun wgn/agent-plans--plans-config ()
+  "Return the \"plans\" object of `agent-plan''s config file, or nil.
+It is read again only once the file, its modification time or its size
+changes, since every change to a plan buffer, and every write of any
+file, asks for it.  A file that is no JSON object is no config, so that
+those writes go on."
+  (let* ((file (wgn/agent-plans--config-file))
+         (attributes (file-attributes file))
+         (stamp (and attributes (list (file-attribute-modification-time attributes)
+                                      (file-attribute-size attributes)))))
+    (unless (equal (list file stamp) (butlast wgn/agent-plans--config-cache))
+      (setq wgn/agent-plans--config-cache
+            (list file stamp
+                  (when (and stamp (file-readable-p file))
+                    (with-temp-buffer
+                      (insert-file-contents file)
+                      (condition-case err
+                          (let ((plans (gethash "plans" (json-parse-buffer))))
+                            (and (hash-table-p plans) plans))
+                        ((json-error wrong-type-argument)
+                         (message "Ignoring %s, which is no JSON object: %s"
+                                  file (error-message-string err))
+                         nil)))))))
+    (nth 2 wgn/agent-plans--config-cache)))
+
 (defun wgn/agent-plans-directory ()
   "Return the directory holding the plans.
 It is \"plans.dir\" in `agent-plan''s config file, or ~/git/notes/agents."
-  (let* ((file (wgn/agent-plans--config-file))
-         (dir (when (file-readable-p file)
-                (with-temp-buffer
-                  (insert-file-contents file)
-                  (gethash "dir" (or (gethash "plans"
-                                              (json-parse-buffer))
-                                     (make-hash-table)))))))
+  (let ((dir (and (wgn/agent-plans--plans-config)
+                  (gethash "dir" (wgn/agent-plans--plans-config)))))
     (expand-file-name (if (and (stringp dir) (not (string-empty-p dir)))
                           dir
                         "~/git/notes/agents"))))
@@ -305,12 +328,8 @@ choose a plan."
 
 (defun wgn/agent-plans--config-value (key)
   "Return \"plans\".KEY in `agent-plan''s config file, or nil."
-  (let ((file (wgn/agent-plans--config-file)))
-    (when (file-readable-p file)
-      (with-temp-buffer
-        (insert-file-contents file)
-        (let ((plans (gethash "plans" (json-parse-buffer))))
-          (and (hash-table-p plans) (gethash key plans)))))))
+  (let ((plans (wgn/agent-plans--plans-config)))
+    (and plans (gethash key plans))))
 
 (defun wgn/agent-plans-host ()
   "Return this host's name in plan file names, as `agent-plan' takes it.
@@ -367,21 +386,122 @@ ID the plan does not hold never settles."
              (unless visiting (kill-buffer))))))
      (wgn/agent-plans--own-files file))))
 
+(defun wgn/agent-plans--log-p (file)
+  "Return non-nil when FILE is a plan's log, which `agent-plan log' alone writes."
+  (equal (nth 2 (wgn/agent-plans--file-parts file)) "log"))
+
+(defun wgn/agent-plans--locked-p (buffer)
+  "Return non-nil when BUFFER visits a plan file that only `agent-plan' writes.
+That is a log or another host's plan always, and this host's plan or
+part while its buffer is read-only: \\[read-only-mode] there is the
+operator's deliberate edit."
+  (let* ((base (or (buffer-base-buffer buffer) buffer))
+         (file (buffer-file-name base)))
+    (and (wgn/agent-plans--file-parts file)
+         (or (wgn/agent-plans--mirror-host file)
+             (wgn/agent-plans--log-p file)
+             (buffer-local-value 'buffer-read-only base)))))
+
+(defun wgn/agent-plans--refusal (file &optional elsewhere)
+  "Return why an edit of, or a write onto, the plan file FILE is refused.
+It names what to use instead, and \\[read-only-mode] only where that
+lets the edit through.  ELSEWHERE is for a write from anything but
+FILE's own buffer, which \\[read-only-mode] there does not let through."
+  (let ((host (wgn/agent-plans--mirror-host file)))
+    (cond
+     ((wgn/agent-plans--log-p file)
+      (format "agent-plan log alone writes %s" (file-name-nondirectory file)))
+     (host (format "%s is %s's plan; answer it there" (file-name-nondirectory file) host))
+     (elsewhere
+      (format "agent-plan writes %s, and it is edited by hand only from its own buffer, after C-x C-q there"
+              (file-name-nondirectory file)))
+     (t
+      (format (concat "agent-plan writes %s: answer its questions with /questions in a"
+                      " Claude session, or C-x C-q to edit it by hand")
+              (file-name-nondirectory file))))))
+
+;; A save of every buffer, as `save-some-buffers' and
+;; `org-save-all-org-buffers' make, stops at the first buffer whose save
+;; signals, leaving every later one unsaved.  So while one runs, a save
+;; this file refuses is skipped, with a warning, its buffer left
+;; modified for `save-buffers-kill-emacs' to ask about; any other
+;; failure stops it as before.
+
+(defvar wgn/agent-plans--skipped 'none
+  "While `save-some-buffers' runs, the buffers whose refused saves it skipped.")
+
+(defvar wgn/agent-plans--refused nil
+  "While a save of every buffer saves one, the data of this file's refusal.")
+
+(defun wgn/agent-plans--refuse (format &rest args)
+  "Signal a `user-error' with FORMAT and ARGS, refusing a write onto a plan file.
+Only a refusal signalled here is skipped by a save of every buffer,
+which tells it apart by its data: `wgn/agent-plans--skip-refused'."
+  (let ((data (list (apply #'format-message format args))))
+    (unless (eq wgn/agent-plans--skipped 'none)
+      (setq wgn/agent-plans--refused data))
+    (signal 'user-error data)))
+
+(defun wgn/agent-plans--save-all (save-some-buffers &rest args)
+  "Call SAVE-SOME-BUFFERS with ARGS, skipping the saves this file refuses."
+  (let ((wgn/agent-plans--skipped nil))
+    (if (called-interactively-p 'any)
+        (apply #'funcall-interactively save-some-buffers args)
+      (apply save-some-buffers args))))
+
+(defun wgn/agent-plans--skip-refused (basic-save-buffer &rest args)
+  "Call BASIC-SAVE-BUFFER with ARGS; in a save of every buffer, skip a refusal.
+Only `wgn/agent-plans--refuse''s refusal of a save of a plan, part or
+log file is caught, and warned about once per buffer; any other error,
+and every refusal outside `save-some-buffers', is signalled as it is."
+  (if (eq wgn/agent-plans--skipped 'none)
+      (apply basic-save-buffer args)
+    (let ((buffer (current-buffer))
+          (wgn/agent-plans--refused nil))
+      (condition-case err
+          (apply basic-save-buffer args)
+        (user-error
+         (unless (and wgn/agent-plans--refused
+                      (eq (cdr err) wgn/agent-plans--refused)
+                      (wgn/agent-plans--file-parts (buffer-file-name buffer)))
+           (signal (car err) (cdr err)))
+         (unless (memq buffer wgn/agent-plans--skipped)
+           (push buffer wgn/agent-plans--skipped)
+           ;; `save-some-buffers' runs in `save-window-excursion', which
+           ;; takes a displayed warning's window away again.
+           (delay-warning 'wgn/agent-plans
+                          (format-message "%s is left unsaved: %s"
+                                          (buffer-name buffer) (cadr err))))
+         nil)))))
+
+(defun wgn/agent-plans--confirm-exit ()
+  "Ask before Emacs exits with an auto-saved plan buffer's changes unsaved.
+For `kill-emacs-query-functions'.  `save-buffers-kill-emacs' asks only
+about a buffer whose `buffer-modified-p' is t, not `autosaved', as a
+recovered buffer's is, and its save of every buffer skips the refused."
+  (let ((unsaved (seq-filter (lambda (buffer)
+                               (and (eq (buffer-modified-p buffer) 'autosaved)
+                                    (with-current-buffer buffer
+                                      (wgn/agent-plans--plan-buffer-p))))
+                             (buffer-list))))
+    (or (null unsaved)
+        (yes-or-no-p (format "%s left unsaved; exit anyway? "
+                             (mapconcat #'buffer-name unsaved ", "))))))
+
 (defun wgn/agent-plans-blocker (change)
   "Refuse the Org state CHANGE where a plan does not allow it.
-In another host's plan, every change, since only that host writes it;
-elsewhere in a plan, a change to done while an ID in the entry's :AFTER:
-is not settled.  Outside plan files, allow everything.  The agenda's dim
-check, whose :from is the symbol `todo', is answered for :AFTER: alone,
-so another host's entries stay listed."
+In a plan file `wgn/agent-plans--locked-p' holds, every change; in one
+opened for a deliberate edit, a change to done while an ID in the
+entry's :AFTER: is not settled.  Outside plan files, allow everything.
+The agenda's dim check, whose :from is the symbol `todo', is answered
+for :AFTER: alone, so locked entries stay listed."
   (let ((file (buffer-file-name (buffer-base-buffer)))
         (to (plist-get change :to)))
     (cond
      ((not (wgn/agent-plans--file-parts file)) t)
-     ((and (wgn/agent-plans--mirror-host file)
+     ((and (wgn/agent-plans--locked-p (current-buffer))
            (not (eq (plist-get change :from) 'todo)))
-      (setq org-block-entry-blocking
-            (format "%s's plan; answer it there" (wgn/agent-plans--mirror-host file)))
+      (setq org-block-entry-blocking (wgn/agent-plans--refusal file))
       nil)
      ((not (or (eq to 'done) (member to org-done-keywords))) t)
      (t
@@ -392,42 +512,635 @@ so another host's entries stay listed."
           (setq org-block-entry-blocking (string-join open " ")))
         (null open))))))
 
-(defun wgn/agent-plans--refuse-save ()
-  "Refuse to save another host's plan file."
-  (user-error "%s is %s's plan; answer it there"
-              (file-name-nondirectory buffer-file-name)
-              (wgn/agent-plans--mirror-host buffer-file-name)))
+(defvar-local wgn/agent-plans--protected nil
+  "The plan file this buffer was visited on, or nil.
+It survives a mode change; \\[write-file] keeps it while renaming the
+buffer, which is how a write to another plan file is told apart.")
+(put 'wgn/agent-plans--protected 'permanent-local t)
 
-(defun wgn/agent-plans--protect-mirror ()
-  "Make the buffer of another host's plan read-only, and refuse its saves."
-  (when (wgn/agent-plans--mirror-host buffer-file-name)
-    (read-only-mode 1)
-    (add-hook 'write-contents-functions #'wgn/agent-plans--refuse-save nil t)))
+;; A plan or part file is never written from Emacs over content its
+;; buffer has not read, since agent-plan writes it whenever no lock file
+;; stops it.  A save compares the file with what its buffer last read or
+;; wrote of it, by hash: the visited modification time cannot tell, as
+;; `set-visited-file-name' and dired's renames clear it.
+
+(defvar-local wgn/agent-plans--seen nil
+  "(FILE . HASH): what the buffer last read or wrote of the plan file FILE.
+HASH is the SHA-256 of the file's bytes then, or nil when no version
+of FILE is known to be the base of the buffer's text, as for text
+recovered from an auto-save file: `wgn/agent-plans--note-unknown-base'.
+It survives a mode change and a rename away and back.")
+(put 'wgn/agent-plans--seen 'permanent-local t)
+
+(defun wgn/agent-plans--buffer-hash ()
+  "Return the SHA-256 of the current buffer's text, as saving encodes it.
+After a visit, a revert or a save, that is the file's bytes."
+  (save-restriction
+    (widen)
+    (secure-hash 'sha256 (encode-coding-string
+                          (buffer-substring-no-properties (point-min) (point-max))
+                          (or save-buffer-coding-system buffer-file-coding-system)
+                          t))))
+
+(defun wgn/agent-plans--file-hash (file)
+  "Return the SHA-256 of FILE's bytes, or nil if there is no FILE."
+  (when (file-exists-p file)
+    (with-temp-buffer
+      (set-buffer-multibyte nil)
+      (insert-file-contents-literally file)
+      (secure-hash 'sha256 (current-buffer)))))
+
+(defun wgn/agent-plans--unknown-base-p ()
+  "Return non-nil when the current buffer's text has no known base in its file.
+See `wgn/agent-plans--note-unknown-base'."
+  (equal wgn/agent-plans--seen (list buffer-file-name)))
+
+(defun wgn/agent-plans--note-unknown-base (&rest _)
+  "Note that no version of its file is known to be a plan buffer's base.
+Before `after-find-file', which `recover-file' and a revert from the
+auto-save file call on a buffer holding the auto-save file's text, and
+so modified; a visit or a revert from the file itself leaves it
+unmodified.  Its save is then refused until it reads the file again,
+since `agent-plan' may have written the file after the text's base."
+  (when (and (buffer-modified-p) (wgn/agent-plans--plan-buffer-p))
+    (setq wgn/agent-plans--seen (list buffer-file-name))))
+
+(defun wgn/agent-plans--note-seen (&optional from-file)
+  "Note that the current buffer holds what its plan file holds.
+With FROM-FILE, note the file's bytes rather than the buffer's: for a
+buffer whose changes are not the file's, which it last read when its
+visited modification time says.  Text with no known base keeps that
+until the buffer is unmodified, as the hooks after `after-find-file'
+would otherwise note the file it never read."
+  (unless (and (buffer-modified-p) (wgn/agent-plans--unknown-base-p))
+    (setq wgn/agent-plans--seen
+          (cons buffer-file-name
+                (if from-file
+                    (wgn/agent-plans--file-hash buffer-file-name)
+                  (wgn/agent-plans--buffer-hash))))))
+
+(defun wgn/agent-plans--seen-current-p (file)
+  "Return non-nil when FILE holds what the current buffer last read or wrote of it."
+  (and (equal (car wgn/agent-plans--seen) file)
+       (cdr wgn/agent-plans--seen)
+       (equal (cdr wgn/agent-plans--seen) (wgn/agent-plans--file-hash file))))
+
+(defun wgn/agent-plans--refuse-unseen (file)
+  "Refuse a write onto the plan file FILE unless it holds what this buffer read.
+The buffer is left as it is, its changes unsaved."
+  (unless (wgn/agent-plans--seen-current-p file)
+    (wgn/agent-plans--refuse
+     (if (cdr wgn/agent-plans--seen)
+         (concat "%s holds what this buffer has not read, likely agent-plan's write:"
+                 " M-x diff-buffer-with-file shows it, and M-x revert-buffer reads it,"
+                 " dropping this buffer's changes")
+       (concat "Which version of %s this buffer's text is based on is unknown, as for"
+               " text recovered from an auto-save file, and agent-plan may have written"
+               " it since: M-x diff-buffer-with-file or M-x ediff-current-file compares"
+               " them, and M-x revert-buffer reads the file, dropping this buffer's changes"))
+     (file-name-nondirectory file))))
+
+(defun wgn/agent-plans--note-read ()
+  "Note what a plan buffer read, for `after-revert-hook', auto-revert's too."
+  (when (wgn/agent-plans--plan-buffer-p)
+    (wgn/agent-plans--note-seen)))
+
+(defun wgn/agent-plans--after-save ()
+  "Note what a plan buffer wrote and arm it again, for `after-save-hook'.
+\\[write-file] makes the buffer writable bypassing `read-only-mode-hook'."
+  (when (wgn/agent-plans--plan-buffer-p)
+    (wgn/agent-plans--note-seen)
+    (wgn/agent-plans--arm)))
+
+(defun wgn/agent-plans--guard-write ()
+  "Refuse to write a buffer to a plan, part or log file it may not write.
+For `write-file-functions'.  A log's own buffer discards its changes
+instead, and writes nothing, since only `agent-plan' writes a log and a
+signal would stop `save-some-buffers' for every other file.  A plan's
+or part's file is written only from the buffer visiting it, opened for
+a deliberate edit, only for this host, and only over what that buffer
+last read of it; so \\[write-file] from elsewhere onto one is refused
+too."
+  (let ((parts (wgn/agent-plans--file-parts buffer-file-name))
+        (elsewhere (not (equal wgn/agent-plans--protected buffer-file-name))))
+    (cond
+     ((not parts) nil)
+     ((and (wgn/agent-plans--log-p buffer-file-name) (not elsewhere))
+      (wgn/agent-plans--settle-changes)
+      t)
+     ((or (wgn/agent-plans--log-p buffer-file-name)
+          (wgn/agent-plans--mirror-host buffer-file-name)
+          elsewhere
+          buffer-read-only)
+      (wgn/agent-plans--refuse "%s" (wgn/agent-plans--refusal buffer-file-name elsewhere)))
+     (t
+      (wgn/agent-plans--refuse-unseen buffer-file-name)
+      nil))))
+
+(defun wgn/agent-plans--refuse-write-onto (file)
+  "Refuse a write onto FILE, an absolute name, if a plan's, part's or log's.
+Only the save of this host's plan or part, from the buffer visiting it,
+is let through, `wgn/agent-plans--guard-write' having decided it; and
+only over what that buffer last read of the file, if it is there.  It is
+not there once a backup has renamed it away."
+  (when (wgn/agent-plans--file-parts file)
+    (if (or (wgn/agent-plans--log-p file)
+            (wgn/agent-plans--mirror-host file)
+            (not (and (equal file buffer-file-name)
+                      (equal wgn/agent-plans--protected buffer-file-name))))
+        (wgn/agent-plans--refuse "%s" (wgn/agent-plans--refusal file t))
+      (when (file-exists-p file)
+        (wgn/agent-plans--refuse-unseen file)))))
+
+(defun wgn/agent-plans--guard-region-write (_start _end filename &rest _)
+  "Refuse a `write-region' onto a plan, part or log file FILENAME.
+As `append-to-file' does; see `wgn/agent-plans--refuse-write-onto'."
+  (when (stringp filename)
+    (wgn/agent-plans--refuse-write-onto (expand-file-name filename))))
+
+(defun wgn/agent-plans--guard-file-copy (file newname &rest _)
+  "Refuse to copy or move FILE onto NEWNAME, a plan, part or log file.
+Before `copy-file' and `rename-file', as dired's C and R call them.  A
+save with `file-precious-flag' moves a file onto the one it saves; see
+`wgn/agent-plans--refuse-write-onto'."
+  (wgn/agent-plans--refuse-write-onto
+   (if (directory-name-p newname)
+       (expand-file-name (file-name-nondirectory (directory-file-name file)) newname)
+     (expand-file-name newname))))
+
+(defun wgn/agent-plans--refuse-visit (filename &rest _)
+  "Refuse to have the current buffer visit FILENAME, a plan, part or log file.
+Before `set-visited-file-name', as \\[write-file], `rename-visited-file'
+and \\[save-buffer] in a buffer visiting no file call it.  Only visiting
+a file guards its buffer, so a buffer may take back the plan file it was
+visited on, `wgn/agent-plans--protected', and no other.  Refused before
+it runs, the buffer keeps its name, mode, auto-save file and lock."
+  (when (and (stringp filename) (not (string-empty-p filename)))
+    (let ((file (expand-file-name filename)))
+      (when (and (wgn/agent-plans--file-parts file)
+                 (not (equal file wgn/agent-plans--protected)))
+        (user-error "%s" (wgn/agent-plans--refusal file t))))))
+
+(defun wgn/agent-plans--undo-refused-rename (write-file filename &rest args)
+  "Call WRITE-FILE with FILENAME and ARGS; if refused, unrename the buffer.
+\\[write-file] renames the buffer onto FILENAME before saving it, so a
+refused save onto a plan file would leave the buffer visiting the plan.
+It also unlocks the buffer, marks it modified, sets its major mode and
+auto-save file by the plan's name, and renaming it back forgets when its
+file was last read, which is how a save notices that `agent-plan' wrote
+it since; all are put back.  Renaming a buffer onto the file it already
+visits changes no name to put back, so a locked buffer's write onto a
+plan, part or log file, its own file too, is refused before WRITE-FILE
+runs."
+  (let* ((own (buffer-file-name (or (buffer-base-buffer) (current-buffer))))
+         (target (cond ((or (null filename) (equal filename "")) own)
+                       ((directory-name-p filename)
+                        (expand-file-name (file-name-nondirectory (or own (buffer-name)))
+                                          filename))
+                       (t (expand-file-name filename)))))
+    (when (and (wgn/agent-plans--file-parts target)
+               (wgn/agent-plans--locked-p (current-buffer)))
+      (user-error "%s" (wgn/agent-plans--refusal target (not (equal target own))))))
+  (let ((file buffer-file-name)
+        (name (buffer-name))
+        (mode major-mode)
+        (auto-save buffer-auto-save-file-name)
+        (read-only buffer-read-only)
+        (modified (buffer-modified-p))
+        (modtime (visited-file-modtime)))
+    (condition-case err
+        (apply write-file filename args)
+      (error
+       (when (and (not (equal buffer-file-name file))
+                  (wgn/agent-plans--file-parts buffer-file-name))
+         (set-visited-file-name file t)
+         (rename-buffer name t)
+         (set-buffer-modified-p modified)
+         (unless (eq major-mode mode)
+           (funcall mode))
+         (if file
+             (unless (numberp modtime)
+               (set-visited-file-modtime modtime))
+           (setq buffer-auto-save-file-name auto-save))
+         (setq buffer-read-only read-only))
+       (signal (car err) (cdr err))))))
+
+(defun wgn/agent-plans--rearm (buffer hooks)
+  "Give BUFFER back its change functions HOOKS, guard and Org's alike.
+Emacs sets the buffer's whole `before-change-functions' to nil when one
+of them signals, as the guard does to refuse a change."
+  (when (buffer-live-p buffer)
+    (with-current-buffer buffer
+      (unless (memq #'wgn/agent-plans--guard-change before-change-functions)
+        (setq-local before-change-functions hooks)))))
+
+(defun wgn/agent-plans--guard-change (&rest _)
+  "Refuse a change to a locked plan buffer, for `before-change-functions'.
+Code that binds `inhibit-read-only', as Org's property and ID commands
+do, gets past the buffer's read-only state but not this; a revert is
+let through.  The buffer's change functions are put back once the
+refused command is over.  The match data is kept, as `replace-match'
+still needs it."
+  (when (and (not revert-buffer-in-progress-p)
+             (save-match-data (wgn/agent-plans--locked-p (current-buffer))))
+    (run-at-time 0 nil #'wgn/agent-plans--rearm (current-buffer)
+                 (copy-sequence before-change-functions))
+    (wgn/agent-plans--refuse "%s" (wgn/agent-plans--refusal
+                                   (buffer-file-name (or (buffer-base-buffer) (current-buffer)))))))
+
+(defconst wgn/agent-plans--agenda-edits
+  '(org-agenda-todo org-agenda-todo-nextset org-agenda-todo-previousset
+    org-agenda-priority org-agenda-priority-up org-agenda-priority-down
+    org-agenda-set-tags org-agenda-schedule org-agenda-deadline
+    org-agenda-date-later org-agenda-date-earlier org-agenda-date-prompt
+    org-agenda-set-property org-agenda-set-effort org-agenda-toggle-archive-tag
+    org-agenda-archive org-agenda-archive-default org-agenda-archive-to-archive-sibling
+    org-agenda-refile org-agenda-kill org-agenda-add-note org-agenda-clock-in)
+  "Agenda commands that write the entry at point.
+They bind `inhibit-read-only', which a read-only buffer does not stop.")
+
+(defun wgn/agent-plans--agenda-guard (command &rest args)
+  "Run the agenda COMMAND with ARGS unless its entry is a locked plan's."
+  (let* ((marker (or (get-text-property (line-beginning-position) 'org-hd-marker)
+                     (get-text-property (line-beginning-position) 'org-marker)))
+         (buffer (and (markerp marker) (marker-buffer marker))))
+    (when (and buffer (wgn/agent-plans--locked-p buffer))
+      (user-error "%s" (wgn/agent-plans--refusal
+                        (buffer-file-name (or (buffer-base-buffer buffer) buffer)))))
+    (apply command args)))
+
+(defun wgn/agent-plans--refuse-move (&rest _)
+  "Refuse to archive an entry out of a locked plan, before `org-archive-subtree'.
+It writes the entry into its new place before cutting it from the plan,
+so the cut's refusal would leave a copy behind."
+  (when (wgn/agent-plans--locked-p (current-buffer))
+    (user-error "%s" (wgn/agent-plans--refusal
+                      (buffer-file-name (or (buffer-base-buffer) (current-buffer)))))))
+
+(defun wgn/agent-plans--refuse-refile-out (&optional arg &rest _)
+  "Refuse to refile out of a locked plan, before `org-refile' with ARG.
+As `wgn/agent-plans--refuse-move'; a refile that copies (ARG 3) or only
+jumps (a prefix list, or 0) leaves the plan as it is."
+  (unless (or (equal arg 3) (equal arg 0) (consp arg))
+    (wgn/agent-plans--refuse-move)))
+
+(defun wgn/agent-plans--header (file)
+  "Return the header line of the buffer visiting FILE, a plan's, part's or log's."
+  (let ((host (wgn/agent-plans--mirror-host file)))
+    (cond
+     (host (format " %s's plan, written there · C-c C-o follows a link" host))
+     ((equal (nth 2 (wgn/agent-plans--file-parts file)) "log")
+      " Written by agent-plan log alone")
+     (t (concat " Written by agent-plan · answer questions with /questions in a Claude session"
+                " · C-c C-o follows a link")))))
+
+(defun wgn/agent-plans--plan-buffer-p ()
+  "Return non-nil when the current buffer was visited on the plan file it visits.
+A buffer showing a file's old revision, as magit's blob buffers do,
+binds `buffer-file-name' while it sets its mode but visits nothing, and
+one \\[write-file] renamed onto a plan file was not visited on it."
+  (and buffer-file-name
+       (equal wgn/agent-plans--protected buffer-file-name)
+       (wgn/agent-plans--file-parts buffer-file-name)))
+
+(defvar wgn/agent-plans--locking nil
+  "Non-nil while this file locks a buffer, which has nothing to settle.")
+
+(defun wgn/agent-plans--settle-changes ()
+  "Have a modified plan buffer saved or its changes discarded, before it locks.
+A locked buffer that is modified could not be saved, and every
+`save-some-buffers' would skip it with a warning.  The buffer is writable while
+it is saved or reverted.  Return nil, saying why, when the operator
+chooses neither or the choice fails, as a save the operator does not
+confirm does; the buffer is then to stay unlocked.  A log's changes,
+which no command lets through, are discarded without asking."
+  (or (not (buffer-modified-p))
+      (let* ((log (wgn/agent-plans--log-p buffer-file-name))
+             (failure
+              (condition-case err
+                  (let ((buffer-read-only nil))
+                    (pcase (if log
+                               ?d
+                             (car (read-multiple-choice
+                                   (format "%s has unsaved changes; before it locks" (buffer-name))
+                                   '((?s "save" "Save the changes, then lock")
+                                     (?d "discard" "Revert to the file, then lock")))))
+                      (?s (save-buffer))
+                      (?d (revert-buffer t t t)))
+                    (and (buffer-modified-p) "the changes are still unsaved"))
+                (quit "neither was chosen")
+                (error (error-message-string err)))))
+        (cond
+         (failure (message (if log "%s keeps its changes: %s" "%s stays unlocked: %s")
+                           (buffer-name) failure))
+         (log (message "Discarded the changes to %s: %s" (buffer-name)
+                       (wgn/agent-plans--refusal buffer-file-name))))
+        (not failure))))
+
+(defun wgn/agent-plans--sync-lockfiles ()
+  "Make lock files of the current plan buffer while it takes changes alone.
+`agent-plan' refuses to write a plan whose lock file says a buffer holds
+unsaved changes of it.  A change refused while the buffer is locked
+would leave a lock file behind, since Emacs makes one before the guard
+refuses.  Emacs makes a lock file only as a buffer first changes, so a
+buffer unlocked with changes already, as a rename leaves it, is locked
+here."
+  (if (wgn/agent-plans--locked-p (current-buffer))
+      (setq-local create-lockfiles nil)
+    (kill-local-variable 'create-lockfiles)
+    (when (and buffer-file-truename (buffer-modified-p))
+      (lock-buffer))))
+
+(defun wgn/agent-plans--arm ()
+  "Give the current plan buffer its header line and change guard.
+They refuse nothing while it is unlocked, but must be there once it
+locks, whichever way it does.  Its indirect buffers are locked or
+unlocked with it."
+  (setq header-line-format (wgn/agent-plans--header buffer-file-name))
+  (wgn/agent-plans--sync-lockfiles)
+  (add-hook 'before-change-functions #'wgn/agent-plans--guard-change nil t)
+  (let ((base (current-buffer))
+        (read-only buffer-read-only))
+    (dolist (buffer (buffer-list))
+      (when (eq (buffer-base-buffer buffer) base)
+        (with-current-buffer buffer
+          (setq buffer-read-only read-only)
+          (setq header-line-format (with-current-buffer base header-line-format))
+          (wgn/agent-plans--sync-lockfiles)
+          (add-hook 'before-change-functions #'wgn/agent-plans--guard-change nil t))))))
+
+(defun wgn/agent-plans--protect-file ()
+  "Make a plan, part or log file's buffer read-only, naming the commands.
+`agent-plan' writes them, so a change is refused while
+`wgn/agent-plans--locked-p' holds.  Run from `org-mode-hook' too, since
+a mode change drops the buffer's local hooks and header line, and after
+every revert, which would restore an earlier unlocked state.  Unsaved
+changes are saved or discarded first, else the buffer is unlocked."
+  (when (wgn/agent-plans--plan-buffer-p)
+    (if (not (wgn/agent-plans--settle-changes))
+        (when buffer-read-only
+          (read-only-mode -1))
+      (let ((wgn/agent-plans--locking t))
+        (read-only-mode 1)))
+    (wgn/agent-plans--arm)))
+
+(defun wgn/agent-plans--on-read-only ()
+  "Settle a plan buffer's changes when \\[read-only-mode] locks it.
+For `read-only-mode-hook'.  Without a choice the buffer stays unlocked.
+Either way, it is armed again: `wgn/agent-plans--arm'.  In an indirect
+buffer of a plan buffer, which `wgn/agent-plans--locked-p' answers for
+by its base, \\[read-only-mode] locks or unlocks the base."
+  (let ((base (buffer-base-buffer)))
+    (cond
+     ((and base (with-current-buffer base (wgn/agent-plans--plan-buffer-p)))
+      (let ((read-only buffer-read-only))
+        (with-current-buffer base
+          (if (eq (not buffer-read-only) (not read-only))
+              (wgn/agent-plans--arm)
+            (read-only-mode (if read-only 1 -1))))))
+     ((wgn/agent-plans--plan-buffer-p)
+      (cond
+       ((and (not buffer-read-only) (wgn/agent-plans--log-p buffer-file-name))
+        (wgn/agent-plans--protect-file)
+        (message "%s" (wgn/agent-plans--refusal buffer-file-name)))
+       ((and buffer-read-only
+             (not wgn/agent-plans--locking)
+             (not (wgn/agent-plans--settle-changes)))
+        (read-only-mode -1)))
+      (wgn/agent-plans--arm)))))
+
+(defun wgn/agent-plans--protect-visited ()
+  "Protect a plan, part or log file's buffer just visited, for `find-file-hook'.
+A buffer changed as it is visited, as `require-final-newline' can leave
+it, last read the file itself; one holding an auto-save file's text
+read none of it: `wgn/agent-plans--note-unknown-base'."
+  (when (wgn/agent-plans--file-parts buffer-file-name)
+    (setq wgn/agent-plans--protected buffer-file-name)
+    (wgn/agent-plans--note-seen (buffer-modified-p))
+    (wgn/agent-plans--protect-file)))
+
+(defun wgn/agent-plans--protect-all ()
+  "Protect every plan, part or log file's buffer, as visiting it does.
+For the buffers visited before `wgn/agent-plans-protect-mode' was on.
+One with unsaved changes is left unlocked, rather than asked about, and
+is taken to have read its file only if the file is unchanged since."
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when (and buffer-file-name
+                 (not (buffer-base-buffer))
+                 (wgn/agent-plans--file-parts buffer-file-name))
+        (setq wgn/agent-plans--protected buffer-file-name)
+        (cond
+         ((not (buffer-modified-p))
+          (wgn/agent-plans--note-seen)
+          (wgn/agent-plans--protect-file))
+         (t
+          (unless (wgn/agent-plans--unknown-base-p)
+            (setq wgn/agent-plans--seen nil))
+          (when (and (not (eql (visited-file-modtime) 0)) (verify-visited-file-modtime))
+            (wgn/agent-plans--note-seen t))
+          (when buffer-read-only
+            (read-only-mode -1))
+          (wgn/agent-plans--arm)))))))
+
+(defun wgn/agent-plans--revisit ()
+  "Protect a buffer `set-visited-file-name' left on its plan file again.
+For `after-set-visited-file-name-hook'.  That function, which
+\\[write-file] and dired's renames of a directory call, marks the buffer
+modified and forgets when the file was last read, so auto-revert no
+longer sees the file change; under version control it also makes the
+buffer writable, bypassing `read-only-mode-hook'.  A buffer holding just
+what it last read, of a file that holds it still, is marked unmodified
+and read then, and locked again.  Any other log is reverted and locked.
+Any other plan or part is left unlocked holding its lock file, its save
+refused; and if the file changed, it is marked as read before the
+change, for auto-revert to read it again."
+  (when (wgn/agent-plans--plan-buffer-p)
+    (let ((read (and (equal (car wgn/agent-plans--seen) buffer-file-name)
+                     (equal (cdr wgn/agent-plans--seen) (wgn/agent-plans--buffer-hash))))
+          (current (wgn/agent-plans--seen-current-p buffer-file-name)))
+      (cond
+       ((and read current)
+        (set-visited-file-modtime)
+        (set-buffer-modified-p nil)
+        (wgn/agent-plans--protect-file))
+       ((wgn/agent-plans--log-p buffer-file-name)
+        (wgn/agent-plans--protect-file))
+       (t
+        (when buffer-read-only
+          (read-only-mode -1))
+        (wgn/agent-plans--arm)
+        (when (and (not current) (file-exists-p buffer-file-name))
+          (set-visited-file-modtime '(0 1))))))))
+
+(defun wgn/agent-plans--protect-indirect (buffer)
+  "Lock BUFFER, an indirect buffer, as its base is, if a plan's; return BUFFER.
+After `make-indirect-buffer', whose buffer without CLONE has none of its
+base's local hooks, though its edits are the base's."
+  (let ((base (buffer-base-buffer buffer)))
+    (when (and base (with-current-buffer base (wgn/agent-plans--plan-buffer-p)))
+      (with-current-buffer buffer
+        (setq buffer-read-only (buffer-local-value 'buffer-read-only base))
+        (setq header-line-format (with-current-buffer base header-line-format))
+        (wgn/agent-plans--sync-lockfiles)
+        (add-hook 'before-change-functions #'wgn/agent-plans--guard-change nil t))))
+  buffer)
+
+(defconst wgn/agent-plans--has-restore-functions
+  (boundp 'revert-buffer-restore-functions)
+  "Non-nil where Emacs has `revert-buffer-restore-functions', from Emacs 30.
+Where it has not, `add-hook' would define it without anything running it.")
+
+(defun wgn/agent-plans--around-revert (revert &rest args)
+  "Call REVERT, `revert-buffer', with ARGS, then lock a plan buffer again.
+Before Emacs 30, `revert-buffer' restores the read-only state from before
+the revert after `after-revert-hook' has run, so only this is late enough."
+  (prog1 (apply revert args)
+    (wgn/agent-plans--protect-file)))
+
+(defun wgn/agent-plans--restore-lock ()
+  "Return what locks a plan buffer again after a revert.
+For `revert-buffer-restore-functions', whose first entry runs last, so
+after the read-only state from before the revert is restored."
+  (when (wgn/agent-plans--plan-buffer-p)
+    (let ((buffer (current-buffer)))
+      (lambda ()
+        (with-current-buffer buffer
+          (wgn/agent-plans--protect-file))))))
+
+(defvar wgn/agent-plans--auto-reverted 'none
+  "While `auto-revert-handler' runs, the plan buffers it reverted.")
+
+(defun wgn/agent-plans--around-auto-revert (handler &rest args)
+  "Run HANDLER, `auto-revert-handler', with ARGS, then lock what it reverted.
+It binds `buffer-read-only' around the revert, so the lock the revert
+put back ends with it."
+  (let ((wgn/agent-plans--auto-reverted nil))
+    (prog1 (apply handler args)
+      (dolist (buffer wgn/agent-plans--auto-reverted)
+        (when (buffer-live-p buffer)
+          (with-current-buffer buffer
+            (wgn/agent-plans--protect-file)))))))
+
+(defvar-local wgn/agent-plans--folds nil
+  "The plan buffer's folds before a revert, with markers.")
+(put 'wgn/agent-plans--folds 'permanent-local t)
+
+(defvar auto-revert--global-mode)
+(declare-function org-fold-core-get-regions "org-fold-core")
+(declare-function org-fold-core-regions "org-fold-core" (regions &rest args))
+
+(defun wgn/agent-plans--before-revert ()
+  "Keep a plan buffer's folds, for `before-revert-hook'."
+  (when (and (derived-mode-p 'org-mode) (wgn/agent-plans--plan-buffer-p))
+    (setq wgn/agent-plans--folds (org-fold-core-get-regions :with-markers t))))
 
 (defun wgn/agent-plans--after-revert ()
-  "Read a reverted plan file's keyword lines again.
+  "Read a reverted plan file's keyword lines again, keeping its folds.
 A revert that keeps the buffer's modes, as auto-revert's does, keeps the
 keywords Org read before; `org-mode-restart' wipes buffer-local hooks,
-so this one is global."
-  (when (and (derived-mode-p 'org-mode) (wgn/agent-plans--file-parts buffer-file-name))
-    (org-mode-restart)
-    (wgn/agent-plans--protect-mirror)))
+so this one is global, and unfolds the buffer, so the folds kept before
+the revert are put back.  It also clears `global-auto-revert-mode''s mark
+on the buffer, which only visiting the file would set again, so the mark
+is kept."
+  (when (and (derived-mode-p 'org-mode) (wgn/agent-plans--plan-buffer-p))
+    (unless (eq wgn/agent-plans--auto-reverted 'none)
+      (push (current-buffer) wgn/agent-plans--auto-reverted))
+    (let ((global-auto-revert (bound-and-true-p auto-revert--global-mode)))
+      (org-mode-restart)
+      (when global-auto-revert
+        (setq-local auto-revert--global-mode t)))
+    (when wgn/agent-plans--folds
+      (org-fold-core-regions wgn/agent-plans--folds :override t :clean-markers t)
+      (setq wgn/agent-plans--folds nil))))
+
+(defun wgn/agent-plans--unprotect-all ()
+  "Take the header line and change guard from every plan buffer.
+Their read-only state is left as it is, for \\[read-only-mode] to change."
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when (memq #'wgn/agent-plans--guard-change before-change-functions)
+        (remove-hook 'before-change-functions #'wgn/agent-plans--guard-change t)
+        (kill-local-variable 'create-lockfiles)
+        (setq header-line-format nil)))))
 
 ;;;###autoload
 (define-minor-mode wgn/agent-plans-protect-mode
   "Hold plan files to what `agent-plan' expects of them.
-Another host's plans are read-only and refuse every state change and
-save; an entry is not done while an item in its :AFTER: is open; and a
-reverted plan buffer reads its keyword lines again."
+A plan's, part's or log's buffer is read-only, since `agent-plan' writes
+them, with a header line naming the commands that do, and refuses saves,
+state changes and the agenda's edits until \\[read-only-mode] there; logs
+and another host's plans refuse them always; a save writes over only
+what the buffer last read of its file, which text recovered from an
+auto-save file did not read; saving every buffer skips, with a
+warning, one whose save is refused; an entry is not done while an item in
+its :AFTER: is open; a reverted plan buffer, auto-reverted too, reads
+its keyword lines again, keeps its folds and is locked again; a plan
+buffer's unsaved changes are saved or discarded before it locks; and
+its indirect buffers are locked with it.  Turning the mode on protects
+the plan buffers already visited; turning it off takes the header line
+and guard from plan buffers and leaves them read-only."
   :global t
   (if wgn/agent-plans-protect-mode
       (progn
         (add-hook 'org-blocker-hook #'wgn/agent-plans-blocker)
-        (add-hook 'find-file-hook #'wgn/agent-plans--protect-mirror)
-        (add-hook 'after-revert-hook #'wgn/agent-plans--after-revert))
+        (add-hook 'find-file-hook #'wgn/agent-plans--protect-visited)
+        (add-hook 'org-mode-hook #'wgn/agent-plans--protect-file)
+        (add-hook 'before-revert-hook #'wgn/agent-plans--before-revert)
+        (add-hook 'after-revert-hook #'wgn/agent-plans--after-revert)
+        (add-hook 'after-revert-hook #'wgn/agent-plans--note-read)
+        (add-hook 'after-save-hook #'wgn/agent-plans--after-save)
+        (add-hook 'after-set-visited-file-name-hook #'wgn/agent-plans--revisit)
+        (if wgn/agent-plans--has-restore-functions
+            (add-hook 'revert-buffer-restore-functions #'wgn/agent-plans--restore-lock)
+          (advice-add 'revert-buffer :around #'wgn/agent-plans--around-revert))
+        (add-hook 'read-only-mode-hook #'wgn/agent-plans--on-read-only)
+        (add-hook 'write-file-functions #'wgn/agent-plans--guard-write)
+        (advice-add 'auto-revert-handler :around #'wgn/agent-plans--around-auto-revert)
+        (advice-add 'after-find-file :before #'wgn/agent-plans--note-unknown-base)
+        (advice-add 'make-indirect-buffer :filter-return #'wgn/agent-plans--protect-indirect)
+        (advice-add 'write-region :before #'wgn/agent-plans--guard-region-write)
+        (advice-add 'copy-file :before #'wgn/agent-plans--guard-file-copy)
+        (advice-add 'rename-file :before #'wgn/agent-plans--guard-file-copy)
+        (advice-add 'write-file :around #'wgn/agent-plans--undo-refused-rename)
+        (advice-add 'save-some-buffers :around #'wgn/agent-plans--save-all)
+        (advice-add 'basic-save-buffer :around #'wgn/agent-plans--skip-refused)
+        (add-hook 'kill-emacs-query-functions #'wgn/agent-plans--confirm-exit)
+        (advice-add 'set-visited-file-name :before #'wgn/agent-plans--refuse-visit)
+        (advice-add 'org-archive-subtree :before #'wgn/agent-plans--refuse-move)
+        (advice-add 'org-refile :before #'wgn/agent-plans--refuse-refile-out)
+        (dolist (command wgn/agent-plans--agenda-edits)
+          (advice-add command :around #'wgn/agent-plans--agenda-guard))
+        (wgn/agent-plans--protect-all))
+    (dolist (command wgn/agent-plans--agenda-edits)
+      (advice-remove command #'wgn/agent-plans--agenda-guard))
+    (advice-remove 'auto-revert-handler #'wgn/agent-plans--around-auto-revert)
+    (advice-remove 'after-find-file #'wgn/agent-plans--note-unknown-base)
+    (advice-remove 'make-indirect-buffer #'wgn/agent-plans--protect-indirect)
+    (advice-remove 'write-region #'wgn/agent-plans--guard-region-write)
+    (advice-remove 'copy-file #'wgn/agent-plans--guard-file-copy)
+    (advice-remove 'rename-file #'wgn/agent-plans--guard-file-copy)
+    (advice-remove 'write-file #'wgn/agent-plans--undo-refused-rename)
+    (advice-remove 'save-some-buffers #'wgn/agent-plans--save-all)
+    (advice-remove 'basic-save-buffer #'wgn/agent-plans--skip-refused)
+    (remove-hook 'kill-emacs-query-functions #'wgn/agent-plans--confirm-exit)
+    (advice-remove 'set-visited-file-name #'wgn/agent-plans--refuse-visit)
+    (advice-remove 'org-archive-subtree #'wgn/agent-plans--refuse-move)
+    (advice-remove 'org-refile #'wgn/agent-plans--refuse-refile-out)
+    (when wgn/agent-plans--has-restore-functions
+      (remove-hook 'revert-buffer-restore-functions #'wgn/agent-plans--restore-lock))
+    (advice-remove 'revert-buffer #'wgn/agent-plans--around-revert)
+    (remove-hook 'read-only-mode-hook #'wgn/agent-plans--on-read-only)
+    (remove-hook 'write-file-functions #'wgn/agent-plans--guard-write)
     (remove-hook 'org-blocker-hook #'wgn/agent-plans-blocker)
-    (remove-hook 'find-file-hook #'wgn/agent-plans--protect-mirror)
-    (remove-hook 'after-revert-hook #'wgn/agent-plans--after-revert)))
+    (remove-hook 'find-file-hook #'wgn/agent-plans--protect-visited)
+    (remove-hook 'org-mode-hook #'wgn/agent-plans--protect-file)
+    (remove-hook 'before-revert-hook #'wgn/agent-plans--before-revert)
+    (remove-hook 'after-revert-hook #'wgn/agent-plans--after-revert)
+    (remove-hook 'after-revert-hook #'wgn/agent-plans--note-read)
+    (remove-hook 'after-save-hook #'wgn/agent-plans--after-save)
+    (remove-hook 'after-set-visited-file-name-hook #'wgn/agent-plans--revisit)
+    (wgn/agent-plans--unprotect-all)))
 
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here
