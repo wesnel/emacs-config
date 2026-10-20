@@ -54,6 +54,7 @@
             eca-guest
             eca-gondolin
             gondolin
+            offline-run
             parinfer-rust-emacs
             wgn-emacs
             wgn-emacs-pgtk
@@ -73,11 +74,12 @@
         };
 
       checks =
-        {
-          eca-gondolin-image-tools = pkgs.eca-gondolin.tests.image-tools;
+        pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+          offline-run-image-tools = pkgs.offline-run.tests.image-tools;
         }
         // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           eca-bwrap-sandbox = pkgs.eca-bwrap.tests.sandbox;
+          offline-run-sandbox = pkgs.offline-run.tests.sandbox;
         };
 
       devShells = {

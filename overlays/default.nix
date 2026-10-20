@@ -737,6 +737,7 @@ in {
   gondolin = final.callPackage ./gondolin {};
   eca-gondolin = final.callPackage ./eca-gondolin {};
   eca-bwrap = final.callPackage ./eca-bwrap {};
+  offline-run = final.callPackage ./offline-run {};
 
   inherit
     emacs30-macport

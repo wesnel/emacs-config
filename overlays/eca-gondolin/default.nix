@@ -11,7 +11,6 @@
   makeWrapper,
   nodejs_24,
   qemu,
-  runCommand,
   stdenvNoCC,
   which,
   writeText,
@@ -62,13 +61,6 @@ in
       done
 
       runHook postInstall
-    '';
-
-    passthru.tests.image-tools = runCommand "eca-gondolin-image-tools" {} ''
-      env -i HOME="$TMPDIR" TMPDIR="$TMPDIR" PATH=/nonexistent \
-        NODE_OPTIONS="--import ${../../tests/gondolin-image-tools.mjs}" \
-        ${finalAttrs.finalPackage}/bin/eca-gondolin-prepare
-      touch $out
     '';
 
     meta = {

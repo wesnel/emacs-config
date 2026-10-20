@@ -52,11 +52,12 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Test image provisioning and the Gondolin wrapper
-        run: node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs
+      - name: Test image provisioning and the Gondolin wrappers
+        run: node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs tests/offline-run.test.mjs
 
+  # offline-run uses Gondolin only on Darwin.
   image-tools:
-    runs-on: ubuntu-24.04
+    runs-on: macos-15
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
@@ -64,7 +65,7 @@ jobs:
           persist-credentials: false
       - uses: cachix/install-nix-action@v31.11.1
       - name: Test packaged image tools
-        run: nix build --print-build-logs .#checks.x86_64-linux.eca-gondolin-image-tools
+        run: nix build --print-build-logs .#checks.aarch64-darwin.offline-run-image-tools
 
   bwrap-sandbox:
     runs-on: ubuntu-24.04
@@ -80,3 +81,5 @@ jobs:
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
       - name: Test the Bubblewrap sandbox
         run: nix build --print-build-logs .#checks.x86_64-linux.eca-bwrap-sandbox
+      - name: Test the Bubblewrap offline-run
+        run: nix build --print-build-logs .#checks.x86_64-linux.offline-run-sandbox

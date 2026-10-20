@@ -214,6 +214,44 @@ This flake is also compatible with MacOS systems using [nix-darwin](https://gith
 }
 ```
 
+## Running a command offline
+
+`offline-run` runs one command that must reach nothing, with no
+network, the workspace read-only and nothing else of the machine but what it
+is handed:
+
+``` sh
+offline-run --workspace . --guest-path /src \
+  --ro-mount /nix/store/...-go:/opt/go --memory 4G --cpus 4 -- go test ./...
+```
+
+On Darwin it boots a Gondolin micro-VM, which has no network device at all.
+On Linux it runs under Bubblewrap, which leaves it only loopback and binds no
+`/`: the command sees the closure of the tools `offlineTools` lists in
+`overlays/offline-run/bwrap.nix`, which are its `PATH`; a stub `/etc` with
+`passwd`, `group`, `nsswitch.conf` and `hosts`; and empty `/tmp`, `/run`,
+`/var/run` and `$HOME`. Anything else a command needs, such as a toolchain,
+has to be handed in with `--ro-mount`.
+
+- `--workspace DIR` (default: the current directory) is mounted read-only at
+  `--guest-path PATH` (default: where it lives), and the command starts there.
+- `--ro-mount HOST:GUEST` mounts the directory `HOST` read-only at `GUEST`, and
+  may be repeated.
+- `--memory SIZE` (QEMU syntax, such as `4G`) and `--cpus N` size Gondolin's
+  VM. How Bubblewrap applies them is described where it does, in
+  `overlays/offline-run/offline-run.sh`.
+- `--image` selects a Gondolin image directory or image selector; Bubblewrap
+  accepts and ignores it.
+- `--offline`, and `--state ''` and `--config ''`, are accepted and change
+  nothing; a non-empty `--state` or `--config` is refused.
+
+Without `--image`, Gondolin builds its guest image on first use, which needs
+the network and takes several minutes; `offline-run-prepare` builds it ahead of
+time. Images are cached under `$XDG_CACHE_HOME/offline-run/images` (by default
+`~/.cache/offline-run/images`), keyed on the image configuration in
+`overlays/offline-run/build-config.json`, the architecture and the Gondolin
+version. Publishing a new image removes the superseded ones.
+
 ## ECA and sandboxed local workspaces
 
 The ECA client is configured in `default.el`. Home Manager installs the
@@ -522,24 +560,24 @@ Node's built-in test runner. The wrapper tests replace the Gondolin SDK
 with a stub, so they need no VM:
 
 ``` sh
-node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs
+node --test tests/image.test.mjs tests/gondolin-wrapper.test.mjs tests/offline-run.test.mjs
 ```
 
-The packaged image tools are tested in a Nix derivation with an empty inherited
-PATH. This test creates an ext4 filesystem and a compressed initramfs without
-network access:
+On Darwin, the packaged image tools are tested in a Nix derivation with an
+empty inherited PATH. This test creates an ext4 filesystem and a compressed
+initramfs without network access:
 
 ``` sh
-nix build .#checks.aarch64-darwin.eca-gondolin-image-tools
+nix build .#checks.aarch64-darwin.offline-run-image-tools
 ```
 
-Use `x86_64-linux` or `aarch64-linux` for those hosts. On Linux,
-`eca-bwrap-sandbox` runs the Bubblewrap wrapper against a local HTTP server
-and checks what the guest can see and reach. It needs a builder that allows
-unprivileged user namespaces inside the build sandbox:
+On Linux, `eca-bwrap-sandbox` and `offline-run-sandbox` run the Bubblewrap
+wrappers against a local HTTP server and check what the guest can see and
+reach. They need a builder that allows unprivileged user namespaces inside
+the build sandbox:
 
 ``` sh
-nix build .#checks.x86_64-linux.eca-bwrap-sandbox
+nix build .#checks.x86_64-linux.eca-bwrap-sandbox .#checks.x86_64-linux.offline-run-sandbox
 ```
 
-GitHub Actions runs the Linux checks alongside the ERT and Node tests.
+GitHub Actions runs these checks alongside the ERT and Node tests.
