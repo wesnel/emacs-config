@@ -17,12 +17,10 @@
 (declare-function agent-shell-buffers "agent-shell")
 (declare-function agent-shell-cwd "agent-shell-project")
 (declare-function agent-shell-insert "agent-shell")
-(declare-function eca-chat-send-prompt "eca-chat")
 (declare-function ghostel-paste-string "ghostel")
 
 (defcustom review-guide-send-target-functions
   '(review-guide-send-agent-shell-targets
-    review-guide-send-eca-targets
     review-guide-send-ghostel-targets)
   "Functions that find where feedback on a repository can go.
 Each is called with the repository's directory and returns a list of
@@ -60,18 +58,6 @@ Feedback is submitted as the session's next prompt."
                            (lambda (text)
                              (agent-shell-insert :text text :submit t
                                                  :shell-buffer buffer))))))
-
-(defun review-guide-send-eca-targets (root)
-  "Return the ECA chats working in ROOT.
-Feedback is sent as a prompt to the chat's session, which ECA delivers
-to that session's most recent chat."
-  (when (fboundp 'eca-chat-send-prompt)
-    (mapcar (lambda (buffer)
-              (cons (format "ECA: %s" (buffer-name buffer))
-                    (lambda (text)
-                      (with-current-buffer buffer
-                        (eca-chat-send-prompt text)))))
-            (review-guide-send--buffers 'eca-chat-mode root))))
 
 (defun review-guide-send-ghostel-targets (root)
   "Return the Ghostel terminals whose directory is in ROOT.
