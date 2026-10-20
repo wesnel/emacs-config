@@ -1,8 +1,7 @@
-// Stands in for the Gondolin SDK when tests/gondolin-wrapper.test.mjs runs
-// the wrapper. Instead of booting a VM, `exec' writes what the wrapper asked
-// for to $STUB_REPORT, reading the staged config while it still exists.
+// Stands in for the Gondolin SDK when tests/offline-run.test.mjs runs the
+// runner. Instead of booting a VM, `exec' writes what the runner asked for to
+// $STUB_REPORT.
 import fs from "node:fs";
-import path from "node:path";
 
 let hooks = null;
 
@@ -21,12 +20,7 @@ export class ReadonlyProvider {
 
 export const createHttpHooks = (options) => {
   hooks = options;
-  return {
-    httpHooks: {},
-    env: Object.fromEntries(
-      Object.keys(options.secrets ?? {}).map((name) => [name, `placeholder-${name}`]),
-    ),
-  };
+  return {httpHooks: {}, env: {}};
 };
 
 export const buildAssets = () => {
@@ -34,16 +28,6 @@ export const buildAssets = () => {
 };
 
 export const verifyAssets = () => false;
-
-const tree = (root, prefix = "") =>
-  Object.fromEntries(
-    fs.readdirSync(path.join(root, prefix), {withFileTypes: true}).flatMap((entry) => {
-      const name = path.join(prefix, entry.name);
-      return entry.isDirectory()
-        ? Object.entries(tree(root, name))
-        : [[name, fs.readFileSync(path.join(root, name), "utf8")]];
-    }),
-  );
 
 export class VM {
   constructor(options) {
@@ -56,8 +40,6 @@ export class VM {
 
   exec(command, options) {
     const {mounts} = this.options.vfs;
-    const config = mounts["/root/.config/eca"];
-    const probes = JSON.parse(process.env.STUB_PROBES || "{}");
 
     fs.writeFileSync(
       process.env.STUB_REPORT,
@@ -68,7 +50,6 @@ export class VM {
         mounts: Object.fromEntries(
           Object.entries(mounts).map(([guest, p]) => [guest, {root: p.root, readonly: !!p.readonly}]),
         ),
-        config: config ? tree(config.root) : null,
         hooksCreated: hooks !== null,
         httpHooks: "httpHooks" in this.options,
         dns: this.options.dns ?? null,
@@ -76,11 +57,6 @@ export class VM {
         sandbox: this.options.sandbox ?? null,
         memory: this.options.memory ?? null,
         cpus: this.options.cpus ?? null,
-        allowedHosts: hooks?.allowedHosts ?? null,
-        secrets: hooks?.secrets ?? null,
-        allowedInternalHosts: hooks?.allowedInternalHosts ?? null,
-        ipAllowed: (probes.ip ?? []).map((info) => hooks.isIpAllowed(info)),
-        rewritten: (probes.urls ?? []).map((url) => hooks.onRequest(new Request(url))?.url ?? null),
       }),
     );
 
