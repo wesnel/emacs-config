@@ -314,6 +314,10 @@
   ;; loaded, ahead of the visiting buffer's `find-file-hook'.
   (wgn/agent-plans-protect-mode)
   (wgn/agent-plans-links-setup)
+  (with-eval-after-load 'org-capture
+    (setq org-capture-templates
+          (append org-capture-templates (wgn/agent-plans-capture-templates)))
+    (add-hook 'org-capture-mode-hook #'wgn/agent-plans--capture-header))
 
   :config
   (wgn/agent-plans-questions-mode)

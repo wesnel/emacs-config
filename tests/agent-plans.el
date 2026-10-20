@@ -2169,6 +2169,169 @@ GitHub.  `commit' commits a file's new text and returns the commit."
             (kill-buffer))
           (should (string-match-p "deadbeef is not a commit" (car warnings))))))))
 
+;;;; Capture
+
+(defun wgn-agent-plans-test--capture (key answers body &optional abort)
+  "Capture with template KEY, answering its prompts with ANSWERS, then BODY.
+Finalize it, or with ABORT leave it open; return the capture buffer."
+  (require 'org-capture)
+  (let ((org-capture-templates (wgn/agent-plans-capture-templates))
+        (org-capture-mode-hook (list #'wgn/agent-plans--capture-header))
+        (before (buffer-list)))
+    (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) (pop answers)))
+              ((symbol-function 'read-string) (lambda (&rest _) (pop answers))))
+      (org-capture nil key))
+    (let ((capture (seq-find (lambda (buffer)
+                               (and (buffer-local-value 'org-capture-mode buffer)
+                                    (not (memq buffer before))))
+                             (buffer-list))))
+      (with-current-buffer capture
+        (goto-char (point-max))
+        (insert body)
+        (unless abort (org-capture-finalize)))
+      capture)))
+
+(ert-deftest wgn-agent-plans-capture-followup-runs-agent-plan-followup ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let* ((plan (wgn-agent-plans-test--question-plan plans))
+             (before (with-temp-buffer (insert-file-contents plan) (buffer-string))))
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--goto "S1")
+          (let ((offered-default nil))
+            (cl-letf (((symbol-function 'org-completing-read)
+                       (lambda (_prompt _choices &optional _p _r _i _h default &rest _)
+                         (setq offered-default default)
+                         (completing-read ""))))
+              (let ((capture (wgn-agent-plans-test--capture
+                              "Af" (list "Guard accepts --draft=false" "S1")
+                              "The guard reads the flag\nas a bare word.\n\n- in pr-loop\n- in sign-pass\n"
+                              t)))
+                (with-current-buffer capture
+                  (should (string-match-p "paragraphs joined by ¶" header-line-format))
+                  (org-capture-finalize))))
+            (should (equal offered-default "S1"))))
+        ;; agent-plan takes a single line: nothing is dropped.
+        (should (equal (wgn-agent-plans-test--calls record)
+                       `(("followup" ,plan "--title" "Guard accepts --draft=false" "--found-in" "S1"
+                          "--context" "The guard reads the flag as a bare word. ¶ - in pr-loop - in sign-pass"))))
+        (should-not (seq-find (lambda (buffer) (string-prefix-p " *agent-plan capture" (buffer-name buffer)))
+                              (buffer-list)))
+        (should (equal (with-temp-buffer (insert-file-contents plan) (buffer-string)) before))))))
+
+(ert-deftest wgn-agent-plans-capture-question-runs-agent-plan-ask-in-the-part ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans)))
+        (wgn-agent-plans-test--visiting (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+          (wgn-agent-plans-test--goto "P1.Q1")
+          (let ((capture (wgn-agent-plans-test--capture
+                          "Aq" (list "Keep the flag?" "yes: scripts use it")
+                          "Two scripts pass it.\n\nBoth are ours.\n- drop it\n- rename it\n" t)))
+            (with-current-buffer capture
+              (should (string-match-p "list items become the alternatives" header-line-format))
+              (goto-char (point-min))
+              (insert "* [#A]")
+              (delete-region (point) (progn (skip-chars-forward "* ") (point)))
+              (insert " ")
+              (org-entry-put nil "AFTER" "P1.Q1 S1")
+              (org-capture-finalize))))
+        (should (equal (wgn-agent-plans-test--calls record)
+                       `(("ask" ,plan "--question" "Keep the flag?" "--recommendation" "yes: scripts use it"
+                          "--priority" "A" "--context" "Two scripts pass it. ¶ Both are ours."
+                          "--alternative" "drop it" "--alternative" "rename it"
+                          "--after" "P1.Q1" "--after" "S1" "--part" "P1"))))))))
+
+(ert-deftest wgn-agent-plans-capture-question-keeps-sub-items-with-their-alternative ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans)))
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--goto "S1")
+          (wgn-agent-plans-test--capture
+           "Aq" (list "Keep the flag?" "yes")
+           "Why.\n- drop it\n  - only the flag\n  - and its tests\n- rename it\n  to --x\n  1. in one pass\n\nAfter.\n"))
+        (should (equal (wgn-agent-plans-test--calls record)
+                       `(("ask" ,plan "--question" "Keep the flag?" "--recommendation" "yes"
+                          "--context" "Why. ¶ After."
+                          "--alternative" "drop it: only the flag; and its tests"
+                          "--alternative" "rename it to --x: in one pass"))))))))
+
+(ert-deftest wgn-agent-plans-capture-refuses-to-refile ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans)))
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--goto "S1")
+          (dolist (key '("Af" "Aq"))
+            (let ((capture (wgn-agent-plans-test--capture key (list "Refiled" "S1") "" t)))
+              (with-current-buffer capture
+                (should-error (org-capture-refile) :type 'user-error)
+                (should (buffer-live-p capture))
+                (org-capture-kill)))))
+        (should-not (wgn-agent-plans-test--calls record))
+        (should-not (seq-find (lambda (buffer)
+                                (string-prefix-p " *agent-plan capture" (buffer-name buffer)))
+                              (buffer-list)))))))
+
+(ert-deftest wgn-agent-plans-capture-stays-open-when-refused ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans))
+            (process-environment (cons "REFUSE=no such item S9" process-environment)))
+        (wgn-agent-plans-test--visiting plan
+          (let ((capture (wgn-agent-plans-test--capture "Af" (list "Something" "S9") "" t)))
+            (with-current-buffer capture
+              (should-error (org-capture-finalize) :type 'user-error)
+              (should (buffer-live-p capture))
+              (org-capture-kill))
+            (should-not (buffer-live-p capture))
+            (should-not (seq-find (lambda (buffer)
+                                    (string-prefix-p " *agent-plan capture" (buffer-name buffer)))
+                                  (buffer-list)))))
+        ;; The refused call, and nothing for the abort.
+        (should (equal (length (wgn-agent-plans-test--calls record)) 1))))))
+
+(ert-deftest wgn-agent-plans-capture-elsewhere-asks-for-the-plan ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans))
+            (mirror (expand-file-name "2026-10-14-y.devbox.org" plans)))
+        (wgn-agent-plans-test--write mirror "* Plan\n")
+        (with-temp-buffer
+          (cl-letf (((symbol-function 'wgn/agent-plans--read) (lambda () plan)))
+            (wgn-agent-plans-test--capture "Af" (list "Found elsewhere" "S1") "")))
+        (should (equal (wgn-agent-plans-test--calls record)
+                       `(("followup" ,plan "--title" "Found elsewhere" "--found-in" "S1"))))
+        ;; Another host's plan is refused before any prompt.
+        (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) (error "Prompted")))
+                  ((symbol-function 'read-string) (lambda (&rest _) (error "Prompted")))
+                  (org-capture-templates (wgn/agent-plans-capture-templates)))
+          (with-temp-buffer
+            (cl-letf (((symbol-function 'wgn/agent-plans--read) (lambda () mirror)))
+              (should-error (org-capture nil "Af") :type 'user-error)))
+          (wgn-agent-plans-test--visiting mirror
+            (should-error (org-capture nil "Aq") :type 'user-error)))
+        (should (equal (length (wgn-agent-plans-test--calls record)) 1))))))
+
+(ert-deftest wgn-agent-plans-captures-at-once-keep-their-own-text ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (wgn-agent-plans-test--question-plan plans)))
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--goto "S1")
+          (let ((first (wgn-agent-plans-test--capture "Af" (list "First" "S1") "One.\n" t))
+                (second (with-current-buffer (find-buffer-visiting plan)
+                          (wgn-agent-plans-test--capture "Aq" (list "Second?" "yes") "Two.\n" t))))
+            (with-current-buffer second (org-capture-finalize))
+            (with-current-buffer first (org-capture-finalize))))
+        (should (equal (wgn-agent-plans-test--calls record)
+                       `(("ask" ,plan "--question" "Second?" "--recommendation" "yes" "--context" "Two.")
+                         ("followup" ,plan "--title" "First" "--found-in" "S1" "--context" "One."))))
+        (should-not (seq-find (lambda (buffer)
+                                (string-prefix-p " *agent-plan capture" (buffer-name buffer)))
+                              (buffer-list)))))))
+
 ;;;; Against the real agent-plan
 ;;
 ;; Skipped where `agent-plan' is not on `exec-path'; nix-config's

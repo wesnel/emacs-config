@@ -788,7 +788,7 @@ jumps (a prefix list, or 0) leaves the plan as it is."
      ((equal (nth 2 (wgn/agent-plans--file-parts file)) "log")
       " Written by agent-plan log alone")
      (t (concat " Written by agent-plan · answer questions with /questions in a Claude session"
-                " · C-c C-o follows a link")))))
+                " · C-c C-o follows a link · org-capture A f or A q adds a follow-up or question")))))
 
 (defun wgn/agent-plans--plan-buffer-p ()
   "Return non-nil when the current buffer was visited on the plan file it visits.
@@ -1665,6 +1665,239 @@ SEARCH, as `org-execute-file-search-functions' expects."
                              :follow (cadr link)
                              :export (wgn/agent-plans--exporter (car link))))
   (add-hook 'org-execute-file-search-functions #'wgn/agent-plans--file-search))
+
+;;;; Capture
+;;
+;; A capture is written to a scratch buffer, never to a plan file; its
+;; finalisation turns the entry into an `agent-plan' command, and a
+;; refusal leaves the capture open to correct.
+
+(defun wgn/agent-plans--refresh (plan)
+  "Show what `agent-plan' just wrote to PLAN: revert the buffers of its files.
+The mode line's hint is asked for again."
+  (let ((own (wgn/agent-plans--plan-file plan)))
+    (dolist (buffer (buffer-list))
+      (let ((file (buffer-file-name buffer)))
+        (when (and file
+                   (equal (wgn/agent-plans--plan-file file) own)
+                   (not (buffer-modified-p buffer)))
+          (with-current-buffer buffer
+            (revert-buffer t t t))))))
+  (clrhash wgn/agent-plans-questions--cache))
+
+(defun wgn/agent-plans--item-here ()
+  "Return (FILE . ID) of the plan entry at point in a plan buffer, or nil."
+  (let ((file (buffer-file-name (buffer-base-buffer))))
+    (when (and (derived-mode-p 'org-mode)
+               (wgn/agent-plans--file-parts file)
+               (not (org-before-first-heading-p)))
+      (save-excursion
+        (org-back-to-heading t)
+        (let ((id (org-entry-get nil "ID")))
+          (and id (cons file id)))))))
+
+(defun wgn/agent-plans--item-at-point ()
+  "Return (FILE . ID) of the plan entry at point, in a plan buffer or the agenda."
+  (let ((waiting (get-text-property (point) 'wgn/agent-plans-item))
+        (marker (and (derived-mode-p 'org-agenda-mode)
+                     (or (get-text-property (line-beginning-position) 'org-hd-marker)
+                         (get-text-property (line-beginning-position) 'org-marker)))))
+    (cond
+     ((eq (plist-get waiting :kind) 'question)
+      (cons (plist-get waiting :file) (plist-get waiting :id)))
+     ((markerp marker)
+      (with-current-buffer (marker-buffer marker)
+        (save-excursion
+          (save-restriction
+            (widen)
+            (goto-char marker)
+            (wgn/agent-plans--item-here)))))
+     (t (wgn/agent-plans--item-here)))))
+
+(declare-function org-capture-get "org-capture" (prop &optional local))
+(declare-function org-capture-put "org-capture" (&rest elements))
+(declare-function org-heading-components "org" ())
+(declare-function org-end-of-meta-data "org" (&optional full))
+(declare-function org-entry-properties "org" (&optional epom which))
+(declare-function org-before-first-heading-p "org" ())
+(declare-function org-at-heading-p "org" (&optional invisible-not-ok))
+(defvar org-note-abort)
+(defvar org-capture-is-refiling)
+(defvar org-capture-bookmark)
+
+(defun wgn/agent-plans--capture-plan (kind)
+  "Choose the plan a capture of KIND, `followup' or `ask', is for.
+The plan and part of the entry at point where the capture started, else
+a plan asked for; another host's plan is refused.  Org fills a template
+in that buffer, before its prompts and its target, so this runs from the
+template.  Return the entry's ID, or nil."
+  (let* ((item (wgn/agent-plans--item-at-point))
+         (file (or (car item)
+                   (let ((visited (buffer-file-name (buffer-base-buffer))))
+                     (and (wgn/agent-plans--file-parts visited) visited))))
+         (plan (if file (wgn/agent-plans--plan-file file) (wgn/agent-plans--read)))
+         (part (let ((name (nth 2 (wgn/agent-plans--file-parts file))))
+                 (and name (not (equal name "log")) name))))
+    (when (wgn/agent-plans--mirror-host plan)
+      (user-error "%s is %s's plan; capture for it there"
+                  (file-name-base plan) (wgn/agent-plans--mirror-host plan)))
+    (org-capture-put :agent-plan plan :agent-part part :agent-kind kind)
+    (cdr item)))
+
+(defun wgn/agent-plans--capture-target ()
+  "Go to a new scratch buffer for the capture to be written to.
+Each capture has its own, so captures open at once keep their text."
+  (let ((buffer (generate-new-buffer " *agent-plan capture*")))
+    (org-capture-put :agent-buffer buffer)
+    (set-buffer buffer)
+    (org-mode)
+    ;; A bookmark of the scratch buffer is useless, and Emacs 29 fails
+    ;; to make one of a buffer that visits no file.
+    (with-no-warnings (setq-local org-capture-bookmark nil))))
+
+(defun wgn/agent-plans--one-line (lines)
+  "Return LINES, a body's, as the one line `agent-plan' takes, or nil.
+Lines of a paragraph are joined by spaces, and paragraphs by \" ¶ \"."
+  (let ((paragraphs (seq-remove
+                     #'string-empty-p
+                     (mapcar (lambda (paragraph)
+                               (string-join (split-string paragraph "\n" t "[ \t]+") " "))
+                             (split-string (string-join lines "\n") "\n[ \t]*\n" t)))))
+    (and paragraphs (string-join paragraphs " ¶ "))))
+
+(defun wgn/agent-plans--captured (&optional alternatives)
+  "Return the captured entry as a plist of :title, :priority, :properties,
+:context, its body as one line, and with ALTERNATIVES, :alternatives, the
+body's list items, which the context then leaves out.  What is indented
+under an item stays with it: its text after a space, its own items
+after \": \" and \"; \"."
+  (save-excursion
+    (goto-char (point-min))
+    (unless (org-at-heading-p)
+      (user-error "The capture holds no entry"))
+    (let* ((components (org-heading-components))
+           (properties (org-entry-properties nil 'standard))
+           context items indent nested)
+      (org-end-of-meta-data t)
+      (dolist (line (split-string (buffer-substring-no-properties (point) (point-max)) "\n"))
+        (cond
+         ((and alternatives
+               (string-match "\\`\\([ \t]*\\)[-+] +\\(.+?\\)[ \t]*\\'" line)
+               (or (null indent) (<= (length (match-string 1 line)) indent)))
+          (setq indent (length (match-string 1 line))
+                nested nil)
+          (push (match-string 2 line) items))
+         ((and indent
+               (string-match "\\`\\([ \t]*\\)\\(\\(?:[-+*]\\|[0-9]+[.)]\\) +\\)?\\(.+?\\)[ \t]*\\'"
+                             line)
+               (> (length (match-string 1 line)) indent))
+          (setcar items (concat (car items)
+                                (cond ((not (match-string 2 line)) " ")
+                                      (nested "; ")
+                                      (t ": "))
+                                (match-string 3 line)))
+          (when (match-string 2 line)
+            (setq nested t)))
+         (t
+          (setq indent nil)
+          (push line context))))
+      (list :title (or (nth 4 components) "")
+            :priority (and (nth 3 components) (char-to-string (nth 3 components)))
+            :properties properties
+            :context (wgn/agent-plans--one-line (nreverse context))
+            :alternatives (nreverse items)))))
+
+(defun wgn/agent-plans--capture-header ()
+  "Say in a capture's header line what `agent-plan' will take of its body.
+For `org-capture-mode-hook'."
+  (pcase (org-capture-get :agent-kind 'local)
+    ('followup
+     (setq header-line-format
+           (concat header-line-format
+                   "  The body goes to agent-plan as one line, paragraphs joined by ¶.")))
+    ('ask
+     (setq header-line-format
+           (concat header-line-format
+                   "  The body's list items become the alternatives, the rest one line,"
+                   " paragraphs joined by ¶; [#A] sets the priority, :AFTER: what it waits for.")))))
+
+(defun wgn/agent-plans--capture-run (&rest args)
+  "Run the `agent-plan' subcommand ARGS for the capture's plan.
+The rest of ARGS come after the plan; the part, if any, is added."
+  (let ((plan (org-capture-get :agent-plan 'local))
+        (part (org-capture-get :agent-part 'local)))
+    (apply #'wgn/agent-plans--call (car args) plan
+           (append (cdr args) (and part (list "--part" part))))
+    (wgn/agent-plans--refresh plan)))
+
+(defun wgn/agent-plans--refuse-refile ()
+  "Refuse to refile a capture for `agent-plan', which would write a file."
+  (when org-capture-is-refiling
+    (user-error "Refiling writes the entry into a file; finish with C-c C-c, which runs agent-plan")))
+
+(defun wgn/agent-plans--capture-followup ()
+  "Record the captured follow-up with `agent-plan followup'."
+  (wgn/agent-plans--refuse-refile)
+  (unless org-note-abort
+    (let ((entry (wgn/agent-plans--captured)))
+      (apply #'wgn/agent-plans--capture-run
+             "followup" "--title" (plist-get entry :title)
+             "--found-in" (or (cdr (assoc "FOUND_IN" (plist-get entry :properties))) "")
+             (and (plist-get entry :context) (list "--context" (plist-get entry :context)))))))
+
+(defun wgn/agent-plans--capture-ask ()
+  "Record the captured question with `agent-plan ask'."
+  (wgn/agent-plans--refuse-refile)
+  (unless org-note-abort
+    (let* ((entry (wgn/agent-plans--captured t))
+           (properties (plist-get entry :properties)))
+      (apply #'wgn/agent-plans--capture-run
+             "ask" "--question" (plist-get entry :title)
+             "--recommendation" (or (cdr (assoc "RECOMMENDATION" properties)) "")
+             (append
+              (and (plist-get entry :priority) (list "--priority" (plist-get entry :priority)))
+              (and (plist-get entry :context) (list "--context" (plist-get entry :context)))
+              (mapcan (lambda (alternative) (list "--alternative" alternative))
+                      (copy-sequence (plist-get entry :alternatives)))
+              (mapcan (lambda (id) (list "--after" id))
+                      (split-string (or (cdr (assoc "AFTER" properties)) ""))))))))
+
+(defun wgn/agent-plans--capture-cleanup ()
+  "Kill the buffer this capture for `agent-plan' was written to."
+  (let ((buffer (org-capture-get :agent-buffer)))
+    (when (buffer-live-p buffer)
+      (with-current-buffer buffer
+        (set-buffer-modified-p nil))
+      (kill-buffer buffer))))
+
+(defun wgn/agent-plans--followup-template ()
+  "Return a follow-up's template, found in the entry the capture started at."
+  (let ((item (wgn/agent-plans--capture-plan 'followup)))
+    (concat "* %^{Follow-up}\n:PROPERTIES:\n"
+            (if item (format ":FOUND_IN: %%^{Found in|%s}\n" item) ":FOUND_IN: %^{Found in}\n")
+            ":END:\n%?")))
+
+(defun wgn/agent-plans--ask-template ()
+  "Return a question's template."
+  (wgn/agent-plans--capture-plan 'ask)
+  "* %^{Question}\n:PROPERTIES:\n:RECOMMENDATION: %^{Recommendation}\n:END:\n%?")
+
+(defun wgn/agent-plans-capture-templates ()
+  "Return `org-capture-templates' entries that write through `agent-plan'.
+\"Af\" a follow-up, `agent-plan followup', and \"Aq\" a question,
+`agent-plan ask'; plan buffers' header line names these keys.  A
+question's body is its context, its list items the alternatives; [#A]
+in its heading is its priority and an :AFTER: property the IDs it waits
+for.  `wgn/agent-plans--capture-header', on `org-capture-mode-hook',
+says so in the capture."
+  (let ((common '(:no-save t :after-finalize wgn/agent-plans--capture-cleanup)))
+    `(("A" "Agent plan")
+      ("Af" "Follow-up" entry (function wgn/agent-plans--capture-target)
+       (function wgn/agent-plans--followup-template)
+       :prepare-finalize wgn/agent-plans--capture-followup ,@common)
+      ("Aq" "Question" entry (function wgn/agent-plans--capture-target)
+       (function wgn/agent-plans--ask-template)
+       :prepare-finalize wgn/agent-plans--capture-ask ,@common))))
 
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here
