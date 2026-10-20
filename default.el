@@ -313,6 +313,7 @@
   ;; Before any plan file is visited: `:after org' runs this once Org is
   ;; loaded, ahead of the visiting buffer's `find-file-hook'.
   (wgn/agent-plans-protect-mode)
+  (wgn/agent-plans-links-setup)
 
   :config
   (wgn/agent-plans-questions-mode)

@@ -1360,5 +1360,311 @@ questions are answered with /questions in a Claude session, and
            help-echo ,(substitute-command-keys
                        "\\<wgn/agent-plans-waiting-map>\\[wgn/agent-plans-waiting-visit]: visit")))))))
 
+;;;; Links
+;;
+;;   plan:PLAN[#ITEM]       a plan by its ID, at the entry whose ID is ITEM
+;;   q:[PLAN#]QID           a question, by default of the plan link is in
+;;   branch:REPO:BRANCH     a branch's log, in magit
+;;   wt:PATH                a worktree's status, in magit
+;;   pr:REPO#N              a pull request, in forge, else in a browser
+;;   commit:REPO:SHA        a commit, in magit
+;;   file:PATH::LINE@SHA    a citation: Org's own file link, at LINE, with a
+;;                          warning where the working tree is not at SHA
+;;
+;; REPO is a repository's directory, or its name under
+;; `wgn/agent-plans-repository-directories'.
+
+(defcustom wgn/agent-plans-repository-directories '("~/git/github.com/*")
+  "Wildcard patterns of the directories that hold repositories.
+A link names a repository by its directory's name under one of them, or
+as OWNER/NAME, where OWNER is the name of the directory holding it."
+  :type '(repeat string))
+
+(defun wgn/agent-plans--need (function feature)
+  "Load FEATURE unless FUNCTION is defined, and refuse if it still is not."
+  (unless (fboundp function)
+    (require feature nil t))
+  (unless (fboundp function)
+    (user-error "%s is not available" feature)))
+
+(defun wgn/agent-plans--repository (repo &optional noerror)
+  "Return the directory of the repository REPO names.
+Ask which one when several match.  NOERROR returns nil for no match."
+  (if (or (file-name-absolute-p repo) (string-prefix-p "~" repo))
+      (if (file-directory-p (expand-file-name repo))
+          (file-name-as-directory (expand-file-name repo))
+        (unless noerror (user-error "No repository at %s" repo)))
+    (let* ((name (file-name-nondirectory repo))
+           (owner (and (string-match-p "/" repo)
+                       (directory-file-name (file-name-directory repo))))
+           (found (delete-dups
+                   (seq-filter
+                    #'file-directory-p
+                    (mapcan
+                     (lambda (pattern)
+                       (mapcar (lambda (parent)
+                                 (file-name-as-directory (expand-file-name name parent)))
+                               (seq-filter
+                                (lambda (parent)
+                                  (or (null owner)
+                                      (equal (file-name-nondirectory (directory-file-name parent))
+                                             owner)))
+                                (file-expand-wildcards (expand-file-name pattern)))))
+                     (copy-sequence wgn/agent-plans-repository-directories))))))
+      (cond
+       ((cdr found) (completing-read (format "Repository %s: " repo) found nil t))
+       (found (car found))
+       (noerror nil)
+       (t (user-error "No repository %s under `wgn/agent-plans-repository-directories'" repo))))))
+
+(defun wgn/agent-plans--split (path separator what)
+  "Split link PATH at the first SEPARATOR into two non-empty parts.
+WHAT names the parts, for the refusal."
+  (let ((at (string-search separator path)))
+    (unless (and at (> at 0) (< (1+ at) (length path)))
+      (user-error "Not %s: %s" what path))
+    (cons (substring path 0 at) (substring path (1+ at)))))
+
+(defun wgn/agent-plans--plan-file (file)
+  "Return the plan's own file of FILE, a plan's, part's or log's file."
+  (let ((parts (wgn/agent-plans--file-parts file)))
+    (when parts
+      (expand-file-name (concat (nth 0 parts) "." (nth 1 parts) ".org")
+                        (wgn/agent-plans-directory)))))
+
+(defun wgn/agent-plans--by-id (id)
+  "Return the plan file of the plan whose ID is ID."
+  (let ((file (expand-file-name (concat id ".org") (wgn/agent-plans-directory))))
+    (unless (and (wgn/agent-plans--file-parts file)
+                 (null (nth 2 (wgn/agent-plans--file-parts file)))
+                 (file-exists-p file))
+      (user-error "No plan %s under %s" id (wgn/agent-plans-directory)))
+    file))
+
+(defun wgn/agent-plans-visit (plan &optional item)
+  "Visit the plan file PLAN, at the entry whose ID is ITEM in it or its parts."
+  (let ((marker (and item
+                     (seq-some (lambda (file) (wgn/agent-plans--id-marker file item))
+                               (wgn/agent-plans--own-files plan)))))
+    (when (and item (null marker))
+      (user-error "%s holds no %s" (file-name-base plan) item))
+    (if (null marker)
+        (find-file plan)
+      (pop-to-buffer-same-window (marker-buffer marker))
+      (widen)
+      (goto-char marker)
+      (org-fold-show-context 'link-search))))
+
+(defun wgn/agent-plans--follow-plan (path _arg)
+  "Follow a plan: link to PATH, PLAN or PLAN#ITEM."
+  (let ((at (string-search "#" path)))
+    (wgn/agent-plans-visit (wgn/agent-plans--by-id (if at (substring path 0 at) path))
+                           (and at (substring path (1+ at))))))
+
+(defun wgn/agent-plans--holding (id)
+  "Return the plan files whose plan holds an entry whose ID is ID."
+  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+    (seq-filter (lambda (plan)
+                  (seq-some (lambda (file)
+                              (with-temp-buffer
+                                (insert-file-contents file)
+                                (re-search-forward pattern nil t)))
+                            (wgn/agent-plans--own-files plan)))
+                (wgn/agent-plans-files))))
+
+(defun wgn/agent-plans--follow-question (path _arg)
+  "Follow a q: link to PATH, QID or PLAN#QID.
+A bare QID is the question of the plan the link is in, else of the plan
+that holds it, asking which when several do."
+  (let* ((at (string-search "#" path))
+         (qid (if at (substring path (1+ at)) path))
+         (here (wgn/agent-plans--plan-file (buffer-file-name (buffer-base-buffer))))
+         (plan (cond
+                (at (wgn/agent-plans--by-id (substring path 0 at)))
+                (here here)
+                (t (let ((plans (wgn/agent-plans--holding qid)))
+                     (cond
+                      ((cdr plans) (wgn/agent-plans--read-holder qid plans))
+                      (plans (car plans))
+                      (t (user-error "No plan holds %s" qid))))))))
+    (wgn/agent-plans-visit plan qid)))
+
+(defun wgn/agent-plans--title (plan)
+  "Return the #+title of the plan file PLAN, or its name."
+  (with-temp-buffer
+    (insert-file-contents plan)
+    (goto-char (point-min))
+    (if (re-search-forward "^#\\+title:[ \t]*\\(.+?\\)[ \t]*$" nil t)
+        (match-string 1)
+      (file-name-base plan))))
+
+(defun wgn/agent-plans--read-holder (qid plans)
+  "Ask which of PLANS, the plan files holding QID, is meant.
+They are offered by title, those where QID is open first."
+  (let ((candidates
+         (mapcar (lambda (entry) (cons (cdr entry) (car entry)))
+                 (sort (mapcar (lambda (plan)
+                                 (let ((open (not (wgn/agent-plans--settled-p plan qid))))
+                                   (cons plan
+                                         (format "%s (%s): %s" (wgn/agent-plans--title plan)
+                                                 (file-name-base plan)
+                                                 (if open "open" "settled")))))
+                               plans)
+                       (lambda (a b)
+                         (and (string-suffix-p ": open" (cdr a))
+                              (not (string-suffix-p ": open" (cdr b)))))))))
+    (cdr (assoc (completing-read
+                 (format "%s of plan: " qid)
+                 (lambda (string predicate action)
+                   (if (eq action 'metadata)
+                       '(metadata (display-sort-function . identity))
+                     (complete-with-action action candidates string predicate)))
+                 nil t)
+                candidates))))
+
+(declare-function magit-status "magit-status" (&optional directory cache))
+(declare-function magit-log-other "magit-log" (revs &optional args files))
+(declare-function magit-show-commit "magit-diff" (rev &optional args files module))
+(declare-function forge-get-pullreq "forge-pullreq")
+(declare-function forge-topic-setup-buffer "forge-topic" (topic))
+(declare-function org-export-data-with-backend "ox" (data backend info))
+(declare-function org-export-derived-backend-p "ox" (backend &rest backends))
+(declare-function org-element-create "org-element-ast" (type &optional props &rest children))
+
+(defun wgn/agent-plans--follow-branch (path _arg)
+  "Follow a branch: link to PATH, REPO:BRANCH, showing its log in magit."
+  (let* ((parts (wgn/agent-plans--split path ":" "REPO:BRANCH"))
+         (default-directory (wgn/agent-plans--repository (car parts))))
+    (wgn/agent-plans--need 'magit-log-other 'magit)
+    (magit-log-other (list (cdr parts)))))
+
+(defun wgn/agent-plans--follow-worktree (path _arg)
+  "Follow a wt: link to PATH, showing the worktree's status in magit."
+  (unless (file-directory-p (expand-file-name path))
+    (user-error "No worktree at %s" path))
+  (wgn/agent-plans--need 'magit-status 'magit)
+  (magit-status (file-name-as-directory (expand-file-name path))))
+
+(defun wgn/agent-plans--follow-commit (path _arg)
+  "Follow a commit: link to PATH, REPO:SHA, showing the commit in magit."
+  (let* ((parts (wgn/agent-plans--split path ":" "REPO:SHA"))
+         (default-directory (wgn/agent-plans--repository (car parts))))
+    (wgn/agent-plans--need 'magit-show-commit 'magit)
+    (magit-show-commit (cdr parts))))
+
+(defun wgn/agent-plans--git (directory &rest args)
+  "Return the trimmed output of git ARGS in DIRECTORY, or nil if it fails."
+  (let ((default-directory directory))
+    (with-temp-buffer
+      (and (eq 0 (apply #'call-process "git" nil (list t nil) nil args))
+           (string-trim (buffer-string))))))
+
+(defun wgn/agent-plans--pr-url (repo number directory)
+  "Return the web URL of pull request NUMBER of REPO, cloned in DIRECTORY.
+The repository is origin's on GitHub, or REPO itself as OWNER/NAME."
+  (let* ((remote (and directory (wgn/agent-plans--git directory "remote" "get-url" "origin")))
+         (slug (or (and remote
+                        (string-match
+                         "github\\.com[:/]\\([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?\\)\\(?:\\.git\\)?/?\\'"
+                         remote)
+                        (match-string 1 remote))
+                   (and (string-match-p "\\`[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\\'" repo) repo))))
+    (and slug (format "https://github.com/%s/pull/%s" slug number))))
+
+(defun wgn/agent-plans--pr (path)
+  "Return (REPO NUMBER DIRECTORY) of a pr: link to PATH, REPO#N."
+  (let ((parts (wgn/agent-plans--split path "#" "REPO#N")))
+    (unless (string-match-p "\\`[0-9]+\\'" (cdr parts))
+      (user-error "Not a pull request number: %s" (cdr parts)))
+    (list (car parts) (string-to-number (cdr parts))
+          (wgn/agent-plans--repository (car parts) t))))
+
+(defun wgn/agent-plans--follow-pr (path _arg)
+  "Follow a pr: link to PATH, REPO#N: in forge where it has the pull
+request, else in a browser."
+  (pcase-let* ((`(,repo ,number ,directory) (wgn/agent-plans--pr path))
+               (topic (and directory
+                           (progn (wgn/agent-plans--need 'forge-get-pullreq 'forge) t)
+                           (let ((default-directory directory))
+                             (ignore-errors (forge-get-pullreq number))))))
+    (if topic
+        (forge-topic-setup-buffer topic)
+      (browse-url (or (wgn/agent-plans--pr-url repo number directory)
+                      (user-error "No web address for %s" path))))))
+
+(defun wgn/agent-plans--exporter (type)
+  "Return the :export function of the link TYPE.
+A pr: link becomes a link to its web address; any other the link's
+description, else TYPE:PATH as verbatim text.  The description arrives
+exported already; TYPE:PATH is exported by BACKEND's own verbatim
+transcoder, which escapes it.  The address holds only characters no
+backend escapes."
+  (lambda (path description backend info)
+    (let* ((url (and (equal type "pr")
+                     (ignore-errors
+                       (pcase-let ((`(,repo ,number ,directory) (wgn/agent-plans--pr path)))
+                         (wgn/agent-plans--pr-url repo number directory)))))
+           (text (or description
+                     (org-export-data-with-backend
+                      (org-element-create 'verbatim (list :value (concat type ":" path)))
+                      backend info))))
+      (cond
+       ((null url) text)
+       ((org-export-derived-backend-p backend 'md) (format "[%s](%s)" text url))
+       ((org-export-derived-backend-p backend 'html) (format "<a href=\"%s\">%s</a>" url text))
+       ((org-export-derived-backend-p backend 'latex) (format "\\href{%s}{%s}" url text))
+       ((org-export-derived-backend-p backend 'odt)
+        (format "<text:a xlink:type=\"simple\" xlink:href=\"%s\">%s</text:a>" url text))
+       (t (format "%s <%s>" text url))))))
+
+(defun wgn/agent-plans--citation-drift (file sha)
+  "Return why FILE's working tree may not show what commit SHA did, or nil."
+  (let* ((directory (file-name-directory file))
+         (head (wgn/agent-plans--git directory "rev-parse" "HEAD"))
+         (cited (wgn/agent-plans--git directory "rev-parse" "--verify" "--quiet"
+                                      (concat sha "^{commit}"))))
+    (cond
+     ((null head) nil)
+     ((null cited) (format "%s is not a commit of the repository of %s" sha file))
+     ((equal head cited) nil)
+     (t (format "%s is cited at %s, but the working tree is at %s, and the file %s"
+                (file-name-nondirectory file) (substring cited 0 12) (substring head 0 12)
+                (if (wgn/agent-plans--git directory "diff" "--quiet" cited "--" file)
+                    "is the same there"
+                  "differs, so the line may have moved"))))))
+
+(defun wgn/agent-plans--file-search (search)
+  "Go to the line of a citation's SEARCH, LINE@SHA, and return t.
+Warn where the working tree is not at SHA.  Return nil for any other
+SEARCH, as `org-execute-file-search-functions' expects."
+  (when (string-match "\\`\\([0-9]+\\)@\\([0-9a-fA-F]\\{4,40\\}\\)\\'" search)
+    (let ((line (string-to-number (match-string 1 search)))
+          (sha (match-string 2 search)))
+      (widen)
+      (goto-char (point-min))
+      (forward-line (1- line))
+      (let ((drift (and buffer-file-name
+                        (wgn/agent-plans--citation-drift buffer-file-name sha))))
+        (when drift
+          (display-warning 'wgn/agent-plans drift)))
+      t)))
+
+(defvar org-execute-file-search-functions)
+(declare-function org-link-set-parameters "ol" (type &rest parameters))
+
+;;;###autoload
+(defun wgn/agent-plans-links-setup ()
+  "Register the plan link types and the LINE@SHA search of file links."
+  (dolist (link `(("plan" ,#'wgn/agent-plans--follow-plan)
+                  ("q" ,#'wgn/agent-plans--follow-question)
+                  ("branch" ,#'wgn/agent-plans--follow-branch)
+                  ("wt" ,#'wgn/agent-plans--follow-worktree)
+                  ("pr" ,#'wgn/agent-plans--follow-pr)
+                  ("commit" ,#'wgn/agent-plans--follow-commit)))
+    (org-link-set-parameters (car link)
+                             :follow (cadr link)
+                             :export (wgn/agent-plans--exporter (car link))))
+  (add-hook 'org-execute-file-search-functions #'wgn/agent-plans--file-search))
+
 (provide 'wgn-agent-plans)
 ;;; wgn-agent-plans.el ends here

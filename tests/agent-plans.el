@@ -1975,6 +1975,200 @@ Return the plan file."
         (should (equal (mapcar (lambda (item) (plist-get item :title)) (wgn/agent-plans-waiting))
                        '("agent-plan: refused: no questions today")))))))
 
+;;;; Links
+
+(defmacro wgn-agent-plans-test--with-links (&rest body)
+  "Run BODY with the link types registered, and unregistered after."
+  (declare (indent 0))
+  `(let ((org-link-parameters (copy-sequence org-link-parameters))
+         (org-execute-file-search-functions nil))
+     (wgn/agent-plans-links-setup)
+     ,@body))
+
+(defun wgn-agent-plans-test--follow (link)
+  "Follow LINK, an Org link's text, from the current buffer."
+  (org-link-open-from-string link))
+
+(ert-deftest wgn-agent-plans-plan-link-visits-the-item ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--with-links
+      (wgn-agent-plans-test--question-plan plans)
+      (with-temp-buffer
+        (wgn-agent-plans-test--follow "[[plan:2026-10-14-x.mac]]")
+        (should (equal (buffer-file-name) (expand-file-name "2026-10-14-x.mac.org" plans))))
+      (with-temp-buffer
+        (wgn-agent-plans-test--follow "[[plan:2026-10-14-x.mac#P1.Q1]]")
+        (should (equal (buffer-file-name) (expand-file-name "2026-10-14-x.mac.P1.org" plans)))
+        (should (equal (org-entry-get nil "ID") "P1.Q1")))
+      (with-temp-buffer
+        (should-error (wgn-agent-plans-test--follow "[[plan:2026-10-14-x.mac#S9]]")
+                      :type 'user-error)
+        (should-error (wgn-agent-plans-test--follow "[[plan:2026-10-14-nope.mac]]")
+                      :type 'user-error)))))
+
+(ert-deftest wgn-agent-plans-question-link-prefers-the-plan-it-is-in ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--with-links
+      (let ((plan (wgn-agent-plans-test--question-plan plans))
+            (other (expand-file-name "2026-10-15-z.mac.org" plans)))
+        (wgn-agent-plans-test--write
+         other (wgn-agent-plans-test--plan-text
+                "Other" :Questions (wgn-agent-plans-test--entry "DECIDED" "Other Q1?" "Q1")))
+        ;; In a plan, its own Q1.
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--follow "[[q:Q1]]")
+          (should (equal (buffer-file-name) plan))
+          (should (equal (org-get-heading t t t t) "Use ghostel?")))
+        ;; Named.
+        (with-temp-buffer
+          (wgn-agent-plans-test--follow "[[q:2026-10-15-z.mac#Q1]]")
+          (should (equal (buffer-file-name) other)))
+        ;; Elsewhere, asked which, by title, the open question first.
+        (with-temp-buffer
+          (let (offered)
+            (cl-letf (((symbol-function 'completing-read)
+                       (lambda (_prompt collection &rest _)
+                         (setq offered (all-completions "" collection))
+                         (cadr offered))))
+              (wgn-agent-plans-test--follow "[[q:Q1]]"))
+            (should (equal offered '("Questions (2026-10-14-x.mac): open"
+                                     "Other (2026-10-15-z.mac): settled")))
+            (should (equal (buffer-file-name) other))))))))
+
+(defmacro wgn-agent-plans-test--with-repo (&rest body)
+  "Run BODY with a git repository at `repo', ROOT/github.com/wesnel/thing.
+`wgn/agent-plans-repository-directories' finds it, and its origin is on
+GitHub.  `commit' commits a file's new text and returns the commit."
+  (declare (indent 0))
+  `(let* ((root (file-name-as-directory (make-temp-file "agent-plans-repo-" t)))
+          (repo (file-name-as-directory (expand-file-name "github.com/wesnel/thing" root)))
+          (wgn/agent-plans-repository-directories
+           (list (expand-file-name "github.com/*" root)))
+          (process-environment
+           (append '("GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
+                     "GIT_AUTHOR_NAME=t" "GIT_AUTHOR_EMAIL=t@t" "GIT_COMMITTER_NAME=t"
+                     "GIT_COMMITTER_EMAIL=t@t")
+                   process-environment)))
+     (cl-flet ((commit (file text)
+                 (wgn-agent-plans-test--write (expand-file-name file repo) text)
+                 (let ((default-directory repo))
+                   (should (eq 0 (call-process "git" nil nil nil "add" file)))
+                   (should (eq 0 (call-process "git" nil nil nil "-c" "commit.gpgsign=false"
+                                               "commit" "-q" "-m" file)))
+                   (wgn/agent-plans--git repo "rev-parse" "HEAD"))))
+       (unwind-protect
+           (progn
+             (make-directory repo t)
+             (let ((default-directory repo))
+               (should (eq 0 (call-process "git" nil nil nil "init" "-q")))
+               (should (eq 0 (call-process "git" nil nil nil "remote" "add" "origin"
+                                           "git@github.com:wesnel/thing.git"))))
+             ,@body)
+         (delete-directory root t)))))
+
+(ert-deftest wgn-agent-plans-repository-is-found-by-name ()
+  (wgn-agent-plans-test--with-repo
+    (should (equal (wgn/agent-plans--repository "thing") repo))
+    (should (equal (wgn/agent-plans--repository "wesnel/thing") repo))
+    (should (equal (wgn/agent-plans--repository repo) repo))
+    (should-not (wgn/agent-plans--repository "someone/thing" t))
+    (should-error (wgn/agent-plans--repository "nothing") :type 'user-error)))
+
+(ert-deftest wgn-agent-plans-git-links-open-magit ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-links
+      (let (shown)
+        (cl-letf (((symbol-function 'magit-log-other)
+                   (lambda (revs &rest _) (push (list 'log revs default-directory) shown)))
+                  ((symbol-function 'magit-show-commit)
+                   (lambda (rev &rest _) (push (list 'commit rev default-directory) shown)))
+                  ((symbol-function 'magit-status)
+                   (lambda (directory &rest _) (push (list 'status directory) shown))))
+          (wgn-agent-plans-test--follow "[[branch:thing:org-plans]]")
+          (wgn-agent-plans-test--follow "[[commit:wesnel/thing:abc1234]]")
+          (wgn-agent-plans-test--follow (format "[[wt:%s]]" (directory-file-name repo)))
+          (should-error (wgn-agent-plans-test--follow "[[branch:thing]]") :type 'user-error))
+        (should (equal (reverse shown)
+                       `((log ("org-plans") ,repo) (commit "abc1234" ,repo) (status ,repo))))))))
+
+(ert-deftest wgn-agent-plans-pr-link-uses-forge-else-the-browser ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-links
+      (let (shown)
+        (cl-letf (((symbol-function 'forge-get-pullreq)
+                   (lambda (number) (and (= number 3) (list 'pullreq number default-directory))))
+                  ((symbol-function 'forge-topic-setup-buffer)
+                   (lambda (topic) (push topic shown)))
+                  ((symbol-function 'browse-url)
+                   (lambda (url &rest _) (push url shown))))
+          (wgn-agent-plans-test--follow "[[pr:thing#3]]")
+          ;; Not pulled into forge.
+          (wgn-agent-plans-test--follow "[[pr:thing#4]]")
+          ;; Not cloned here.
+          (wgn-agent-plans-test--follow "[[pr:wesnel/elsewhere#5]]")
+          (should-error (wgn-agent-plans-test--follow "[[pr:elsewhere#5]]") :type 'user-error)
+          (should-error (wgn-agent-plans-test--follow "[[pr:thing#x]]") :type 'user-error))
+        (should (equal (reverse shown)
+                       `((pullreq 3 ,repo)
+                         "https://github.com/wesnel/thing/pull/4"
+                         "https://github.com/wesnel/elsewhere/pull/5")))))))
+
+(ert-deftest wgn-agent-plans-links-export-as-text-or-their-address ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-links
+      (require 'ox-html)
+      (require 'ox-md)
+      (let ((org-export-with-toc nil)
+            (org-html-postamble nil))
+        (let ((html (org-export-string-as
+                     (concat "[[pr:thing#4][the PR & more]] and [[plan:2026-10-14-x.mac#Q1]]"
+                             " and [[commit:thing:a<b]] and [[plan:x][a & b]]")
+                     'html t)))
+          (should (string-match-p
+                   "<a href=\"https://github.com/wesnel/thing/pull/4\">the PR &amp; more</a>" html))
+          (should (string-match-p "<code>plan:2026-10-14-x.mac#Q1</code>" html))
+          (should (string-match-p "<code>commit:thing:a&lt;b</code>" html))
+          ;; A description arrives exported already.
+          (should (string-match-p " a &amp; b" html)))
+        (require 'ox-latex)
+        (let ((latex (org-export-string-as
+                      "[[plan:2026-10-14-x.mac#Q_1]] and [[pr:thing#4][the PR & more]]" 'latex t)))
+          (should (string-match-p (regexp-quote "\\texttt{plan:2026-10-14-x.mac\\#Q\\_1}") latex))
+          (should (string-match-p (regexp-quote "\\href{https://github.com/wesnel/thing/pull/4}{the PR \\& more}")
+                                  latex)))
+        (should (string-match-p "`branch:thing:main`"
+                                (org-export-string-as "[[branch:thing:main]]" 'md t)))))))
+
+(ert-deftest wgn-agent-plans-citation-goes-to-the-line-and-warns-of-drift ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-links
+      (let* ((cited (commit "a.el" "one\ntwo\nthree\n"))
+             (file (expand-file-name "a.el" repo))
+             warnings)
+        (cl-letf (((symbol-function 'display-warning)
+                   (lambda (_type message &rest _) (push message warnings))))
+          (with-temp-buffer
+            (wgn-agent-plans-test--follow (format "[[file:%s::2@%s]]" file (substring cited 0 7)))
+            (should (equal (buffer-file-name) file))
+            (should (equal (line-number-at-pos) 2))
+            (should-not warnings)
+            (kill-buffer))
+          (commit "b.el" "other\n")
+          (with-temp-buffer
+            (wgn-agent-plans-test--follow (format "[[file:%s::3@%s]]" file cited))
+            (should (equal (line-number-at-pos) 3))
+            (kill-buffer))
+          (should (string-match-p "the file is the same there" (car warnings)))
+          (commit "a.el" "zero\none\ntwo\nthree\n")
+          (with-temp-buffer
+            (wgn-agent-plans-test--follow (format "[[file:%s::3@%s]]" file cited))
+            (kill-buffer))
+          (should (string-match-p "differs, so the line may have moved" (car warnings)))
+          (with-temp-buffer
+            (wgn-agent-plans-test--follow (format "[[file:%s::1@deadbeef]]" file))
+            (kill-buffer))
+          (should (string-match-p "deadbeef is not a commit" (car warnings))))))))
+
 ;;;; Against the real agent-plan
 ;;
 ;; Skipped where `agent-plan' is not on `exec-path'; nix-config's
