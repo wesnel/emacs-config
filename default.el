@@ -762,8 +762,19 @@ if USER is given, its username is USER.  The port is not matched."
   (pr-review
    pr-review-open-url)
 
+  :bind
+  (:map pr-review-mode-map
+        ("C-c C-g" . #'review-guide))
+
   :custom
   (pr-review-ghub-auth-name 'forge))
+
+;;;; Read a review record of git delegate's.
+(use-package review-guide
+  :ensure t
+
+  :commands
+  (review-guide))
 
 ;;;; Aggregate project TODO comments in magit.
 (use-package magit-todos
