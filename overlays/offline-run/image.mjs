@@ -80,12 +80,12 @@ function prune(cacheDirectory, keep, now = Date.now()) {
 }
 
 export function managedImageOptions(env = process.env) {
-  for (const name of ["ECA_GONDOLIN_BUILD_CONFIG", "ECA_GONDOLIN_BUILDER_ID", "ECA_GONDOLIN_IMAGE_CACHE"]) {
+  for (const name of ["OFFLINE_RUN_BUILD_CONFIG", "OFFLINE_RUN_BUILDER_ID", "OFFLINE_RUN_IMAGE_CACHE"]) {
     if (!env[name]) throw new Error(`${name} is unset`);
   }
   return {
-    configPath: env.ECA_GONDOLIN_BUILD_CONFIG,
-    builderId: env.ECA_GONDOLIN_BUILDER_ID,
-    cacheDirectory: env.ECA_GONDOLIN_IMAGE_CACHE,
+    configPath: env.OFFLINE_RUN_BUILD_CONFIG,
+    builderId: env.OFFLINE_RUN_BUILDER_ID,
+    cacheDirectory: env.OFFLINE_RUN_IMAGE_CACHE,
   };
 }

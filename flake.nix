@@ -44,40 +44,34 @@
           ;
       };
     in {
-      packages = with pkgs;
-        {
-          inherit
-            emacs-config
-            emacs-config-dynamic
-            claude-agent-acp
-            eca
-            eca-guest
-            eca-gondolin
-            gondolin
-            parinfer-rust-emacs
-            wgn-emacs
-            wgn-emacs-pgtk
-            wgn-emacs-nox
-            wgn-emacs-macport
-            wgn-emacs-macport-cross
-            wgn-emacs-unstable
-            wgn-emacs-unstable-nox
-            wgn-emacs-git
-            wgn-emacs-git-nox
-            ;
+      packages = with pkgs; {
+        inherit
+          emacs-config
+          emacs-config-dynamic
+          claude-agent-acp
+          gondolin
+          offline-run
+          parinfer-rust-emacs
+          wgn-emacs
+          wgn-emacs-pgtk
+          wgn-emacs-nox
+          wgn-emacs-macport
+          wgn-emacs-macport-cross
+          wgn-emacs-unstable
+          wgn-emacs-unstable-nox
+          wgn-emacs-git
+          wgn-emacs-git-nox
+          ;
 
-          default = wgn-emacs;
-        }
-        // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-          inherit (pkgs) eca-bwrap;
-        };
+        default = wgn-emacs;
+      };
 
       checks =
-        {
-          eca-gondolin-image-tools = pkgs.eca-gondolin.tests.image-tools;
+        pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
+          offline-run-image-tools = pkgs.offline-run.tests.image-tools;
         }
         // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
-          eca-bwrap-sandbox = pkgs.eca-bwrap.tests.sandbox;
+          offline-run-sandbox = pkgs.offline-run.tests.sandbox;
         };
 
       devShells = {
@@ -111,8 +105,6 @@
         }: let
           cfg = config.home.programs.wgn.emacs;
         in {
-          imports = [./modules/eca.nix];
-
           options = {
             home.programs.wgn.emacs = {
               enable = lib.mkEnableOption "Enable the Home Manager portion of Wesley's Emacs Configuration";
