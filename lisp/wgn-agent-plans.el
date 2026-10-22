@@ -386,14 +386,73 @@ ID the plan does not hold never settles."
   "Return non-nil when FILE is a plan's log, which `agent-plan log' alone writes."
   (equal (nth 2 (wgn/agent-plans--file-parts file)) "log"))
 
+;; Review records, which `git delegate' and `pr-loop' alone write, are
+;; held by the same lock as this host's plans: a deliberate edit, after
+;; C-x C-q, is how the operator repairs one that either refuses.
+
+(defvar review-guide-records-directory)
+
+(defun wgn/agent-plans-records-directories ()
+  "Return the directories of review records.
+`git delegate' and `pr-loop' write them under agent-tools/reviews in
+$XDG_STATE_HOME, else in ~/.local/state; `review-guide-records-directory',
+when set, is where review-guide reads them."
+  (let ((state (getenv "XDG_STATE_HOME")))
+    (delete-dups
+     (delq nil
+           (list (file-name-as-directory
+                  (expand-file-name "agent-tools/reviews"
+                                    (if (and state (file-name-absolute-p state))
+                                        state
+                                      "~/.local/state")))
+                 (and (bound-and-true-p review-guide-records-directory)
+                      (file-name-as-directory
+                       (expand-file-name review-guide-records-directory))))))))
+
+(defun wgn/agent-plans--in-records-p (file)
+  "Return non-nil when FILE is under a directory of review records."
+  (and file
+       (let ((truename (file-truename file)))
+         (seq-some (lambda (directory)
+                     (string-prefix-p (file-truename directory) truename))
+                   (wgn/agent-plans-records-directories)))))
+
+(defun wgn/agent-plans--record-p (file)
+  "Return non-nil when FILE is a review record, an Org file in their directory.
+Only records are locked: a save's backup and an auto-save file beside
+one are Emacs's own."
+  (and file
+       (string-suffix-p ".org" file)
+       (wgn/agent-plans--in-records-p file)))
+
+(defun wgn/agent-plans--guarded-parts (file)
+  "Return (NAME HOST PART) of FILE when the lock holds it, else nil.
+That is a plan's, part's or log's file, as `wgn/agent-plans--file-parts'
+gives it, or a review record, whose HOST is nil and PART \"record\"."
+  (or (wgn/agent-plans--file-parts file)
+      (and (wgn/agent-plans--record-p file)
+           (list (file-name-nondirectory file) nil "record"))))
+
+(defun wgn/agent-plans--record-locals (function &rest args)
+  "Call FUNCTION with ARGS; under the records, with no file variables.
+FUNCTION is `hack-local-variables', or `set-auto-mode', which reads a
+-*- line's mode: itself.  A review record, and a backup of one, holds
+text from models, GitHub and test runs, and Emacs's scan for a Local
+Variables list reads the end of the file, example blocks and all."
+  (if (wgn/agent-plans--in-records-p buffer-file-name)
+      (let ((enable-local-variables nil)
+            (enable-dir-local-variables nil))
+        (apply function args))
+    (apply function args)))
+
 (defun wgn/agent-plans--locked-p (buffer)
   "Return non-nil when BUFFER visits a plan file that only `agent-plan' writes.
 That is a log or another host's plan always, and this host's plan or
-part while its buffer is read-only: \\[read-only-mode] there is the
-operator's deliberate edit."
+part, or a review record, while its buffer is read-only:
+\\[read-only-mode] there is the operator's deliberate edit."
   (let* ((base (or (buffer-base-buffer buffer) buffer))
          (file (buffer-file-name base)))
-    (and (wgn/agent-plans--file-parts file)
+    (and (wgn/agent-plans--guarded-parts file)
          (or (wgn/agent-plans--mirror-host file)
              (wgn/agent-plans--log-p file)
              (buffer-local-value 'buffer-read-only base)))))
@@ -408,6 +467,12 @@ FILE's own buffer, which \\[read-only-mode] there does not let through."
      ((wgn/agent-plans--log-p file)
       (format "agent-plan log alone writes %s" (file-name-nondirectory file)))
      (host (format "%s is %s's plan; answer it there" (file-name-nondirectory file) host))
+     ((and (wgn/agent-plans--record-p file) elsewhere)
+      (format "git delegate and pr-loop write %s, and it is edited by hand only from its own buffer, after C-x C-q there"
+              (file-name-nondirectory file)))
+     ((wgn/agent-plans--record-p file)
+      (format "git delegate and pr-loop write %s: C-x C-q to edit it by hand"
+              (file-name-nondirectory file)))
      (elsewhere
       (format "agent-plan writes %s, and it is edited by hand only from its own buffer, after C-x C-q there"
               (file-name-nondirectory file)))
@@ -459,7 +524,7 @@ and every refusal outside `save-some-buffers', is signalled as it is."
         (user-error
          (unless (and wgn/agent-plans--refused
                       (eq (cdr err) wgn/agent-plans--refused)
-                      (wgn/agent-plans--file-parts (buffer-file-name buffer)))
+                      (wgn/agent-plans--guarded-parts (buffer-file-name buffer)))
            (signal (car err) (cdr err)))
          (unless (memq buffer wgn/agent-plans--skipped)
            (push buffer wgn/agent-plans--skipped)
@@ -494,7 +559,7 @@ for :AFTER: alone, so locked entries stay listed."
   (let ((file (buffer-file-name (buffer-base-buffer)))
         (to (plist-get change :to)))
     (cond
-     ((not (wgn/agent-plans--file-parts file)) t)
+     ((not (wgn/agent-plans--guarded-parts file)) t)
      ((and (wgn/agent-plans--locked-p (current-buffer))
            (not (eq (plist-get change :from) 'todo)))
       (setq org-block-entry-blocking (wgn/agent-plans--refusal file))
@@ -617,7 +682,7 @@ or part's file is written only from the buffer visiting it, opened for
 a deliberate edit, only for this host, and only over what that buffer
 last read of it; so \\[write-file] from elsewhere onto one is refused
 too."
-  (let ((parts (wgn/agent-plans--file-parts buffer-file-name))
+  (let ((parts (wgn/agent-plans--guarded-parts buffer-file-name))
         (elsewhere (not (equal wgn/agent-plans--protected buffer-file-name))))
     (cond
      ((not parts) nil)
@@ -639,7 +704,7 @@ Only the save of this host's plan or part, from the buffer visiting it,
 is let through, `wgn/agent-plans--guard-write' having decided it; and
 only over what that buffer last read of the file, if it is there.  It is
 not there once a backup has renamed it away."
-  (when (wgn/agent-plans--file-parts file)
+  (when (wgn/agent-plans--guarded-parts file)
     (if (or (wgn/agent-plans--log-p file)
             (wgn/agent-plans--mirror-host file)
             (not (and (equal file buffer-file-name)
@@ -673,7 +738,7 @@ visited on, `wgn/agent-plans--protected', and no other.  Refused before
 it runs, the buffer keeps its name, mode, auto-save file and lock."
   (when (and (stringp filename) (not (string-empty-p filename)))
     (let ((file (expand-file-name filename)))
-      (when (and (wgn/agent-plans--file-parts file)
+      (when (and (wgn/agent-plans--guarded-parts file)
                  (not (equal file wgn/agent-plans--protected)))
         (user-error "%s" (wgn/agent-plans--refusal file t))))))
 
@@ -694,7 +759,7 @@ runs."
                         (expand-file-name (file-name-nondirectory (or own (buffer-name)))
                                           filename))
                        (t (expand-file-name filename)))))
-    (when (and (wgn/agent-plans--file-parts target)
+    (when (and (wgn/agent-plans--guarded-parts target)
                (wgn/agent-plans--locked-p (current-buffer)))
       (user-error "%s" (wgn/agent-plans--refusal target (not (equal target own))))))
   (let ((file buffer-file-name)
@@ -708,7 +773,7 @@ runs."
         (apply write-file filename args)
       (error
        (when (and (not (equal buffer-file-name file))
-                  (wgn/agent-plans--file-parts buffer-file-name))
+                  (wgn/agent-plans--guarded-parts buffer-file-name))
          (set-visited-file-name file t)
          (rename-buffer name t)
          (set-buffer-modified-p modified)
@@ -781,12 +846,15 @@ jumps (a prefix list, or 0) leaves the plan as it is."
     (wgn/agent-plans--refuse-move)))
 
 (defun wgn/agent-plans--header (file)
-  "Return the header line of the buffer visiting FILE, a plan's, part's or log's."
+  "Return the header line of the buffer visiting FILE.
+FILE is a plan's, part's or log's, or a review record."
   (let ((host (wgn/agent-plans--mirror-host file)))
     (cond
      (host (format " %s's plan, written there · C-c C-o follows a link" host))
      ((equal (nth 2 (wgn/agent-plans--file-parts file)) "log")
       " Written by agent-plan log alone")
+     ((wgn/agent-plans--record-p file)
+      " Written by git delegate and pr-loop · M-x review-guide shows it with its diff")
      (t (concat " Written by agent-plan · answer questions with /questions in a Claude session"
                 " · C-c C-o follows a link · org-capture A f or A q adds a follow-up or question")))))
 
@@ -797,7 +865,7 @@ binds `buffer-file-name' while it sets its mode but visits nothing, and
 one \\[write-file] renamed onto a plan file was not visited on it."
   (and buffer-file-name
        (equal wgn/agent-plans--protected buffer-file-name)
-       (wgn/agent-plans--file-parts buffer-file-name)))
+       (wgn/agent-plans--guarded-parts buffer-file-name)))
 
 (defvar wgn/agent-plans--locking nil
   "Non-nil while this file locks a buffer, which has nothing to settle.")
@@ -910,7 +978,7 @@ by its base, \\[read-only-mode] locks or unlocks the base."
 A buffer changed as it is visited, as `require-final-newline' can leave
 it, last read the file itself; one holding an auto-save file's text
 read none of it: `wgn/agent-plans--note-unknown-base'."
-  (when (wgn/agent-plans--file-parts buffer-file-name)
+  (when (wgn/agent-plans--guarded-parts buffer-file-name)
     (setq wgn/agent-plans--protected buffer-file-name)
     (wgn/agent-plans--note-seen (buffer-modified-p))
     (wgn/agent-plans--protect-file)))
@@ -924,7 +992,7 @@ is taken to have read its file only if the file is unchanged since."
     (with-current-buffer buffer
       (when (and buffer-file-name
                  (not (buffer-base-buffer))
-                 (wgn/agent-plans--file-parts buffer-file-name))
+                 (wgn/agent-plans--guarded-parts buffer-file-name))
         (setq wgn/agent-plans--protected buffer-file-name)
         (cond
          ((not (buffer-modified-p))
@@ -1073,9 +1141,12 @@ warning, one whose save is refused; an entry is not done while an item in
 its :AFTER: is open; a reverted plan buffer, auto-reverted too, reads
 its keyword lines again, keeps its folds and is locked again; a plan
 buffer's unsaved changes are saved or discarded before it locks; and
-its indirect buffers are locked with it.  Turning the mode on protects
-the plan buffers already visited; turning it off takes the header line
-and guard from plan buffers and leaves them read-only."
+its indirect buffers are locked with it.  Review records, under
+`wgn/agent-plans-records-directories', are held as this host's plans
+are, since only `git delegate' and `pr-loop' write them, and no file
+variables apply in them.  Turning the mode on protects the plan
+buffers already visited; turning it off takes the header line and
+guard from plan buffers and leaves them read-only."
   :global t
   (if wgn/agent-plans-protect-mode
       (progn
@@ -1105,6 +1176,8 @@ and guard from plan buffers and leaves them read-only."
         (advice-add 'set-visited-file-name :before #'wgn/agent-plans--refuse-visit)
         (advice-add 'org-archive-subtree :before #'wgn/agent-plans--refuse-move)
         (advice-add 'org-refile :before #'wgn/agent-plans--refuse-refile-out)
+        (advice-add 'hack-local-variables :around #'wgn/agent-plans--record-locals)
+        (advice-add 'set-auto-mode :around #'wgn/agent-plans--record-locals)
         (dolist (command wgn/agent-plans--agenda-edits)
           (advice-add command :around #'wgn/agent-plans--agenda-guard))
         (wgn/agent-plans--protect-all))
@@ -1123,6 +1196,8 @@ and guard from plan buffers and leaves them read-only."
     (advice-remove 'set-visited-file-name #'wgn/agent-plans--refuse-visit)
     (advice-remove 'org-archive-subtree #'wgn/agent-plans--refuse-move)
     (advice-remove 'org-refile #'wgn/agent-plans--refuse-refile-out)
+    (advice-remove 'hack-local-variables #'wgn/agent-plans--record-locals)
+    (advice-remove 'set-auto-mode #'wgn/agent-plans--record-locals)
     (when wgn/agent-plans--has-restore-functions
       (remove-hook 'revert-buffer-restore-functions #'wgn/agent-plans--restore-lock))
     (advice-remove 'revert-buffer #'wgn/agent-plans--around-revert)

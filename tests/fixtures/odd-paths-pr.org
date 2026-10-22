@@ -1,0 +1,32 @@
+#+title: review
+#+TODO: OPEN DEFER OPERATOR | FIX PROPOSE REBUT DUPLICATE BELONGS
+* Pull request
+:PROPERTIES:
+:VERSION: 2
+:REPO: owner/repo
+:PR: 12
+:UPDATED: [2026-10-20 Tue 14:05]
+:END:
+** T-PRRT_kwDOAbc001
+:PROPERTIES:
+:AUTHORS: copilot-pull-request-reviewer:Bot
+:RESOLVED: nil
+:PATH: app/%5Bid%5D/page.tsx
+:LINE: 2
+:END:
+#+begin_example
+The key can collide when two writes share an mtime.
+#+end_example
+** T-PRRT_kwDOAbc002
+:PROPERTIES:
+:AUTHORS: qodo-code-review:Bot wesnel:User
+:RESOLVED: t
+:PATH: na%C3%AFve.txt
+:LINE: 12
+:END:
+#+begin_example
+Add a test of a miss.
+#+end_example
+#+begin_example
+Added in "Test a cache miss".
+#+end_example

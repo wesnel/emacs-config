@@ -221,6 +221,18 @@ final: prev: let
             };
           };
 
+        review-guide = ePkgs.trivialBuild {
+          pname = "review-guide";
+          version = "0.2";
+
+          src = ../lisp/review-guide;
+
+          packageRequires = with ePkgs; [
+            magit-section
+            pr-review
+          ];
+        };
+
         auctex = ePrev.auctex.overrideAttrs (old: {
           outputs =
             (old.outputs or [])

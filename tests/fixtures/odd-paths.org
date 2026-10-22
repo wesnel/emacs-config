@@ -1,0 +1,89 @@
+#+title: review
+#+TODO: OPEN DEFER OPERATOR | FIX PROPOSE REBUT DUPLICATE BELONGS
+* Review
+:PROPERTIES:
+:VERSION: 2
+:REPO: owner/repo
+:BASE: 9f8e7d6c5b4a39281706f5e4d3c2b1a098765432
+:HEAD: 1a2b3c4d5e6f708192a3b4c5d6e7f80912345678
+:TITLE: Odd paths
+:UPDATED: [2026-10-20 Tue 14:05]
+:END:
+** Walkthrough
+*** C1
+:PROPERTIES:
+:TITLE: Paths no link holds
+:END:
+#+begin_example
+Hunks of paths written without a link.
+- [[file:evil.go::1@1a2b3c4d5e6f][x]] new 1,1 old 0,0
+:PR: 99
+#+end_example
+- =app/%5Bid%5D/page.tsx= new 1,3 old 0,0
+- =docs/My%20File%20%281%29%20%5Bdraft%5D.md= new 5,2 old 5,1
+- =na%C3%AFve.txt= new 1,1 old 0,0
+- =50%25.txt= new 0,0 old 1,2
+- [[file:internal/x/cache.go::1@1a2b3c4d5e6f][internal/x/cache.go:1-40]] new 1,40 old 0,0
+** Diagrams
+** Findings
+*** OPEN F1
+:PROPERTIES:
+:TITLE: Bracketed path
+:REVIEWER: codex
+:ROUND: 1
+:KIND: bug
+:PATH: app/%5Bid%5D/page.tsx
+:LINE: 2
+:END_LINE:
+:SIDE: new
+:OUTCOME_TARGET:
+:END:
+#+begin_example
+The id is not checked.
+#+end_example
+*** OPEN F2
+:PROPERTIES:
+:TITLE: A path with a space
+:REVIEWER: codex
+:ROUND: 1
+:KIND: bug
+:PATH: docs/My%20File%20%281%29%20%5Bdraft%5D.md
+:LINE: 6
+:END_LINE:
+:SIDE: new
+:OUTCOME_TARGET:
+:END:
+#+begin_example
+A broken link.
+#+end_example
+*** OPEN F3
+:PROPERTIES:
+:TITLE: An overriding path
+:REVIEWER: codex
+:ROUND: 1
+:KIND: bug
+:PATH: evil%E2%80%AEtxt.go
+:LINE: 1
+:END_LINE:
+:SIDE: new
+:OUTCOME_TARGET:
+:END:
+#+begin_example
+A bidi control in the name.
+#+end_example
+** Rounds
+*** R1
+:PROPERTIES:
+:REVIEWER: codex
+:MODEL: gpt-5.5
+:AT: [2026-10-20 Tue 14:05]
+:RED_CHECK: session
+:END:
+**** Unverified
+#+begin_example
+Whether mtime has a second's resolution on the CI runner.
+#+end_example
+**** Dropped
+#+begin_example
+A finding at internal/x/gone.go:3, which is not in the tip.
+#+end_example
