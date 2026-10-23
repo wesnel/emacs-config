@@ -1,3 +1,7 @@
+# A gosec finding that does not apply is annotated where it is found,
+# `//nolint:gosec // <why it does not apply>`; nolintlint refuses an
+# annotation without a rule or a reason. An exclusion added here carries its
+# reason beside it.
 version: "2"
 
 linters:
@@ -5,13 +9,31 @@ linters:
   enable:
     - errcheck
     - exhaustive
+    - gosec
     - govet
     - ineffassign
     - misspell
+    - nolintlint
     - staticcheck
     - unused
+
+  settings:
+    gosec:
+      excludes:
+        # Unchecked errors: errcheck reports the same calls.
+        - G104
+    nolintlint:
+      require-explanation: true
+      require-specific: true
 
 formatters:
   enable:
     - gofmt
     - goimports
+
+# Report every finding: with the default caps and one issue per line, one
+# finding can hide another.
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  uniq-by-line: false
