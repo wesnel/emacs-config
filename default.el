@@ -533,9 +533,12 @@ if USER is given, its username is USER.  The port is not matched."
   (global-hl-todo-mode +1))
 
 ;;;; Remote editing.
+;;
+;; NOTE: This is the TRAMP built into Emacs.  Ensuring the ELPA
+;;       package instead puts a copy on `load-path' that shadows it,
+;;       and security fixes which nixpkgs applies to Emacs do not
+;;       reach that copy.
 (use-package tramp
-  :ensure t
-
   :custom
   (remote-file-name-inhibit-locks t)
   (tramp-use-scp-direct-remote-copying t)
