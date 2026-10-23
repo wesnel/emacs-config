@@ -90,10 +90,43 @@ Its part and log files sit beside it."
 (ert-deftest wgn-agent-plans-directory-comes-from-the-tools-config ()
   (wgn-agent-plans-test--with-plans
     (should (equal (wgn/agent-plans-directory) plans)))
+  ;; Nothing else names it.
   (let ((process-environment
          (cons "AGENT_TOOLS_CONFIG=/nonexistent/config.json" process-environment)))
-    (should (equal (wgn/agent-plans-directory)
-                   (expand-file-name "~/git/notes/agents")))))
+    (should-not (wgn/agent-plans-directory))))
+
+(ert-deftest wgn-agent-plans-directory-is-only-an-absolute-path ()
+  (wgn-agent-plans-test--with-plans
+    ;; As agent-plan refuses them: empty, relative to somewhere, or ~.
+    (let ((stamp 0))
+      (dolist (dir '("" "plans" "~/plans"))
+        (wgn-agent-plans-test--write
+         config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" dir))
+        (set-file-times config (time-add (current-time) (cl-incf stamp)))
+        (should-not (wgn/agent-plans-directory))))))
+
+(ert-deftest wgn-agent-plans-views-say-the-config-is-missing ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (wgn-agent-plans-test--write config "{\"plans\": {\"host\": \"mac\"}}")
+      (let ((missing (format "agent-tools config is missing: %s sets no plans.dir" config))
+            (org-agenda-files '("~/org"))
+            (org-link-parameters (copy-sequence org-link-parameters))
+            (org-execute-file-search-functions nil))
+        (wgn/agent-plans-links-setup)
+        (cl-letf (((symbol-function 'completing-read) (lambda (&rest _) (error "Prompted"))))
+          (should (equal (cadr (should-error (wgn/agent-plans) :type 'user-error)) missing))
+          (should (equal (cadr (should-error (org-link-open-from-string "[[plan:2026-10-14-x.mac]]")
+                                             :type 'user-error))
+                         missing))
+          (with-temp-buffer
+            (should (equal (cadr (should-error (org-link-open-from-string "[[q:Q1]]")
+                                               :type 'user-error))
+                           missing))))
+        (let ((blocks (unwind-protect (wgn-agent-plans-test--agenda-blocks)
+                        (org-agenda-quit))))
+          (should (string-match-p (concat "^  " (regexp-quote missing) "$")
+                                  (cdr (assoc "Waiting on you" blocks)))))))))
 
 (ert-deftest wgn-agent-plans-config-is-read-once-per-change ()
   (wgn-agent-plans-test--with-plans
@@ -116,7 +149,7 @@ Its part and log files sit beside it."
     (wgn-agent-plans-test--protected
       (let ((other (expand-file-name "other.txt" root)))
         (wgn-agent-plans-test--write config "{\"plans\": {\"dir\": ")
-        (should (equal (wgn/agent-plans-directory) (expand-file-name "~/git/notes/agents")))
+        (should-not (wgn/agent-plans-directory))
         ;; Every write asks whether it is onto a plan.
         (with-temp-file other (insert "x"))
         (should (file-exists-p other))))))

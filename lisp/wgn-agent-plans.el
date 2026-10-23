@@ -129,26 +129,40 @@ those writes go on."
                          nil)))))))
     (nth 2 wgn/agent-plans--config-cache)))
 
+(defun wgn/agent-plans--config-path (key)
+  "Return \"plans\".KEY in `agent-plan''s config file, or nil.
+It is nil unless the file sets KEY to an absolute path, as `agent-plan'
+requires: one starting with /, not ~."
+  (let ((path (and (wgn/agent-plans--plans-config)
+                   (gethash key (wgn/agent-plans--plans-config)))))
+    (and (stringp path) (string-prefix-p "/" path) (expand-file-name path))))
+
+(defun wgn/agent-plans--missing-config (key)
+  "Return the message that `agent-plan''s config file sets no \"plans\".KEY."
+  (format "agent-tools config is missing: %s sets no plans.%s"
+          (wgn/agent-plans--config-file) key))
+
 (defun wgn/agent-plans-directory ()
-  "Return the directory holding the plans.
-It is \"plans.dir\" in `agent-plan''s config file, or ~/git/notes/agents."
-  (let ((dir (and (wgn/agent-plans--plans-config)
-                  (gethash "dir" (wgn/agent-plans--plans-config)))))
-    (expand-file-name (if (and (stringp dir) (not (string-empty-p dir)))
-                          dir
-                        "~/git/notes/agents"))))
+  "Return the directory holding the plans, \"plans.dir\" in `agent-plan''s
+config file, or nil where the file does not set it."
+  (wgn/agent-plans--config-path "dir"))
+
+(defun wgn/agent-plans--require-directory ()
+  "Return `wgn/agent-plans-directory', or refuse, saying the config is missing."
+  (or (wgn/agent-plans-directory)
+      (user-error "%s" (wgn/agent-plans--missing-config "dir"))))
 
 (defun wgn/agent-plans-files ()
   "Return every plan file in the plans directory, newest first.
 Other hosts' plans, which are mirrors, are included.  Part and log files
 are not."
-  (sort (when (file-directory-p (wgn/agent-plans-directory))
-          (seq-filter (lambda (file)
-                        (let ((base (file-name-nondirectory file)))
-                          (and (string-match wgn/agent-plans--file-regexp base)
-                               (not (match-string 3 base)))))
-                      (directory-files (wgn/agent-plans-directory) t
-                                       wgn/agent-plans--file-regexp)))
+  (sort (let ((dir (wgn/agent-plans-directory)))
+          (when (and dir (file-directory-p dir))
+            (seq-filter (lambda (file)
+                          (let ((base (file-name-nondirectory file)))
+                            (and (string-match wgn/agent-plans--file-regexp base)
+                                 (not (match-string 3 base)))))
+                        (directory-files dir t wgn/agent-plans--file-regexp))))
         #'wgn/agent-plans--newer-p))
 
 (defun wgn/agent-plans--run (plan &rest args)
@@ -185,7 +199,7 @@ are not."
                               (cons (wgn/agent-plans--candidate plan) plan))
                             (or (wgn/agent-plans-files)
                                 (user-error "No plans under %s"
-                                            (wgn/agent-plans-directory))))))
+                                            (wgn/agent-plans--require-directory))))))
     (cdr (assoc (completing-read
                  "Plan: "
                  (lambda (string predicate action)
@@ -228,9 +242,9 @@ Logs are not."
    (lambda (file)
      (let ((parts (wgn/agent-plans--file-parts file)))
        (and parts (not (equal (nth 2 parts) "log")))))
-   (when (file-directory-p (wgn/agent-plans-directory))
-     (sort (directory-files (wgn/agent-plans-directory) t "\\.org\\'")
-           #'wgn/agent-plans--newer-p))))
+   (let ((dir (wgn/agent-plans-directory)))
+     (when (and dir (file-directory-p dir))
+       (sort (directory-files dir t "\\.org\\'") #'wgn/agent-plans--newer-p)))))
 
 (defun wgn/agent-plans-agenda-command ()
   "Return the `org-agenda-custom-commands' entry for key \"A\".
@@ -388,6 +402,7 @@ first dot."
   "Return (NAME HOST PART) of FILE in the plans directory, or nil.
 PART is a part's ID, \"log\", or nil for the plan's own file."
   (when (and file
+             (wgn/agent-plans-directory)
              (file-equal-p (file-name-directory file)
                            (file-name-as-directory (wgn/agent-plans-directory))))
     (let ((base (file-name-nondirectory file)))
@@ -1269,9 +1284,10 @@ Its refusal, on standard error, is signalled as a `user-error'."
   (unless (executable-find "agent-plan")
     (user-error "agent-plan is not on `exec-path'"))
   (let ((stderr (make-temp-file "agent-plan-stderr"))
-        (default-directory (if (file-directory-p (wgn/agent-plans-directory))
-                               (file-name-as-directory (wgn/agent-plans-directory))
-                             (expand-file-name "~/"))))
+        (default-directory (let ((dir (wgn/agent-plans-directory)))
+                             (if (and dir (file-directory-p dir))
+                                 (file-name-as-directory dir)
+                               (expand-file-name "~/")))))
     (unwind-protect
         (with-temp-buffer
           (let ((status (apply #'call-process "agent-plan" nil (list t stderr) nil args)))
@@ -1463,8 +1479,11 @@ questions are answered with /questions in a Claude session, and
   (org-agenda-prepare "Waiting on you")
   (insert (propertize "Waiting on you" 'face 'org-agenda-structure) "\n")
   (let ((items (wgn/agent-plans-waiting)))
-    (unless items
-      (insert "  nothing\n"))
+    (cond
+     ((not (wgn/agent-plans-directory))
+      (insert "  " (wgn/agent-plans--missing-config "dir") "\n"))
+     ((not items)
+      (insert "  nothing\n")))
     (dolist (item items)
       (let ((start (point)))
         (insert (format "  %s %s %s%s\n"
@@ -1557,7 +1576,7 @@ WHAT names the parts, for the refusal."
 
 (defun wgn/agent-plans--by-id (id)
   "Return the plan file of the plan whose ID is ID."
-  (let ((file (expand-file-name (concat id ".org") (wgn/agent-plans-directory))))
+  (let ((file (expand-file-name (concat id ".org") (wgn/agent-plans--require-directory))))
     (unless (and (wgn/agent-plans--file-parts file)
                  (null (nth 2 (wgn/agent-plans--file-parts file)))
                  (file-exists-p file))
@@ -1605,7 +1624,8 @@ that holds it, asking which when several do."
          (plan (cond
                 (at (wgn/agent-plans--by-id (substring path 0 at)))
                 (here here)
-                (t (let ((plans (wgn/agent-plans--holding qid)))
+                (t (let ((plans (progn (wgn/agent-plans--require-directory)
+                                       (wgn/agent-plans--holding qid))))
                      (cond
                       ((cdr plans) (wgn/agent-plans--read-holder qid plans))
                       (plans (car plans))
