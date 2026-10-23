@@ -270,10 +270,11 @@ GitHub Actions runs the same suite on pushes and pull requests.
 
 The guest image provisioning tests and the Gondolin runner tests use
 Node's built-in test runner. The runner tests replace the Gondolin SDK
-with a stub, so they need no VM:
+with a stub, so they need no VM. The same command runs the tests of CI's
+Emacs install script, which stub `apt-get`:
 
 ``` sh
-node --test tests/image.test.mjs tests/offline-run.test.mjs
+node --test tests/image.test.mjs tests/offline-run.test.mjs tests/install-emacs.test.mjs
 ```
 
 On Darwin, the packaged image tools are tested in a Nix derivation with an

@@ -17,10 +17,10 @@ jobs:
         with:
           persist-credentials: false
       # elpa-magit-section lets the guide buffer's tests run rather than skip.
-      - name: Install Emacs
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y emacs-nox elpa-magit-section
+      - uses: ./.github/actions/install-emacs
+        timeout-minutes: 5
+        with:
+          packages: elpa-magit-section
       - name: Run review-guide tests
         run: |
           emacsclient --alternate-editor="" --socket-name=review-guide-tests --eval '
