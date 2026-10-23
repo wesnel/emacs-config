@@ -45,6 +45,29 @@ A plan's own file has no group 3.")
 (defconst wgn/agent-plans-followup-id "^\\(P[0-9]+\\.\\)?F[0-9]+$"
   "Match the ID of a follow-up.")
 
+(defconst wgn/agent-plans--id-properties '("CUSTOM_ID" "ID")
+  "The properties that hold an entry's ID, the first one set winning.
+`agent-plan' writes items' IDs to ID; plans that are org-roam nodes hold
+them in CUSTOM_ID, since org-id and org-roam take every ID as global.
+Plans of both forms are on disk, so both are read.")
+
+(defun wgn/agent-plans--id-line (id)
+  "Return a regexp matching the property line that gives an entry the ID ID."
+  (format "^[ \t]*:%s:[ \t]+%s[ \t]*$"
+          (regexp-opt wgn/agent-plans--id-properties) (regexp-quote id)))
+
+(defun wgn/agent-plans--entry-id ()
+  "Return the ID of the entry at point, or nil."
+  (seq-some (lambda (property) (org-entry-get nil property))
+            wgn/agent-plans--id-properties))
+
+(defun wgn/agent-plans--id-match (&rest patterns)
+  "Return an agenda match for entries whose ID matches one of PATTERNS."
+  (mapconcat (lambda (pattern)
+               (mapconcat (lambda (property) (concat property "={" pattern "}"))
+                          wgn/agent-plans--id-properties "|"))
+             patterns "|"))
+
 (defun wgn/agent-plans--config-file ()
   "Return the file `agent-plan' reads its settings from."
   (or (getenv "AGENT_TOOLS_CONFIG")
@@ -194,9 +217,9 @@ day.  `org-agenda-files' is bound to the plan files for this view alone."
   `("A" "Agent plans"
     ((wgn/agent-plans-agenda-waiting "")
      ;; Two matches rather than one regexp: the matcher splits at `|'.
-     (tags-todo ,(concat "ID={" wgn/agent-plans-part-id "}|ID={" wgn/agent-plans-step-id "}")
+     (tags-todo ,(wgn/agent-plans--id-match wgn/agent-plans-part-id wgn/agent-plans-step-id)
                 ((org-agenda-overriding-header "Ready")))
-     (tags-todo ,(concat "ID={" wgn/agent-plans-followup-id "}")
+     (tags-todo ,(wgn/agent-plans--id-match wgn/agent-plans-followup-id)
                 ((org-agenda-overriding-header "Follow-ups"))))
     ((org-agenda-files (wgn/agent-plans-agenda-files))
      (org-agenda-dim-blocked-tasks 'invisible)
@@ -362,7 +385,7 @@ PART is a part's ID, \"log\", or nil for the plan's own file."
   "Return non-nil when ID is settled in the plan FILE belongs to.
 Settled is Org's rule: the entry's keyword is a done one of its file.  An
 ID the plan does not hold never settles."
-  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+  (let ((pattern (wgn/agent-plans--id-line id)))
     (seq-some
      (lambda (f)
        (let ((visiting (find-buffer-visiting f)))
@@ -1339,7 +1362,7 @@ Its answer is kept until one of their files changes."
         (save-restriction
           (widen)
           (goto-char (point-min))
-          (when (re-search-forward (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id)) nil t)
+          (when (re-search-forward (wgn/agent-plans--id-line id) nil t)
             (org-back-to-heading t)
             (point-marker)))))))
 
@@ -1538,7 +1561,7 @@ WHAT names the parts, for the refusal."
 
 (defun wgn/agent-plans--holding (id)
   "Return the plan files whose plan holds an entry whose ID is ID."
-  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+  (let ((pattern (wgn/agent-plans--id-line id)))
     (seq-filter (lambda (plan)
                   (seq-some (lambda (file)
                               (with-temp-buffer
@@ -1768,7 +1791,7 @@ The mode line's hint is asked for again."
                (not (org-before-first-heading-p)))
       (save-excursion
         (org-back-to-heading t)
-        (let ((id (org-entry-get nil "ID")))
+        (let ((id (wgn/agent-plans--entry-id)))
           (and id (cons file id)))))))
 
 (defun wgn/agent-plans--item-at-point ()

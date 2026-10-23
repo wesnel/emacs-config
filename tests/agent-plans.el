@@ -349,11 +349,32 @@ SECTIONS alternate a section name and its entries' text."
                      '("Goal" "Steps" "Distribution" "Questions" "Follow-ups" "Verification")
                      "")))
 
+(defvar wgn-agent-plans-test--id-property "ID"
+  "The property test entries hold their IDs in.
+\"ID\" is what `agent-plan' writes; \"CUSTOM_ID\" is the form plans
+take as org-roam nodes, which the views read as well.")
+
+(defmacro wgn-agent-plans-test--in-both-forms (name &rest body)
+  "Define test NAME running BODY with entries' IDs in ID.
+Also NAME-by-custom-id, running BODY with them in CUSTOM_ID."
+  (declare (indent 1))
+  `(progn
+     (ert-deftest ,name ()
+       (let ((wgn-agent-plans-test--id-property "ID")) ,@body))
+     (ert-deftest ,(intern (concat (symbol-name name) "-by-custom-id")) ()
+       (let ((wgn-agent-plans-test--id-property "CUSTOM_ID")) ,@body))))
+
 (defun wgn-agent-plans-test--entry (keyword title id &optional after)
-  "Return an entry heading KEYWORD TITLE with ID, waiting for AFTER."
-  (concat "*** " keyword " " title "\n:PROPERTIES:\n:ID: " id "\n"
+  "Return an entry heading KEYWORD TITLE with ID, waiting for AFTER.
+The ID is in `wgn-agent-plans-test--id-property'."
+  (concat "*** " keyword " " title "\n:PROPERTIES:\n:" wgn-agent-plans-test--id-property
+          ": " id "\n"
           (if after (concat ":AFTER: " after "\n") "")
           ":END:\n"))
+
+(defun wgn-agent-plans-test--id-here ()
+  "Return the ID of the entry at point, in either property."
+  (or (org-entry-get nil "CUSTOM_ID") (org-entry-get nil "ID")))
 
 (defmacro wgn-agent-plans-test--visiting (file &rest body)
   "Run BODY in a buffer visiting FILE, then kill the buffer unsaved."
@@ -367,7 +388,7 @@ SECTIONS alternate a section name and its entries' text."
 (defun wgn-agent-plans-test--goto (id)
   "Move to the heading whose ID is ID."
   (goto-char (point-min))
-  (re-search-forward (format "^:ID: %s$" (regexp-quote id)))
+  (re-search-forward (format "^:\\(?:CUSTOM_\\)?ID: %s$" (regexp-quote id)))
   (org-back-to-heading t))
 
 (defun wgn-agent-plans-test--try (id state)
@@ -421,7 +442,7 @@ S2 waits for the part's P1.S1, and Q2 for Q1."
     (should (equal (wgn/agent-plans-host)
                    (car (split-string (system-name) "\\."))))))
 
-(ert-deftest wgn-agent-plans-blocker-waits-for-after-items ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-blocker-waits-for-after-items
   (wgn-agent-plans-test--with-plans
     (wgn-agent-plans-test--protected
       (let ((plan (wgn-agent-plans-test--waiting-plan plans)))
@@ -549,7 +570,8 @@ Return the other host's plan file."
     "Ours"
     :Steps (concat (wgn-agent-plans-test--entry "TODO" "First step" "S1")
                    (wgn-agent-plans-test--entry "TODO" "After the first" "S2" "S1")
-                   "*** TODO Postponed step\nSCHEDULED: <2099-01-01 Thu>\n:PROPERTIES:\n:ID: S3\n:END:\n"
+                   "*** TODO Postponed step\nSCHEDULED: <2099-01-01 Thu>\n:PROPERTIES:\n:"
+                   wgn-agent-plans-test--id-property ": S3\n:END:\n"
                    (wgn-agent-plans-test--entry "DONE" "Finished step" "S4"))
     :Distribution (wgn-agent-plans-test--entry "TODO" "Part one" "P1")
     :Questions (concat (wgn-agent-plans-test--entry "ASK" "Keep it?" "Q1")
@@ -605,7 +627,7 @@ line counts only when its start is visible."
         (forward-line 1)))
     (mapcar (lambda (block) (cons (car block) (string-join (cdr block) "\n"))) blocks)))
 
-(ert-deftest wgn-agent-plans-agenda-lists-what-is-ready ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-agenda-lists-what-is-ready
   (wgn-agent-plans-test--with-plans
     (wgn-agent-plans-test--protected
       (wgn-agent-plans-test--agenda-plans plans)
@@ -1946,7 +1968,7 @@ Return the plan file."
   (re-search-forward pattern)
   (beginning-of-line))
 
-(ert-deftest wgn-agent-plans-waiting-is-a-list-to-read ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-waiting-is-a-list-to-read
   (wgn-agent-plans-test--with-cli
     (wgn-agent-plans-test--protected
       (let* ((plan (wgn-agent-plans-test--question-plan plans))
@@ -1975,7 +1997,7 @@ Return the plan file."
               ;; RET visits it.
               (call-interactively (lookup-key (get-text-property (point) 'keymap) (kbd "RET")))
               (should (equal (buffer-file-name) (expand-file-name "2026-10-14-x.mac.P1.org" plans)))
-              (should (equal (org-entry-get nil "ID") "P1.Q1")))
+              (should (equal (wgn-agent-plans-test--id-here) "P1.Q1")))
           (org-agenda-quit))
         ;; agent-plan was asked for its questions, and nothing else.
         (should (equal (mapcar #'car (wgn-agent-plans-test--calls record)) '("questions")))
@@ -2003,7 +2025,7 @@ Return the plan file."
   "Follow LINK, an Org link's text, from the current buffer."
   (org-link-open-from-string link))
 
-(ert-deftest wgn-agent-plans-plan-link-visits-the-item ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-plan-link-visits-the-item
   (wgn-agent-plans-test--with-cli
     (wgn-agent-plans-test--with-links
       (wgn-agent-plans-test--question-plan plans)
@@ -2013,14 +2035,14 @@ Return the plan file."
       (with-temp-buffer
         (wgn-agent-plans-test--follow "[[plan:2026-10-14-x.mac#P1.Q1]]")
         (should (equal (buffer-file-name) (expand-file-name "2026-10-14-x.mac.P1.org" plans)))
-        (should (equal (org-entry-get nil "ID") "P1.Q1")))
+        (should (equal (wgn-agent-plans-test--id-here) "P1.Q1")))
       (with-temp-buffer
         (should-error (wgn-agent-plans-test--follow "[[plan:2026-10-14-x.mac#S9]]")
                       :type 'user-error)
         (should-error (wgn-agent-plans-test--follow "[[plan:2026-10-14-nope.mac]]")
                       :type 'user-error)))))
 
-(ert-deftest wgn-agent-plans-question-link-prefers-the-plan-it-is-in ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-question-link-prefers-the-plan-it-is-in
   (wgn-agent-plans-test--with-cli
     (wgn-agent-plans-test--with-links
       (let ((plan (wgn-agent-plans-test--question-plan plans))
@@ -2205,7 +2227,7 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
         (unless abort (org-capture-finalize)))
       capture)))
 
-(ert-deftest wgn-agent-plans-capture-followup-runs-agent-plan-followup ()
+(wgn-agent-plans-test--in-both-forms wgn-agent-plans-capture-followup-runs-agent-plan-followup
   (wgn-agent-plans-test--with-cli
     (wgn-agent-plans-test--protected
       (let* ((plan (wgn-agent-plans-test--question-plan plans))
@@ -2232,6 +2254,26 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
         (should-not (seq-find (lambda (buffer) (string-prefix-p " *agent-plan capture" (buffer-name buffer)))
                               (buffer-list)))
         (should (equal (with-temp-buffer (insert-file-contents plan) (buffer-string)) before))))))
+
+;; org-id gives an entry an ID of its own, as `org-id-get-create' or
+;; `org-store-link' do; the entry's plan ID is still its CUSTOM_ID.
+(ert-deftest wgn-agent-plans-capture-offers-custom-id-over-an-org-id ()
+  (wgn-agent-plans-test--with-cli
+    (wgn-agent-plans-test--protected
+      (let ((plan (expand-file-name "2026-10-14-x.mac.org" plans))
+            offered-default)
+        (wgn-agent-plans-test--write
+         plan (wgn-agent-plans-test--plan-text
+               "Both" :Steps (concat "*** TODO First\n:PROPERTIES:\n:CUSTOM_ID: S1\n"
+                                     ":ID: 3f2a9c1e-7b4d-4e8a-9f10-2c3d4e5f6a7b\n:END:\n")))
+        (wgn-agent-plans-test--visiting plan
+          (wgn-agent-plans-test--goto "S1")
+          (cl-letf (((symbol-function 'org-completing-read)
+                     (lambda (_prompt _choices &optional _p _r _i _h default &rest _)
+                       (setq offered-default default)
+                       (completing-read ""))))
+            (wgn-agent-plans-test--capture "Af" (list "Found here" "S1") "")))
+        (should (equal offered-default "S1"))))))
 
 (ert-deftest wgn-agent-plans-capture-question-runs-agent-plan-ask-in-the-part ()
   (wgn-agent-plans-test--with-cli
