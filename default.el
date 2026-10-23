@@ -744,6 +744,16 @@ if USER is given, its username is USER.  The port is not matched."
   :custom
   (magit-tbdiff-subcommand "range-diff"))
 
+;;;; Structural diffs with difftastic: `M-d' and `M-c' in magit's diff
+;;;; menu, `M-d' in its file menu and `M-RET' in blame.  The Nix package
+;;;; points `difftastic-executable' at its own `difft'; elsewhere `difft'
+;;;; has to be on PATH.
+(use-package difftastic-bindings
+  :ensure difftastic
+
+  :config
+  (difftastic-bindings-mode +1))
+
 ;;;; Pull requests, issues and review threads in magit.  Forge reads its
 ;;;; GitHub token from auth-source, under the host `api.github.com' and the
 ;;;; user `USERNAME^forge'.
@@ -1012,6 +1022,7 @@ if USER is given, its username is USER.  The port is not matched."
 
   :hook
   ((python-ts-mode . combobulate-mode)
+   (go-ts-mode . combobulate-mode)
    (js-ts-mode . combobulate-mode)
    (css-ts-mode . combobulate-mode)
    (yaml-ts-mode . combobulate-mode)
@@ -1178,6 +1189,9 @@ if USER is given, its username is USER.  The port is not matched."
    eglot-ensure
    eglot-rename
    eglot-find-implementation
+   eglot-find-typeDefinition
+   eglot-show-call-hierarchy
+   eglot-show-type-hierarchy
    eglot-code-actions
    eglot-format-buffer)
 
@@ -1190,6 +1204,9 @@ if USER is given, its username is USER.  The port is not matched."
    ("C-c C-l ?" . #'xref-find-references)
    ("C-c C-l r" . #'eglot-rename)
    ("C-c C-l i" . #'eglot-find-implementation)
+   ("C-c C-l t" . #'eglot-find-typeDefinition)
+   ("C-c C-l c" . #'eglot-show-call-hierarchy)
+   ("C-c C-l h" . #'eglot-show-type-hierarchy)
    ("C-c C-l e" . #'eglot-code-actions)))
 
 ;;;; Pop-up window instead of echo area for Eldoc documentation
@@ -1862,6 +1879,15 @@ GUI notification retains its icon and duration."
 
   ;; Set up eglot for rust-ts-mode.
   (add-hook 'rust-ts-mode-hook #'wgn/rust-ts-mode-eglot-setup))
+
+;;;; Lua support.
+(use-package lua-ts-mode
+  :defer t
+
+  :init
+  ;; Open Lua files with tree-sitter support.
+  (add-to-list 'major-mode-remap-alist
+               '(lua-mode . lua-ts-mode)))
 
 ;;;; Python support.
 ;;
