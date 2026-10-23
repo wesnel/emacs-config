@@ -2157,6 +2157,227 @@ Return the plan file."
             (should (equal (buffer-file-name) part))
             (should (equal (wgn-agent-plans-test--id-here) "P1.S1"))))))))
 
+;;;; Org-roam
+
+(ert-deftest wgn-agent-plans-org-roam-exclude-matches-parts-logs-and-locks ()
+  ;; Org-roam matches it against names relative to its directory.
+  (dolist (file '("agents/plans/20261014120000-x.mac.P1.org"
+                  "agents/plans/20261014120000-x.mac.log.org"
+                  "agents/plans/2026-10-14-x.mac.P12.org"
+                  "agents/plans/2026-10-14-x.mac.log.org"
+                  "agents/plans/20261014120000-x.mac.log.org.lock"
+                  "agents/plans/.sync.lock"))
+    (should (string-match-p wgn/agent-plans-org-roam-exclude-regexp file)))
+  (dolist (file '("agents/plans/20261014120000-x.mac.org"
+                  "agents/plans/2026-10-14-x.mac.org"
+                  "agents/20261023150000-next_session.org"
+                  "20200101000000-a_note.org"
+                  "notes/20261014120000-x.mac.log.org.txt"
+                  ;; A name that only ends like a log's.
+                  "notes/my-2026-10-14-a.mac.log.org"))
+    (should-not (string-match-p wgn/agent-plans-org-roam-exclude-regexp file))))
+
+(defvar org-roam-directory)
+(defvar org-roam-db-location)
+(defvar org-roam-file-exclude-regexp)
+(defvar org-roam-db-node-include-function)
+(defvar org-roam-db-autosync-mode)
+(defvar wgn/agent-plans-org-roam-directory)
+(declare-function org-roam-db-autosync-mode "org-roam-db" (&optional arg))
+(declare-function org-roam-db-sync "org-roam-db" (&optional force))
+(declare-function org-roam-db-query "org-roam-db" (sql &rest args))
+(declare-function org-roam-db--close "org-roam-db" (&optional db))
+
+(defun wgn-agent-plans-test--standard (variable)
+  "Return a fresh copy of VARIABLE's standard value."
+  (eval (car (get variable 'standard-value)) t))
+
+(defmacro wgn-agent-plans-test--with-roam (&rest body)
+  "Run BODY with org-roam set to its defaults on a notes directory of its own.
+Skipped where org-roam is not on `load-path': give its directory with
+-L to run it.  Binds `root', the notes directory, which
+`wgn/agent-plans-org-roam-directory' names, as the machine file does,
+and `plans', its agents/plans; `node' returns a file node's text, and
+`nodes' the database's nodes.  `org-roam-directory' starts elsewhere,
+and `org-roam-db-autosync-mode' is turned off after."
+  (declare (indent 0))
+  `(progn
+     (skip-unless (require 'org-roam nil t))
+     (let* ((root (file-name-as-directory
+                   (file-truename (make-temp-file "agent-plans-roam-" t))))
+            (plans (expand-file-name "agents/plans" root))
+            (wgn/agent-plans-org-roam-directory root)
+            ;; Never the operator's.
+            (process-environment
+             (cons (concat "AGENT_TOOLS_CONFIG=" (expand-file-name "no-config.json" root))
+                   process-environment))
+            (org-roam-directory (expand-file-name "not-the-notes/" root))
+            (org-roam-db-location (expand-file-name "roam.db" root))
+            (org-roam-file-exclude-regexp
+             (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp))
+            (org-roam-db-node-include-function
+             (wgn-agent-plans-test--standard 'org-roam-db-node-include-function))
+            (org-id-locations-file (expand-file-name "org-id-locations" root))
+            (org-id-locations nil)
+            (org-id-files nil))
+       (cl-flet ((node (id title &optional body)
+                   (concat ":PROPERTIES:\n:ID: " id "\n:END:\n#+title: " title "\n" body))
+                 (nodes ()
+                   (sort (org-roam-db-query [:select [id title] :from nodes])
+                         (lambda (a b) (string< (car a) (car b))))))
+         (unwind-protect
+             (progn ,@body)
+           (org-roam-db-autosync-mode -1)
+           (org-roam-db--close)
+           (delete-directory root t))))))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-plans-but-not-parts-or-logs ()
+  (wgn-agent-plans-test--with-roam
+    (wgn/agent-plans-org-roam-setup)
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261014120000-a.mac.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"
+           (concat "* Plan\n:PROPERTIES:\n:CUSTOM_ID: 20261014120000-a.mac\n:END:\n"
+                   "** Related\n"
+                   "- [[id:a1b2c3d4-0000-4000-8000-00000000000b][Plan B]]: shares its parser\n"
+                   "** Steps\n*** TODO First\n:PROPERTIES:\n:CUSTOM_ID: S1\n:END:\n")))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261015120000-b.mac.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))
+    ;; Each would be a node, were it not left out.
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261014120000-a.mac.P1.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-0000000000a1" "Part one"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261014120000-a.mac.log.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-0000000000a2" "Log"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "agents/20261023150000-next_session.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000c" "Next session"))
+    (org-roam-db-sync)
+    (should (equal (nodes)
+                   '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")
+                     ("a1b2c3d4-0000-4000-8000-00000000000b" "Plan B")
+                     ("a1b2c3d4-0000-4000-8000-00000000000c" "Next session"))))
+    (should (equal (org-roam-db-query [:select [source dest] :from links
+                                       :where (= type "id")])
+                   '(("a1b2c3d4-0000-4000-8000-00000000000a"
+                      "a1b2c3d4-0000-4000-8000-00000000000b"))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-takes-only-an-absolute-directory ()
+  (wgn-agent-plans-test--with-roam
+    ;; "" would make org-roam index Emacs's current directory.
+    (dolist (directory '("" "notes" "~/notes"))
+      (let ((wgn/agent-plans-org-roam-directory directory))
+        (wgn/agent-plans-org-roam-setup)
+        (should (equal org-roam-directory (expand-file-name "not-the-notes/" root)))
+        (should-not org-roam-db-autosync-mode)))))
+
+(defconst wgn-agent-plans-test--repository
+  (file-name-directory (directory-file-name (file-name-directory load-file-name)))
+  "The checkout these tests are in.")
+
+(defun wgn-agent-plans-test--repository-text (file)
+  "Return the text of FILE in the checkout, skipping the test if it is absent."
+  (let ((path (expand-file-name file wgn-agent-plans-test--repository)))
+    (unless (file-exists-p path)
+      (ert-skip (format "%s is not in the checkout" path)))
+    (with-temp-buffer (insert-file-contents path) (buffer-string))))
+
+(ert-deftest wgn-agent-plans-org-roam-machine-file-is-the-one-home-manager-writes ()
+  (should (string-search
+           (concat "\".emacs.d/" wgn/agent-plans-org-roam-machine-file "\" = ")
+           (wgn-agent-plans-test--repository-text "flake.nix"))))
+
+(ert-deftest wgn-agent-plans-org-roam-form-loads-the-machine-file-before-setup ()
+  (let* ((text (wgn-agent-plans-test--repository-text "default.el"))
+         (form (with-temp-buffer
+                 (insert text)
+                 (goto-char (point-min))
+                 (re-search-forward "^(use-package org-roam$")
+                 (goto-char (match-beginning 0))
+                 (read (current-buffer))))
+         (config (cdr (memq :config form))))
+    (should (equal (seq-take config 2)
+                   '((load (expand-file-name wgn/agent-plans-org-roam-machine-file
+                                             user-emacs-directory)
+                           t t)
+                     (wgn/agent-plans-org-roam-setup))))))
+
+;; Org is loaded by then, so the org-roam form syncs as it is evaluated:
+;; before no-littering moves `org-roam-db-location', a first database
+;; would be made at the default one.
+(ert-deftest wgn-agent-plans-org-roam-form-follows-no-littering ()
+  (let ((text (wgn-agent-plans-test--repository-text "default.el")))
+    (should (< (string-match "^(use-package no-littering$" text)
+               (string-match "^(use-package org-roam$" text)))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-quietly-does-nothing-without-a-directory ()
+  (wgn-agent-plans-test--with-roam
+    (let ((wgn/agent-plans-org-roam-directory nil)
+          ;; Agent-plan's config names the notes repository: it is not
+          ;; org-roam's directory.
+          (process-environment
+           (cons (concat "AGENT_TOOLS_CONFIG=" (expand-file-name "config.json" root))
+                 process-environment))
+          messages)
+      (wgn-agent-plans-test--write
+       (expand-file-name "config.json" root)
+       (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\", \"repo\": %S}}" plans root))
+      (cl-letf (((symbol-function 'message)
+                 (lambda (&rest args) (push args messages))))
+        (wgn/agent-plans-org-roam-setup))
+      (should-not messages)
+      (should (equal org-roam-directory (expand-file-name "not-the-notes/" root)))
+      (should (equal org-roam-file-exclude-regexp
+                     (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp)))
+      (should-not (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))
+      (should-not org-roam-db-autosync-mode))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-syncs-the-directory-if-there ()
+  (wgn-agent-plans-test--with-roam
+    (setq wgn/agent-plans-org-roam-directory (expand-file-name "missing" root))
+    (wgn/agent-plans-org-roam-setup)
+    (should (equal org-roam-directory (expand-file-name "missing" root)))
+    (should-not org-roam-db-autosync-mode)
+    (setq wgn/agent-plans-org-roam-directory root)
+    (wgn/agent-plans-org-roam-setup)
+    (wgn/agent-plans-org-roam-setup)
+    (should (equal org-roam-directory root))
+    (should org-roam-db-autosync-mode)
+    (should (equal org-roam-file-exclude-regexp
+                   (cons wgn/agent-plans-org-roam-exclude-regexp
+                         (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp))))
+    (should (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))))
+
+(ert-deftest wgn-agent-plans-org-roam-makes-each-plan-one-node ()
+  (wgn-agent-plans-test--with-roam
+    (wgn/agent-plans-org-roam-setup)
+    ;; As agent-plan writes plans: every entry's ID in :ID:, the same
+    ;; IDs in every plan.
+    (dolist (name '("2026-10-14-p" "2026-10-15-q"))
+      (wgn-agent-plans-test--write
+       (expand-file-name (concat name ".mac.org") plans)
+       (concat "#+title: " name "\n* Plan\n:PROPERTIES:\n:ID: " name ".mac\n:END:\n** Steps\n"
+               (wgn-agent-plans-test--entry "TODO" "First" "S1"))))
+    ;; A node whose entry org-id gave an ID of its own.
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261016120000-r.mac.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-00000000000d" "Plan R"
+           (concat "* Plan\n:PROPERTIES:\n:CUSTOM_ID: 20261016120000-r.mac\n:END:\n"
+                   "*** TODO First\n:PROPERTIES:\n:CUSTOM_ID: S1\n"
+                   ":ID: a1b2c3d4-0000-4000-8000-0000000000d1\n:END:\n")))
+    ;; The operator's notes keep their headings' nodes.
+    (wgn-agent-plans-test--write
+     (expand-file-name "20200101000000-a_note.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000e" "A note"
+           "* A heading\n:PROPERTIES:\n:ID: a1b2c3d4-0000-4000-8000-0000000000e1\n:END:\n"))
+    (org-roam-db-sync)
+    (should (equal (nodes)
+                   '(("a1b2c3d4-0000-4000-8000-00000000000d" "Plan R")
+                     ("a1b2c3d4-0000-4000-8000-00000000000e" "A note")
+                     ("a1b2c3d4-0000-4000-8000-0000000000e1" "A heading"))))))
+
 (defmacro wgn-agent-plans-test--with-repo (&rest body)
   "Run BODY with a git repository at `repo', ROOT/github.com/wesnel/thing.
 `wgn/agent-plans-repository-directories' finds it, and its origin is on

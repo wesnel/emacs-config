@@ -1809,6 +1809,67 @@ SEARCH, as `org-execute-file-search-functions' expects."
                              :export (wgn/agent-plans--exporter (car link))))
   (add-hook 'org-execute-file-search-functions #'wgn/agent-plans--file-search))
 
+;;;; Org-roam
+;;
+;; The plans directory is inside the operator's org-roam notes
+;; repository.  A plan's own file is a node; its parts and its log are
+;; not, nor are the lock files `agent-plan' keeps beside them.
+
+(defvar org-roam-file-exclude-regexp)
+(defvar org-roam-db-node-include-function)
+(defvar org-roam-directory)
+(defvar org-roam-db-autosync-mode)
+(declare-function org-roam-db-autosync-mode "org-roam-db" (&optional arg))
+
+(defconst wgn/agent-plans-org-roam-exclude-regexp
+  (concat "\\(?:\\`\\|/\\)" wgn/agent-plans--name-regexp
+          "\\.\\(?:" wgn/agent-plans--suffix-regexp "\\)\\.org\\'"
+          "\\|\\.lock\\'")
+  "Match a plan's part, log or lock file, by its name under `org-roam-directory'.")
+
+(defun wgn/agent-plans-org-roam-node-p ()
+  "Return nil at an entry of a plan's file, else t.
+For `org-roam-db-node-include-function', which org-roam calls at each
+heading with an ID and at the start of each file: a plan's file is one
+node, at its file-level ID.  Its entries' IDs, the same S1 and Q1 in
+every plan, are no nodes, nor is an ID org-id gives an entry."
+  (let ((file (buffer-file-name (buffer-base-buffer))))
+    (not (and file
+              (string-match-p wgn/agent-plans--file-regexp (file-name-nondirectory file))
+              (not (org-before-first-heading-p))))))
+
+(defvar wgn/agent-plans-org-roam-directory nil
+  "The notes repository that is org-roam's directory, or nil for none.
+Home Manager's home.programs.wgn.emacs.org-roam.directory sets it, in
+the file `wgn/agent-plans-org-roam-machine-file' names.")
+
+(defconst wgn/agent-plans-org-roam-machine-file "etc/org-roam-notes.el"
+  "The file, under `user-emacs-directory', that Home Manager writes.
+It sets `wgn/agent-plans-org-roam-directory'.")
+
+(defun wgn/agent-plans-org-roam-setup ()
+  "Make `wgn/agent-plans-org-roam-directory' org-roam's, each plan one node.
+Plans' parts, logs and lock files are left out of org-roam.  If the
+directory exists, `org-roam-db-autosync-mode' keeps the database in
+step with it, syncing it now.  Unless the variable is an absolute path,
+one starting with /, nothing is set up: \"\" would be Emacs's current
+directory.
+
+Call this once org-roam is loaded: it adds to org-roam's own exclusions,
+which may be one regexp or a list of them, and sets
+`org-roam-db-node-include-function'.  Calling it again changes nothing."
+  (let ((repo wgn/agent-plans-org-roam-directory))
+    (when (and (stringp repo) (string-prefix-p "/" repo))
+      (setq org-roam-directory (file-truename repo))
+      (let ((exclusions (ensure-list org-roam-file-exclude-regexp)))
+        (unless (member wgn/agent-plans-org-roam-exclude-regexp exclusions)
+          (setq org-roam-file-exclude-regexp
+                (cons wgn/agent-plans-org-roam-exclude-regexp exclusions))))
+      (setq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p)
+      (when (and (file-directory-p org-roam-directory)
+                 (not org-roam-db-autosync-mode))
+        (org-roam-db-autosync-mode 1)))))
+
 ;;;; Capture
 ;;
 ;; A capture is written to a scratch buffer, never to a plan file; its
