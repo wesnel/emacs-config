@@ -1,9 +1,11 @@
 ;;; wgn-agent-plans.el --- Read agents' plan files -*- lexical-binding: t; -*-
 
 ;; Plans are flat files in the plans directory, written by `agent-plan':
-;;   <YYYY-MM-DD>-<slug>.<host>.org         the plan
-;;   <YYYY-MM-DD>-<slug>.<host>.<part>.org  a subagent's part
-;;   <YYYY-MM-DD>-<slug>.<host>.log.org     the log
+;;   <date>-<slug>.<host>.org         the plan
+;;   <date>-<slug>.<host>.<part>.org  a subagent's part
+;;   <date>-<slug>.<host>.log.org     the log
+;; <date> is YYYY-MM-DD, or YYYYMMDDHHMMSS in plans named the org-roam
+;; way; plans of both names are on disk, so both are read.
 ;; Only the plan files are listed here.  Nothing here adds them to
 ;; `org-agenda-files' or `org-refile-targets', or writes any other Org file.
 
@@ -21,12 +23,37 @@
 (defvar org-done-keywords)
 (defvar org-inhibit-startup)
 
+(defconst wgn/agent-plans--date-regexp
+  "\\`\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)-"
+  "Match the date that starts a plan's name as `agent-plan' writes it today.
+Groups 1 to 3 are its year, month and day.")
+
+(defconst wgn/agent-plans--name-regexp
+  (concat "\\(\\(?:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\|[0-9]\\{14\\}\\)"
+          "-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
+          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)")
+  "Match a plan's name and host, the start of each of its files' names.
+Group 1 is the name, YYYY-MM-DD-slug or, named the org-roam way,
+YYYYMMDDHHMMSS-slug; group 2 is the host.")
+
+(defconst wgn/agent-plans--suffix-regexp "P[0-9]+\\|log"
+  "Match what follows the host in a part's or a log's file name.")
+
 (defconst wgn/agent-plans--file-regexp
-  (concat "\\`\\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
-          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)\\(?:\\.\\(P[0-9]+\\|log\\)\\)?\\.org\\'")
+  (concat "\\`" wgn/agent-plans--name-regexp
+          "\\(?:\\.\\(" wgn/agent-plans--suffix-regexp "\\)\\)?\\.org\\'")
   "Match a plan's, a part's or a log's file name, as `agent-plan' names them.
 Group 1 is the plan's name, 2 its host, and 3 the part or \"log\".
 A plan's own file has no group 3.")
+
+(defun wgn/agent-plans--newer-p (a b)
+  "Return non-nil when the plan file A sorts before B, the newer first.
+Plans are dated by their names, whether written YYYY-MM-DD or, named the
+org-roam way, YYYYMMDDHHMMSS."
+  (let ((key (lambda (file)
+               (replace-regexp-in-string wgn/agent-plans--date-regexp "\\1\\2\\3-"
+                                         (file-name-nondirectory file)))))
+    (string> (funcall key a) (funcall key b))))
 
 ;; The keywords, and which are done, come from each file's own #+TODO
 ;; lines, so nothing here names one.  Entries are told apart by their ID
@@ -122,8 +149,7 @@ are not."
                                (not (match-string 3 base)))))
                       (directory-files (wgn/agent-plans-directory) t
                                        wgn/agent-plans--file-regexp)))
-        (lambda (a b)
-          (string> (file-name-nondirectory a) (file-name-nondirectory b)))))
+        #'wgn/agent-plans--newer-p))
 
 (defun wgn/agent-plans--run (plan &rest args)
   "Return the output of `agent-plan' ARGS for the plan file PLAN."
@@ -204,8 +230,7 @@ Logs are not."
        (and parts (not (equal (nth 2 parts) "log")))))
    (when (file-directory-p (wgn/agent-plans-directory))
      (sort (directory-files (wgn/agent-plans-directory) t "\\.org\\'")
-           (lambda (a b)
-             (string> (file-name-nondirectory a) (file-name-nondirectory b)))))))
+           #'wgn/agent-plans--newer-p))))
 
 (defun wgn/agent-plans-agenda-command ()
   "Return the `org-agenda-custom-commands' entry for key \"A\".

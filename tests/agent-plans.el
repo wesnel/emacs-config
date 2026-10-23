@@ -130,6 +130,22 @@ Its part and log files sit beside it."
       (should (file-exists-p (expand-file-name "2026-10-01-a.mac.log.org" plans)))
       (should (equal (wgn/agent-plans-files) (list b a))))))
 
+(ert-deftest wgn-agent-plans-files-of-both-names-are-newest-first ()
+  (wgn-agent-plans-test--with-plans
+    (let ((old (wgn-agent-plans-test--plan plans "mac" "2026-10-14-a" "A" "working" 1 2))
+          (new (wgn-agent-plans-test--plan plans "mac" "20261013090000-b" "B" "working" 1 2))
+          (newest (wgn-agent-plans-test--plan plans "devbox" "20261015090000-c" "C" "working" 1 2)))
+      ;; A date with no time, or a part of one, is neither name.
+      (wgn-agent-plans-test--write (expand-file-name "20261016-d.mac.org" plans) "* Plan\n")
+      (wgn-agent-plans-test--write (expand-file-name "202610161200-e.mac.org" plans) "* Plan\n")
+      ;; By the date in the name, whichever way it is written.
+      (should (equal (wgn/agent-plans-files) (list newest old new)))
+      ;; With their parts, and never their logs.
+      (should (equal (mapcar #'file-name-nondirectory (wgn/agent-plans-agenda-files))
+                     '("20261015090000-c.devbox.org" "20261015090000-c.devbox.P1.org"
+                       "2026-10-14-a.mac.org" "2026-10-14-a.mac.P1.org"
+                       "20261013090000-b.mac.org" "20261013090000-b.mac.P1.org"))))))
+
 (ert-deftest wgn-agent-plans-summary-reads-title-status-and-progress ()
   (wgn-agent-plans-test--with-plans
     (let ((dir (wgn-agent-plans-test--plan plans "mac" "2026-10-01-a" "Add a thing"
@@ -416,10 +432,12 @@ The ID is in `wgn-agent-plans-test--id-property'."
            (progn (wgn/agent-plans-protect-mode 1) ,@body)
          (wgn/agent-plans-protect-mode -1)))))
 
-(defun wgn-agent-plans-test--waiting-plan (plans)
-  "Make plan 2026-10-14-x.mac under PLANS, with a part P1, and return it.
-S2 waits for the part's P1.S1, and Q2 for Q1."
-  (let ((plan (expand-file-name "2026-10-14-x.mac.org" plans)))
+(defun wgn-agent-plans-test--waiting-plan (plans &optional name)
+  "Make plan NAME.mac under PLANS, with a part P1, and return it.
+NAME is 2026-10-14-x unless given.  S2 waits for the part's P1.S1, and
+Q2 for Q1."
+  (let* ((name (or name "2026-10-14-x"))
+         (plan (expand-file-name (concat name ".mac.org") plans)))
     (wgn-agent-plans-test--write
      plan
      (wgn-agent-plans-test--plan-text
@@ -430,7 +448,7 @@ S2 waits for the part's P1.S1, and Q2 for Q1."
       :Questions (concat (wgn-agent-plans-test--entry "ASK" "Keep it?" "Q1")
                          (wgn-agent-plans-test--entry "ASK" "Rename it?" "Q2" "Q1"))))
     (wgn-agent-plans-test--write
-     (expand-file-name "2026-10-14-x.mac.P1.org" plans)
+     (expand-file-name (concat name ".mac.P1.org") plans)
      (wgn-agent-plans-test--plan-text
       "Part one" :Steps (wgn-agent-plans-test--entry "TODO" "The part's step" "P1.S1")))
     plan))
@@ -2070,6 +2088,41 @@ Return the plan file."
             (should (equal offered '("Questions (2026-10-14-x.mac): open"
                                      "Other (2026-10-15-z.mac): settled")))
             (should (equal (buffer-file-name) other))))))))
+
+;; Plans named the org-roam way, YYYYMMDDHHMMSS-slug, are read beside
+;; those named YYYY-MM-DD-slug.
+(ert-deftest wgn-agent-plans-org-roam-named-plans-are-plans ()
+  (wgn-agent-plans-test--with-plans
+    (wgn-agent-plans-test--protected
+      (wgn-agent-plans-test--with-links
+        (let* ((wgn-agent-plans-test--id-property "CUSTOM_ID")
+               (plan (wgn-agent-plans-test--waiting-plan plans "20261014120000-x"))
+               (part (expand-file-name "20261014120000-x.mac.P1.org" plans))
+               (log (expand-file-name "20261014120000-x.mac.log.org" plans)))
+          ;; An org-roam node: a file-level ID before the title.
+          (wgn-agent-plans-test--write
+           plan (concat ":PROPERTIES:\n:ID: 0f8d3c2e-5b1a-4e6f-9c7d-2a4b6c8e0f13\n:END:\n"
+                        (with-temp-buffer (insert-file-contents plan) (buffer-string))))
+          (wgn-agent-plans-test--write log "* done S1\n")
+          (wgn-agent-plans-test--visiting plan
+            (should buffer-read-only)
+            (read-only-mode -1)
+            (should (equal (wgn-agent-plans-test--try "S2" "DONE") "TODO")))
+          ;; The part's step, settled in its own file, unblocks S2.
+          (wgn-agent-plans-test--visiting part
+            (should buffer-read-only)
+            (read-only-mode -1)
+            (should (equal (wgn-agent-plans-test--try "P1.S1" "ABANDONED") "ABANDONED"))
+            (save-buffer))
+          (wgn-agent-plans-test--visiting plan
+            (read-only-mode -1)
+            (should (equal (wgn-agent-plans-test--try "S2" "DONE") "DONE")))
+          (wgn-agent-plans-test--visiting log
+            (should (string-match-p "agent-plan log alone" header-line-format)))
+          (with-temp-buffer
+            (wgn-agent-plans-test--follow "[[plan:20261014120000-x.mac#P1.S1]]")
+            (should (equal (buffer-file-name) part))
+            (should (equal (wgn-agent-plans-test--id-here) "P1.S1"))))))))
 
 (defmacro wgn-agent-plans-test--with-repo (&rest body)
   "Run BODY with a git repository at `repo', ROOT/github.com/wesnel/thing.
