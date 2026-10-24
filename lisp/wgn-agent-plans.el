@@ -8,6 +8,10 @@
 ;; way; plans of both names are on disk, so both are read.
 ;; Only the plan files are listed here.  Nothing here adds them to
 ;; `org-agenda-files' or `org-refile-targets', or writes any other Org file.
+;; Where the plans are in org-roam's notes, it keeps org-roam's index of
+;; them current, on a timer and on file notifications from the plans
+;; directory, reverting an unmodified buffer visiting a plan that
+;; `agent-plan' changed.
 
 (require 'filenotify)
 (require 'json)
