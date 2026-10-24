@@ -266,9 +266,17 @@ emacsclient --eval '
 ```
 
 The runner returns the test report and signals an error on failure.
-GitHub Actions runs the same suite on pushes and pull requests. The test
-that syncs plans into an org-roam database runs only where org-roam is on
-`load-path`, and is skipped elsewhere, GitHub Actions included.
+GitHub Actions runs the same suite on pushes and pull requests. The tests
+that index plans in an org-roam database run only where org-roam is on
+`load-path`, and are skipped elsewhere, GitHub Actions included. To run
+them, give Emacs org-roam's directory and those of the packages it
+requires with `-L`, as in this batch run:
+
+``` sh
+emacs -Q --batch -L /path/to/org-roam -L /path/to/emacsql -L ... \
+  -l /absolute/path/to/emacs-config/tests/run-agent-plans.el \
+  --eval '(princ (wgn-agent-plans-run-tests))'
+```
 
 The guest image provisioning tests and the Gondolin runner tests use
 Node's built-in test runner. The runner tests replace the Gondolin SDK
