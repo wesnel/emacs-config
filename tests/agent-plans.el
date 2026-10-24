@@ -2320,6 +2320,42 @@ input.  Return what DONE last returned."
                  (lambda () (seq-find (lambda (m) (string-search "database is locked" m))
                                       messages))))))))
 
+(ert-deftest wgn-agent-plans-org-roam-watch-passes-over-a-file-already-gone ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          messages)
+      (wgn/agent-plans-org-roam-setup)
+      ;; Created, then renamed away before the event is handled.
+      (cl-letf (((symbol-function 'message)
+                 (lambda (format &rest args)
+                   (push (apply #'format-message format args) messages))))
+        (wgn-agent-plans-test--watched
+         (list 'created (expand-file-name "20261014120000-a.mac.org" plans))))
+      (should-not messages)
+      (should-not (nodes)))))
+
+(ert-deftest wgn-agent-plans-org-roam-watch-keeps-a-current-buffer ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (let ((buffer (find-file-noselect a))
+            (reverted 0))
+        (unwind-protect
+            (with-current-buffer buffer
+              (add-hook 'after-revert-hook (lambda () (cl-incf reverted)) nil t)
+              ;; The buffer holds what the file does: it needs no revert.
+              (wgn-agent-plans-test--watched (list 'changed a))
+              (should (= reverted 0))
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn-agent-plans-test--watched (list 'changed a))
+              (should (= reverted 1)))
+          (kill-buffer buffer))))))
+
 (ert-deftest wgn-agent-plans-org-roam-watch-keeps-the-database-in-step ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
