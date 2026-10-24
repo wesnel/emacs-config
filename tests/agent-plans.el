@@ -2560,7 +2560,7 @@ input.  Return what DONE last returned."
     (make-directory plans t)
     (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (a (expand-file-name "20261014120000-a.mac.org" plans))
-          (b(expand-file-name "20261015120000-b.mac.org" plans))
+          (b (expand-file-name "20261015120000-b.mac.org" plans))
           (part (expand-file-name "20261014120000-a.mac.P1.org" plans)))
       (wgn/agent-plans-org-roam-setup)
       ;; New, beside a part, which is no node.
