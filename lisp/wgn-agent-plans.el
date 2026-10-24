@@ -2054,8 +2054,8 @@ which may be one regexp or a list of them, and puts
 where that one lets it.  A later `setq' of that variable drops it, so
 set your own filter before this runs, or add yours with
 `add-function'.  Calling it again changes nothing."
-  (let ((repo wgn/agent-plans-org-roam-directory))
-    (when (and (stringp repo) (string-prefix-p "/" repo))
+  (let ((repo (wgn/agent-plans--absolute wgn/agent-plans-org-roam-directory)))
+    (when repo
       (setq org-roam-directory (file-truename repo))
       (let ((exclusions (ensure-list org-roam-file-exclude-regexp)))
         (unless (member wgn/agent-plans-org-roam-exclude-regexp exclusions)
