@@ -266,7 +266,9 @@ emacsclient --eval '
 ```
 
 The runner returns the test report and signals an error on failure.
-GitHub Actions runs the same suite on pushes and pull requests.
+GitHub Actions runs the same suite on pushes and pull requests. The test
+that syncs plans into an org-roam database runs only where org-roam is on
+`load-path`, and is skipped elsewhere, GitHub Actions included.
 
 The guest image provisioning tests and the Gondolin runner tests use
 Node's built-in test runner. The runner tests replace the Gondolin SDK

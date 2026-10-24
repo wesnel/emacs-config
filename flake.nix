@@ -68,6 +68,11 @@
         pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isDarwin {
           offline-run-image-tools = pkgs.offline-run.tests.image-tools;
         }
+        // {
+          org-roam-module = pkgs.callPackage ./tests/org-roam-module.nix {
+            module = self.homeManagerModules.default;
+          };
+        }
         // pkgs.lib.optionalAttrs pkgs.stdenv.hostPlatform.isLinux {
           offline-run-sandbox = pkgs.offline-run.tests.sandbox;
         };
@@ -125,6 +130,22 @@
               codex = {
                 enable = lib.mkEnableOption "Enable Codex integration for Emacs";
               };
+
+              org-roam = {
+                directory = lib.mkOption {
+                  # Emacs would read "" or a relative path against its
+                  # current directory.
+                  type = lib.types.nullOr (lib.types.strMatching "/.*");
+                  default = null;
+                  example = "/home/me/git/notes";
+                  description = ''
+                    Absolute path of the notes repository that org-roam
+                    indexes, agents' plans among its notes. Emacs reads it
+                    from ~/.emacs.d/etc/org-roam-notes.el, which this writes.
+                    With null, org-roam is not set up for the notes.
+                  '';
+                };
+              };
             };
           };
 
@@ -159,6 +180,14 @@
                   };
 
                 ".emacs.d/etc/eshell/login".source = ./login.el;
+
+                # `wgn/agent-plans-org-roam-machine-file' names this file.
+                ".emacs.d/etc/org-roam-notes.el" = lib.mkIf (cfg.org-roam.directory != null) {
+                  text = ''
+                    ;;; org-roam-notes.el --- Machine org-roam notes -*- lexical-binding: t; -*-
+                    (setq wgn/agent-plans-org-roam-directory ${builtins.toJSON cfg.org-roam.directory})
+                  '';
+                };
               };
             };
 

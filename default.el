@@ -463,6 +463,24 @@ if USER is given, its username is USER.  The port is not matched."
   :config
   (no-littering-theme-backups))
 
+;;;; Notes as org-roam nodes, the agents' plans among them.
+;;
+;; Home Manager names the notes repository in the machine file, from
+;; home.programs.wgn.emacs.org-roam.directory; without it, org-roam is
+;; not set up for the notes.  `wgn/agent-plans-org-roam-setup' says what
+;; it configures.  The `org-agenda' form above defines it in its
+;; `:preface'.  Org is loaded before this form runs, so the setup's
+;; first sync happens here: after no-littering, which sets
+;; `org-roam-db-location', or that sync makes a second database.
+(use-package org-roam
+  :ensure t
+
+  :after org
+
+  :config
+  (load (expand-file-name wgn/agent-plans-org-roam-machine-file user-emacs-directory) t t)
+  (wgn/agent-plans-org-roam-setup))
+
 ;;;; Required for :bind in use-package.
 (use-package bind-key
   :ensure t)

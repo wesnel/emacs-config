@@ -1,9 +1,11 @@
 ;;; wgn-agent-plans.el --- Read agents' plan files -*- lexical-binding: t; -*-
 
 ;; Plans are flat files in the plans directory, written by `agent-plan':
-;;   <YYYY-MM-DD>-<slug>.<host>.org         the plan
-;;   <YYYY-MM-DD>-<slug>.<host>.<part>.org  a subagent's part
-;;   <YYYY-MM-DD>-<slug>.<host>.log.org     the log
+;;   <date>-<slug>.<host>.org         the plan
+;;   <date>-<slug>.<host>.<part>.org  a subagent's part
+;;   <date>-<slug>.<host>.log.org     the log
+;; <date> is YYYY-MM-DD, or YYYYMMDDHHMMSS in plans named the org-roam
+;; way; plans of both names are on disk, so both are read.
 ;; Only the plan files are listed here.  Nothing here adds them to
 ;; `org-agenda-files' or `org-refile-targets', or writes any other Org file.
 
@@ -21,12 +23,37 @@
 (defvar org-done-keywords)
 (defvar org-inhibit-startup)
 
+(defconst wgn/agent-plans--date-regexp
+  "\\`\\([0-9]\\{4\\}\\)-\\([0-9]\\{2\\}\\)-\\([0-9]\\{2\\}\\)-"
+  "Match the date that starts a plan's name as `agent-plan' writes it today.
+Groups 1 to 3 are its year, month and day.")
+
+(defconst wgn/agent-plans--name-regexp
+  (concat "\\(\\(?:[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}\\|[0-9]\\{14\\}\\)"
+          "-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
+          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)")
+  "Match a plan's name and host, the start of each of its files' names.
+Group 1 is the name, YYYY-MM-DD-slug or, named the org-roam way,
+YYYYMMDDHHMMSS-slug; group 2 is the host.")
+
+(defconst wgn/agent-plans--suffix-regexp "P[0-9]+\\|log"
+  "Match what follows the host in a part's or a log's file name.")
+
 (defconst wgn/agent-plans--file-regexp
-  (concat "\\`\\([0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]-[a-z0-9]+\\(?:-[a-z0-9]+\\)*\\)"
-          "\\.\\([A-Za-z0-9][A-Za-z0-9_-]*\\)\\(?:\\.\\(P[0-9]+\\|log\\)\\)?\\.org\\'")
+  (concat "\\`" wgn/agent-plans--name-regexp
+          "\\(?:\\.\\(" wgn/agent-plans--suffix-regexp "\\)\\)?\\.org\\'")
   "Match a plan's, a part's or a log's file name, as `agent-plan' names them.
 Group 1 is the plan's name, 2 its host, and 3 the part or \"log\".
 A plan's own file has no group 3.")
+
+(defun wgn/agent-plans--newer-p (a b)
+  "Return non-nil when the plan file A sorts before B, the newer first.
+Plans are dated by their names, whether written YYYY-MM-DD or, named the
+org-roam way, YYYYMMDDHHMMSS."
+  (let ((key (lambda (file)
+               (replace-regexp-in-string wgn/agent-plans--date-regexp "\\1\\2\\3-"
+                                         (file-name-nondirectory file)))))
+    (string> (funcall key a) (funcall key b))))
 
 ;; The keywords, and which are done, come from each file's own #+TODO
 ;; lines, so nothing here names one.  Entries are told apart by their ID
@@ -44,6 +71,29 @@ A plan's own file has no group 3.")
 
 (defconst wgn/agent-plans-followup-id "^\\(P[0-9]+\\.\\)?F[0-9]+$"
   "Match the ID of a follow-up.")
+
+(defconst wgn/agent-plans--id-properties '("CUSTOM_ID" "ID")
+  "The properties that hold an entry's ID, the first one set winning.
+`agent-plan' writes items' IDs to ID; plans that are org-roam nodes hold
+them in CUSTOM_ID, since org-id and org-roam take every ID as global.
+Plans of both forms are on disk, so both are read.")
+
+(defun wgn/agent-plans--id-line (id)
+  "Return a regexp matching the property line that gives an entry the ID ID."
+  (format "^[ \t]*:%s:[ \t]+%s[ \t]*$"
+          (regexp-opt wgn/agent-plans--id-properties) (regexp-quote id)))
+
+(defun wgn/agent-plans--entry-id ()
+  "Return the ID of the entry at point, or nil."
+  (seq-some (lambda (property) (org-entry-get nil property))
+            wgn/agent-plans--id-properties))
+
+(defun wgn/agent-plans--id-match (&rest patterns)
+  "Return an agenda match for entries whose ID matches one of PATTERNS."
+  (mapconcat (lambda (pattern)
+               (mapconcat (lambda (property) (concat property "={" pattern "}"))
+                          wgn/agent-plans--id-properties "|"))
+             patterns "|"))
 
 (defun wgn/agent-plans--config-file ()
   "Return the file `agent-plan' reads its settings from."
@@ -79,28 +129,41 @@ those writes go on."
                          nil)))))))
     (nth 2 wgn/agent-plans--config-cache)))
 
+(defun wgn/agent-plans--config-path (key)
+  "Return \"plans\".KEY in `agent-plan''s config file, or nil.
+It is nil unless the file sets KEY to an absolute path, as `agent-plan'
+requires: one starting with /, not ~."
+  (let ((path (and (wgn/agent-plans--plans-config)
+                   (gethash key (wgn/agent-plans--plans-config)))))
+    (and (stringp path) (string-prefix-p "/" path) (expand-file-name path))))
+
+(defun wgn/agent-plans--missing-config (key)
+  "Return the message that `agent-plan''s config file sets no \"plans\".KEY."
+  (format "agent-tools config is missing: %s sets no plans.%s"
+          (wgn/agent-plans--config-file) key))
+
 (defun wgn/agent-plans-directory ()
-  "Return the directory holding the plans.
-It is \"plans.dir\" in `agent-plan''s config file, or ~/git/notes/agents."
-  (let ((dir (and (wgn/agent-plans--plans-config)
-                  (gethash "dir" (wgn/agent-plans--plans-config)))))
-    (expand-file-name (if (and (stringp dir) (not (string-empty-p dir)))
-                          dir
-                        "~/git/notes/agents"))))
+  "Return the directory holding the plans, \"plans.dir\" in `agent-plan''s
+config file, or nil where the file does not set it."
+  (wgn/agent-plans--config-path "dir"))
+
+(defun wgn/agent-plans--require-directory ()
+  "Return `wgn/agent-plans-directory', or refuse, saying the config is missing."
+  (or (wgn/agent-plans-directory)
+      (user-error "%s" (wgn/agent-plans--missing-config "dir"))))
 
 (defun wgn/agent-plans-files ()
   "Return every plan file in the plans directory, newest first.
 Other hosts' plans, which are mirrors, are included.  Part and log files
 are not."
-  (sort (when (file-directory-p (wgn/agent-plans-directory))
-          (seq-filter (lambda (file)
-                        (let ((base (file-name-nondirectory file)))
-                          (and (string-match wgn/agent-plans--file-regexp base)
-                               (not (match-string 3 base)))))
-                      (directory-files (wgn/agent-plans-directory) t
-                                       wgn/agent-plans--file-regexp)))
-        (lambda (a b)
-          (string> (file-name-nondirectory a) (file-name-nondirectory b)))))
+  (sort (let ((dir (wgn/agent-plans-directory)))
+          (when (and dir (file-directory-p dir))
+            (seq-filter (lambda (file)
+                          (let ((base (file-name-nondirectory file)))
+                            (and (string-match wgn/agent-plans--file-regexp base)
+                                 (not (match-string 3 base)))))
+                        (directory-files dir t wgn/agent-plans--file-regexp))))
+        #'wgn/agent-plans--newer-p))
 
 (defun wgn/agent-plans--run (plan &rest args)
   "Return the output of `agent-plan' ARGS for the plan file PLAN."
@@ -136,7 +199,7 @@ are not."
                               (cons (wgn/agent-plans--candidate plan) plan))
                             (or (wgn/agent-plans-files)
                                 (user-error "No plans under %s"
-                                            (wgn/agent-plans-directory))))))
+                                            (wgn/agent-plans--require-directory))))))
     (cdr (assoc (completing-read
                  "Plan: "
                  (lambda (string predicate action)
@@ -179,10 +242,9 @@ Logs are not."
    (lambda (file)
      (let ((parts (wgn/agent-plans--file-parts file)))
        (and parts (not (equal (nth 2 parts) "log")))))
-   (when (file-directory-p (wgn/agent-plans-directory))
-     (sort (directory-files (wgn/agent-plans-directory) t "\\.org\\'")
-           (lambda (a b)
-             (string> (file-name-nondirectory a) (file-name-nondirectory b)))))))
+   (let ((dir (wgn/agent-plans-directory)))
+     (when (and dir (file-directory-p dir))
+       (sort (directory-files dir t "\\.org\\'") #'wgn/agent-plans--newer-p)))))
 
 (defun wgn/agent-plans-agenda-command ()
   "Return the `org-agenda-custom-commands' entry for key \"A\".
@@ -194,9 +256,9 @@ day.  `org-agenda-files' is bound to the plan files for this view alone."
   `("A" "Agent plans"
     ((wgn/agent-plans-agenda-waiting "")
      ;; Two matches rather than one regexp: the matcher splits at `|'.
-     (tags-todo ,(concat "ID={" wgn/agent-plans-part-id "}|ID={" wgn/agent-plans-step-id "}")
+     (tags-todo ,(wgn/agent-plans--id-match wgn/agent-plans-part-id wgn/agent-plans-step-id)
                 ((org-agenda-overriding-header "Ready")))
-     (tags-todo ,(concat "ID={" wgn/agent-plans-followup-id "}")
+     (tags-todo ,(wgn/agent-plans--id-match wgn/agent-plans-followup-id)
                 ((org-agenda-overriding-header "Follow-ups"))))
     ((org-agenda-files (wgn/agent-plans-agenda-files))
      (org-agenda-dim-blocked-tasks 'invisible)
@@ -340,6 +402,7 @@ first dot."
   "Return (NAME HOST PART) of FILE in the plans directory, or nil.
 PART is a part's ID, \"log\", or nil for the plan's own file."
   (when (and file
+             (wgn/agent-plans-directory)
              (file-equal-p (file-name-directory file)
                            (file-name-as-directory (wgn/agent-plans-directory))))
     (let ((base (file-name-nondirectory file)))
@@ -362,7 +425,7 @@ PART is a part's ID, \"log\", or nil for the plan's own file."
   "Return non-nil when ID is settled in the plan FILE belongs to.
 Settled is Org's rule: the entry's keyword is a done one of its file.  An
 ID the plan does not hold never settles."
-  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+  (let ((pattern (wgn/agent-plans--id-line id)))
     (seq-some
      (lambda (f)
        (let ((visiting (find-buffer-visiting f)))
@@ -1221,9 +1284,10 @@ Its refusal, on standard error, is signalled as a `user-error'."
   (unless (executable-find "agent-plan")
     (user-error "agent-plan is not on `exec-path'"))
   (let ((stderr (make-temp-file "agent-plan-stderr"))
-        (default-directory (if (file-directory-p (wgn/agent-plans-directory))
-                               (file-name-as-directory (wgn/agent-plans-directory))
-                             (expand-file-name "~/"))))
+        (default-directory (let ((dir (wgn/agent-plans-directory)))
+                             (if (and dir (file-directory-p dir))
+                                 (file-name-as-directory dir)
+                               (expand-file-name "~/")))))
     (unwind-protect
         (with-temp-buffer
           (let ((status (apply #'call-process "agent-plan" nil (list t stderr) nil args)))
@@ -1339,7 +1403,7 @@ Its answer is kept until one of their files changes."
         (save-restriction
           (widen)
           (goto-char (point-min))
-          (when (re-search-forward (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id)) nil t)
+          (when (re-search-forward (wgn/agent-plans--id-line id) nil t)
             (org-back-to-heading t)
             (point-marker)))))))
 
@@ -1415,8 +1479,11 @@ questions are answered with /questions in a Claude session, and
   (org-agenda-prepare "Waiting on you")
   (insert (propertize "Waiting on you" 'face 'org-agenda-structure) "\n")
   (let ((items (wgn/agent-plans-waiting)))
-    (unless items
-      (insert "  nothing\n"))
+    (cond
+     ((not (wgn/agent-plans-directory))
+      (insert "  " (wgn/agent-plans--missing-config "dir") "\n"))
+     ((not items)
+      (insert "  nothing\n")))
     (dolist (item items)
       (let ((start (point)))
         (insert (format "  %s %s %s%s\n"
@@ -1509,7 +1576,7 @@ WHAT names the parts, for the refusal."
 
 (defun wgn/agent-plans--by-id (id)
   "Return the plan file of the plan whose ID is ID."
-  (let ((file (expand-file-name (concat id ".org") (wgn/agent-plans-directory))))
+  (let ((file (expand-file-name (concat id ".org") (wgn/agent-plans--require-directory))))
     (unless (and (wgn/agent-plans--file-parts file)
                  (null (nth 2 (wgn/agent-plans--file-parts file)))
                  (file-exists-p file))
@@ -1538,7 +1605,7 @@ WHAT names the parts, for the refusal."
 
 (defun wgn/agent-plans--holding (id)
   "Return the plan files whose plan holds an entry whose ID is ID."
-  (let ((pattern (format "^[ \t]*:ID:[ \t]+%s[ \t]*$" (regexp-quote id))))
+  (let ((pattern (wgn/agent-plans--id-line id)))
     (seq-filter (lambda (plan)
                   (seq-some (lambda (file)
                               (with-temp-buffer
@@ -1557,7 +1624,8 @@ that holds it, asking which when several do."
          (plan (cond
                 (at (wgn/agent-plans--by-id (substring path 0 at)))
                 (here here)
-                (t (let ((plans (wgn/agent-plans--holding qid)))
+                (t (let ((plans (progn (wgn/agent-plans--require-directory)
+                                       (wgn/agent-plans--holding qid))))
                      (cond
                       ((cdr plans) (wgn/agent-plans--read-holder qid plans))
                       (plans (car plans))
@@ -1741,6 +1809,67 @@ SEARCH, as `org-execute-file-search-functions' expects."
                              :export (wgn/agent-plans--exporter (car link))))
   (add-hook 'org-execute-file-search-functions #'wgn/agent-plans--file-search))
 
+;;;; Org-roam
+;;
+;; The plans directory is inside the operator's org-roam notes
+;; repository.  A plan's own file is a node; its parts and its log are
+;; not, nor are the lock files `agent-plan' keeps beside them.
+
+(defvar org-roam-file-exclude-regexp)
+(defvar org-roam-db-node-include-function)
+(defvar org-roam-directory)
+(defvar org-roam-db-autosync-mode)
+(declare-function org-roam-db-autosync-mode "org-roam-db" (&optional arg))
+
+(defconst wgn/agent-plans-org-roam-exclude-regexp
+  (concat "\\(?:\\`\\|/\\)" wgn/agent-plans--name-regexp
+          "\\.\\(?:" wgn/agent-plans--suffix-regexp "\\)\\.org\\'"
+          "\\|\\.lock\\'")
+  "Match a plan's part, log or lock file, by its name under `org-roam-directory'.")
+
+(defun wgn/agent-plans-org-roam-node-p ()
+  "Return nil at an entry of a plan's file, else t.
+For `org-roam-db-node-include-function', which org-roam calls at each
+heading with an ID and at the start of each file: a plan's file is one
+node, at its file-level ID.  Its entries' IDs, the same S1 and Q1 in
+every plan, are no nodes, nor is an ID org-id gives an entry."
+  (let ((file (buffer-file-name (buffer-base-buffer))))
+    (not (and file
+              (string-match-p wgn/agent-plans--file-regexp (file-name-nondirectory file))
+              (not (org-before-first-heading-p))))))
+
+(defvar wgn/agent-plans-org-roam-directory nil
+  "The notes repository that is org-roam's directory, or nil for none.
+Home Manager's home.programs.wgn.emacs.org-roam.directory sets it, in
+the file `wgn/agent-plans-org-roam-machine-file' names.")
+
+(defconst wgn/agent-plans-org-roam-machine-file "etc/org-roam-notes.el"
+  "The file, under `user-emacs-directory', that Home Manager writes.
+It sets `wgn/agent-plans-org-roam-directory'.")
+
+(defun wgn/agent-plans-org-roam-setup ()
+  "Make `wgn/agent-plans-org-roam-directory' org-roam's, each plan one node.
+Plans' parts, logs and lock files are left out of org-roam.  If the
+directory exists, `org-roam-db-autosync-mode' keeps the database in
+step with it, syncing it now.  Unless the variable is an absolute path,
+one starting with /, nothing is set up: \"\" would be Emacs's current
+directory.
+
+Call this once org-roam is loaded: it adds to org-roam's own exclusions,
+which may be one regexp or a list of them, and sets
+`org-roam-db-node-include-function'.  Calling it again changes nothing."
+  (let ((repo wgn/agent-plans-org-roam-directory))
+    (when (and (stringp repo) (string-prefix-p "/" repo))
+      (setq org-roam-directory (file-truename repo))
+      (let ((exclusions (ensure-list org-roam-file-exclude-regexp)))
+        (unless (member wgn/agent-plans-org-roam-exclude-regexp exclusions)
+          (setq org-roam-file-exclude-regexp
+                (cons wgn/agent-plans-org-roam-exclude-regexp exclusions))))
+      (setq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p)
+      (when (and (file-directory-p org-roam-directory)
+                 (not org-roam-db-autosync-mode))
+        (org-roam-db-autosync-mode 1)))))
+
 ;;;; Capture
 ;;
 ;; A capture is written to a scratch buffer, never to a plan file; its
@@ -1768,7 +1897,7 @@ The mode line's hint is asked for again."
                (not (org-before-first-heading-p)))
       (save-excursion
         (org-back-to-heading t)
-        (let ((id (org-entry-get nil "ID")))
+        (let ((id (wgn/agent-plans--entry-id)))
           (and id (cons file id)))))))
 
 (defun wgn/agent-plans--item-at-point ()
