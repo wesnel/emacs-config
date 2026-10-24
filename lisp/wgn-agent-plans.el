@@ -1903,13 +1903,17 @@ reading input when the event arrived."
 
 (defun wgn/agent-plans--org-roam-watch-plans ()
   "Watch the plans directory for `agent-plan''s writes, if there is one.
-Any earlier watch is removed first.  There is none to add while
-`org-roam-db-autosync-mode' is off, which keeps nothing in step."
-  (when wgn/agent-plans--org-roam-watch
-    (file-notify-rm-watch wgn/agent-plans--org-roam-watch)
-    (setq wgn/agent-plans--org-roam-watch nil))
+Any earlier watch is removed first.  There is none while
+`org-roam-db-autosync-mode' is off, which keeps nothing in step: the
+mode's hook runs this as it is turned on or off."
+  (let ((old wgn/agent-plans--org-roam-watch))
+    ;; Forgotten first, so that the `stopped' its removal sends is not
+    ;; taken for the current watch's.
+    (setq wgn/agent-plans--org-roam-watch nil)
+    (when old
+      (file-notify-rm-watch old)))
   (let ((dir (wgn/agent-plans-directory)))
-    (when (and dir org-roam-db-autosync-mode (file-directory-p dir))
+    (when (and dir (file-directory-p dir))
       (condition-case err
           (setq wgn/agent-plans--org-roam-watch
                 (file-notify-add-watch (file-truename dir) '(change)
@@ -1944,10 +1948,12 @@ set your own filter before this runs, or add yours with
                 (cons wgn/agent-plans-org-roam-exclude-regexp exclusions))))
       (add-function :before-while org-roam-db-node-include-function
                     #'wgn/agent-plans-org-roam-node-p)
-      (when (and (file-directory-p org-roam-directory)
-                 (not org-roam-db-autosync-mode))
-        (org-roam-db-autosync-mode 1))
-      (wgn/agent-plans--org-roam-watch-plans))))
+      (add-hook 'org-roam-db-autosync-mode-hook #'wgn/agent-plans--org-roam-watch-plans)
+      (if (or org-roam-db-autosync-mode
+              (not (file-directory-p org-roam-directory)))
+          (wgn/agent-plans--org-roam-watch-plans)
+        ;; Its hook adds the watch.
+        (org-roam-db-autosync-mode 1)))))
 
 ;;;; Capture
 ;;

@@ -2190,6 +2190,7 @@ Return the plan file."
 (declare-function org-roam-db--close "org-roam-db" (&optional db))
 
 (defvar wgn/agent-plans--org-roam-watch)
+(defvar org-roam-db-autosync-mode-hook)
 
 (defun wgn-agent-plans-test--standard (variable)
   "Return a fresh copy of VARIABLE's standard value."
@@ -2234,6 +2235,7 @@ on the plans directory."
             (org-id-locations-file (expand-file-name "org-id-locations" root))
             (org-id-locations nil)
             (org-id-files nil)
+            (org-roam-db-autosync-mode-hook nil)
             (wgn/agent-plans--org-roam-watch nil))
        (cl-flet ((node (id title &optional body)
                    (concat ":PROPERTIES:\n:ID: " id "\n:END:\n#+title: " title "\n" body))
@@ -2433,6 +2435,17 @@ input.  Return what DONE last returned."
         (file-notify-rm-watch wgn/agent-plans--org-roam-watch)
         (should-not wgn/agent-plans--org-roam-watch)
         (should (= (hash-table-count file-notify-descriptors) watches))))))
+
+(ert-deftest wgn-agent-plans-org-roam-watch-follows-autosync ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should wgn/agent-plans--org-roam-watch)
+      (org-roam-db-autosync-mode -1)
+      (should-not wgn/agent-plans--org-roam-watch)
+      (org-roam-db-autosync-mode 1)
+      (should (file-notify-valid-p wgn/agent-plans--org-roam-watch)))))
 
 (ert-deftest wgn-agent-plans-org-roam-setup-watches-nothing-without-a-plans-directory ()
   (wgn-agent-plans-test--with-roam
