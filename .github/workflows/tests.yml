@@ -16,10 +16,8 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
-      - name: Install Emacs
-        run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y emacs-nox
+      - uses: ./.github/actions/install-emacs
+        timeout-minutes: 5
       # The first step to reach the server starts it.
       - name: Run agent plan tests
         run: |
@@ -46,8 +44,8 @@ jobs:
         with:
           node-version: '24'
           package-manager-cache: false
-      - name: Test image provisioning and the Gondolin runner
-        run: node --test tests/image.test.mjs tests/offline-run.test.mjs
+      - name: Test image provisioning, the Gondolin runner and the Emacs install
+        run: node --test tests/image.test.mjs tests/offline-run.test.mjs tests/install-emacs.test.mjs
 
   # offline-run uses Gondolin only on Darwin.
   image-tools:
