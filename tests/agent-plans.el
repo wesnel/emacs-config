@@ -2190,6 +2190,7 @@ Return the plan file."
 (declare-function org-roam-db--close "org-roam-db" (&optional db))
 
 (defvar wgn/agent-plans--org-roam-watch)
+(defvar wgn/agent-plans--org-roam-watched)
 (defvar org-roam-db-autosync-mode-hook)
 
 (defun wgn-agent-plans-test--standard (variable)
@@ -2236,7 +2237,8 @@ on the plans directory."
             (org-id-locations nil)
             (org-id-files nil)
             (org-roam-db-autosync-mode-hook nil)
-            (wgn/agent-plans--org-roam-watch nil))
+            (wgn/agent-plans--org-roam-watch nil)
+            (wgn/agent-plans--org-roam-watched nil))
        (cl-flet ((node (id title &optional body)
                    (concat ":PROPERTIES:\n:ID: " id "\n:END:\n#+title: " title "\n" body))
                  (nodes ()
@@ -2244,6 +2246,7 @@ on the plans directory."
                          (lambda (a b) (string< (car a) (car b))))))
          (unwind-protect
              (progn ,@body)
+           (cancel-function-timers #'wgn/agent-plans--org-roam-rewatch)
            (when wgn/agent-plans--org-roam-watch
              (file-notify-rm-watch wgn/agent-plans--org-roam-watch))
            (org-roam-db-autosync-mode -1)
@@ -2298,6 +2301,37 @@ input.  Return what DONE last returned."
         (while (and (not (nodes)) (time-less-p nil deadline))
           (read-event nil nil 0.1)))
       (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-plans-once-their-directory-appears ()
+  (wgn-agent-plans-test--with-roam
+    (skip-unless file-notify--library)
+    ;; As when the notes are cloned after Emacs has started.
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should (eq 0 (call-process "mkdir" nil nil nil "-p" plans)))
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (equal (wgn-agent-plans-test--read-events-until (lambda () (nodes)))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-follows-the-plans-directory-away-and-back ()
+  (wgn-agent-plans-test--with-roam
+    (skip-unless file-notify--library)
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (wgn-agent-plans-test--read-events-until (lambda () (nodes))))
+      (should (eq 0 (call-process "rm" nil nil nil "-rf" plans)))
+      (should (wgn-agent-plans-test--read-events-until (lambda () (not (nodes)))))
+      (should (eq 0 (call-process "mkdir" nil nil nil "-p" plans)))
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))
+      (should (equal (wgn-agent-plans-test--read-events-until (lambda () (nodes)))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000b" "Plan B")))))))
 
 (ert-deftest wgn-agent-plans-org-roam-watch-reports-its-errors-without-signalling ()
   (wgn-agent-plans-test--with-roam
@@ -2431,10 +2465,15 @@ input.  Return what DONE last returned."
         (wgn/agent-plans-org-roam-setup)
         (should (= (hash-table-count file-notify-descriptors) (1+ watches)))
         (should (file-notify-valid-p wgn/agent-plans--org-roam-watch))
-        ;; A watch that stops, as when its directory goes, is forgotten.
+        ;; A watch that stops while its directory is there is replaced,
+        ;; once filenotify has forgotten it.
         (file-notify-rm-watch wgn/agent-plans--org-roam-watch)
         (should-not wgn/agent-plans--org-roam-watch)
-        (should (= (hash-table-count file-notify-descriptors) watches))))))
+        (should (= (hash-table-count file-notify-descriptors) watches))
+        (should (wgn-agent-plans-test--read-events-until
+                 (lambda () wgn/agent-plans--org-roam-watch)))
+        (should (file-notify-valid-p wgn/agent-plans--org-roam-watch))
+        (should (= (hash-table-count file-notify-descriptors) (1+ watches)))))))
 
 (ert-deftest wgn-agent-plans-org-roam-watch-follows-autosync ()
   (wgn-agent-plans-test--with-roam
