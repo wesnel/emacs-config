@@ -100,11 +100,29 @@ Plans of both forms are on disk, so both are read.")
                           wgn/agent-plans--id-properties "|"))
              patterns "|"))
 
+(defvar wgn/agent-plans-config-file nil
+  "The absolute path of `agent-plan''s config file, or nil.
+Set it to the file the deployed agent-tools read where that build has
+its config file built in: such a build reads no environment, so
+neither does Emacs while this is set.")
+
+(defun wgn/agent-plans--absolute (path)
+  "Return PATH if it is absolute, starting with /, else nil.
+An empty or relative path would be read against the current directory."
+  (and (stringp path) (string-prefix-p "/" path) path))
+
 (defun wgn/agent-plans--config-file ()
-  "Return the file `agent-plan' reads its settings from."
-  (or (getenv "AGENT_TOOLS_CONFIG")
+  "Return the file `agent-plan' reads its settings from.
+It is `wgn/agent-plans-config-file' where that is set.  Otherwise it is
+found as agent-tools does when no config file is built in:
+AGENT_TOOLS_CONFIG, else agent-tools/config.json under XDG_CONFIG_HOME,
+else under ~/.config; a variable that is empty or not absolute counts
+as unset."
+  (or (wgn/agent-plans--absolute wgn/agent-plans-config-file)
+      (wgn/agent-plans--absolute (getenv "AGENT_TOOLS_CONFIG"))
       (expand-file-name "agent-tools/config.json"
-                        (or (getenv "XDG_CONFIG_HOME") "~/.config"))))
+                        (or (wgn/agent-plans--absolute (getenv "XDG_CONFIG_HOME"))
+                            "~/.config"))))
 
 (defvar wgn/agent-plans--config-cache nil
   "(FILE ATTRIBUTES PLANS): the \"plans\" object of FILE, read when it had ATTRIBUTES.")
