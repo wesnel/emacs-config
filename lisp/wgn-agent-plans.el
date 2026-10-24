@@ -1852,14 +1852,39 @@ the file `wgn/agent-plans-org-roam-machine-file' names.")
   "The file, under `user-emacs-directory', that Home Manager writes.
 It sets `wgn/agent-plans-org-roam-directory'.")
 
+;; `org-roam-db-autosync-mode' indexes only what Emacs saves, and
+;; `agent-plan' writes plans from outside.  A stream of file events is
+;; no full record of the plans directory: removing it, or moving a
+;; directory above it, reports no event for each plan, and a watch
+;; follows the directory it was added on wherever that goes.  So one
+;; function, `wgn/agent-plans--org-roam-reconcile', makes org-roam's
+;; entries match the files at the plans directory's path, and it runs
+;; on a timer, and soon after each event of a watch where one can be
+;; added.
+
+(defcustom wgn/agent-plans-org-roam-reconcile-interval 60
+  "Seconds between reconciles of org-roam's entries with the plans.
+They run while `org-roam-db-autosync-mode' is on.  A change takes
+effect when that mode is next turned on."
+  :type 'number)
+
+(defvar wgn/agent-plans--org-roam-timer nil
+  "The timer of the periodic reconcile, or nil.")
+
+(defvar wgn/agent-plans--org-roam-pending nil
+  "The timer of a reconcile a file event asked for, or nil.")
+
 (defvar wgn/agent-plans--org-roam-watch nil
-  "The file notification watch keeping org-roam in step with the plans, or nil.
-It watches the plans directory, or while that is missing, its nearest
-existing ancestor: `wgn/agent-plans--org-roam-watched' says which.")
+  "The file notification watch on the plans directory, or nil.")
 
 (defvar wgn/agent-plans--org-roam-watched nil
-  "(WATCHED . PLANS): the directory `wgn/agent-plans--org-roam-watch'
-watches, and the plans directory, by its true name, that it is for.")
+  "(DIRECTORY . INODE): the directory `wgn/agent-plans--org-roam-watch'
+was added on, by its true name, and its inode then.")
+
+(defvar wgn/agent-plans--org-roam-awaiting nil
+  "Non-nil while the setup waits for `org-roam-directory' to exist.
+The periodic reconcile's timer then turns `org-roam-db-autosync-mode'
+on once it does.")
 
 (defun wgn/agent-plans--org-roam-written (file)
   "Index FILE, written outside Emacs, in org-roam's database.
@@ -1877,122 +1902,125 @@ buffer over FILE.  The database takes it when the buffer is saved."
         (error (message "org-roam could not index %s: %s"
                         file (error-message-string err)))))))
 
-(defun wgn/agent-plans--org-roam-file-changed (event)
-  "Keep org-roam's database in step with EVENT in the plans directory.
-EVENT is a file notification, (DESCRIPTOR ACTION FILE [FILE1]).
-`org-roam-db-autosync-mode' sees only what Emacs writes, and
-`agent-plan' writes plans from outside, each by a temporary file
-renamed into place.  Only files `org-roam-file-p' takes are touched.
-An error is reported, not signalled: it would reach whatever was
-reading input when the event arrived."
+(defun wgn/agent-plans--org-roam-reconcile ()
+  "Make org-roam's entries for the plans directory match the files there.
+Each file in it that org-roam takes is indexed, which org-roam skips
+where the file's hash is unchanged, and each entry for a file the
+directory no longer holds is cleared: every one, where the directory
+is gone.  The directory is the one at the path the agent-tools config
+names now.  An error is reported, not signalled: this runs from timers."
   (condition-case err
-      (wgn/agent-plans--org-roam-handle event)
-    (error (message "org-roam missed %s in the plans directory: %s"
-                    (nth 2 event) (error-message-string err)))))
+      (when-let* ((dir (wgn/agent-plans-directory)))
+        (let* ((plans (file-name-as-directory (file-truename dir)))
+               (files (and (file-directory-p plans)
+                           (seq-filter (lambda (file)
+                                         (and (file-regular-p file) (org-roam-file-p file)))
+                                       (directory-files plans t)))))
+          (dolist (row (org-roam-db-query [:select file :from files]))
+            (let ((file (car row)))
+              (when (and (equal (file-name-directory file) plans)
+                         (not (member file files)))
+                (org-roam-db-clear-file file))))
+          (mapc #'wgn/agent-plans--org-roam-written files)))
+    (error (message "org-roam's plans may be out of date: %s"
+                    (error-message-string err)))))
 
-(defun wgn/agent-plans--org-roam-handle (event)
-  "Do what `wgn/agent-plans--org-roam-file-changed' says for EVENT."
-  (pcase-let ((`(,descriptor ,action ,file ,file1) event)
-              (`(,watched . ,plans) wgn/agent-plans--org-roam-watched))
-    (cond
-     ;; The watched directory went, or the watch was lost.  filenotify
-     ;; forgets the watch only once this returns, and a watch added
-     ;; before then could be given the same descriptor, so the new one
-     ;; is added afterwards.
-     ((eq action 'stopped)
-      (when (equal descriptor wgn/agent-plans--org-roam-watch)
-        (setq wgn/agent-plans--org-roam-watch nil)
-        (run-at-time 0 nil #'wgn/agent-plans--org-roam-rewatch)))
-     ;; An ancestor is watched until the plans directory appears.
-     ((not (equal watched plans))
-      (when (and (memq action '(created renamed))
-                 (string-prefix-p (file-name-as-directory (or file1 file))
-                                  (file-name-as-directory plans)))
-        (wgn/agent-plans--org-roam-watch-plans t)))
-     ((memq action '(created changed renamed))
-      (when (and (eq action 'renamed) (org-roam-file-p file))
-        (org-roam-db-clear-file file))
-      (let ((written (if (eq action 'renamed) file1 file)))
-        (when (and (org-roam-file-p written) (file-exists-p written))
-          (wgn/agent-plans--org-roam-written written))))
-     ((eq action 'deleted)
-      (when (org-roam-file-p file)
-        (org-roam-db-clear-file file))))))
+(defun wgn/agent-plans--org-roam-reconcile-pending ()
+  "Run the reconcile a file event asked for."
+  (setq wgn/agent-plans--org-roam-pending nil)
+  (wgn/agent-plans--org-roam-reconcile))
 
-(defun wgn/agent-plans--org-roam-rewatch ()
-  "Watch the plans again after the watch stopped, unless that is done."
-  (unless wgn/agent-plans--org-roam-watch
-    (condition-case err
-        (wgn/agent-plans--org-roam-watch-plans t)
-      (error (message "org-roam lost its watch on the plans directory: %s"
-                      (error-message-string err))))))
+(defun wgn/agent-plans--org-roam-file-changed (_event)
+  "Reconcile a second after a file event in the plans directory.
+The events of one write by `agent-plan', a temporary file renamed into
+place, then make one reconcile."
+  (unless (timerp wgn/agent-plans--org-roam-pending)
+    (setq wgn/agent-plans--org-roam-pending
+          (run-at-time 1 nil #'wgn/agent-plans--org-roam-reconcile-pending))))
 
-(defun wgn/agent-plans--org-roam-forget (directory)
-  "Clear org-roam's entries for the files under DIRECTORY, which is gone."
-  (let ((prefix (file-name-as-directory directory)))
-    (dolist (row (org-roam-db-query [:select file :from files]))
-      (when (string-prefix-p prefix (car row))
-        (org-roam-db-clear-file (car row))))))
-
-(defun wgn/agent-plans--org-roam-index (directory)
-  "Index each file in DIRECTORY that org-roam takes."
-  (dolist (file (directory-files directory t))
-    (when (and (file-regular-p file) (org-roam-file-p file))
-      (wgn/agent-plans--org-roam-written file))))
-
-(defun wgn/agent-plans--existing-ancestor (directory)
-  "Return the nearest ancestor of DIRECTORY that is a directory."
-  (let ((parent (directory-file-name
-                 (file-name-directory (directory-file-name directory)))))
-    (if (or (file-directory-p parent) (equal parent directory))
-        parent
-      (wgn/agent-plans--existing-ancestor parent))))
-
-(defun wgn/agent-plans--org-roam-watch-plans (&optional index)
-  "Watch the plans directory for `agent-plan''s writes, if there is one.
-Any earlier watch is removed first.  There is none while
-`org-roam-db-autosync-mode' is off, which keeps nothing in step: the
-mode's hook runs this as it is turned on or off.
-
-While the directory is missing, org-roam's entries for the files that
-were in it are cleared, and its nearest existing ancestor is watched
-instead, until it appears.  INDEX non-nil indexes the files in the
-directory, which may have appeared with them."
+(defun wgn/agent-plans--org-roam-unwatch ()
+  "Remove the watch on the plans directory, if there is one."
   (let ((old wgn/agent-plans--org-roam-watch))
-    ;; Forgotten first, so that the `stopped' its removal sends is not
-    ;; taken for the current watch's.
     (setq wgn/agent-plans--org-roam-watch nil
           wgn/agent-plans--org-roam-watched nil)
     (when old
-      (file-notify-rm-watch old)))
-  (let ((dir (wgn/agent-plans-directory)))
-    (when (and dir org-roam-db-autosync-mode)
-      (let* ((plans (file-truename dir))
-             (watched (if (file-directory-p plans)
-                          plans
-                        (wgn/agent-plans--org-roam-forget plans)
-                        (wgn/agent-plans--existing-ancestor plans))))
-        (condition-case err
+      (ignore-errors (file-notify-rm-watch old)))))
+
+(defun wgn/agent-plans--org-roam-ensure-watch ()
+  "Watch the plans directory, unless the watch on it is current.
+A watch follows the directory it was added on wherever that is moved,
+so one added on a directory with another inode than the one at the
+path now is replaced.  Where no watch can be added, for any reason,
+there is none: the periodic reconcile does without."
+  (let* ((dir (wgn/agent-plans-directory))
+         (plans (and dir (file-truename dir)))
+         (attributes (and plans (file-attributes plans)))
+         (here (and (eq t (file-attribute-type attributes))
+                    (cons plans (file-attribute-inode-number attributes)))))
+    (unless (and here
+                 wgn/agent-plans--org-roam-watch
+                 (equal here wgn/agent-plans--org-roam-watched)
+                 (file-notify-valid-p wgn/agent-plans--org-roam-watch))
+      (wgn/agent-plans--org-roam-unwatch)
+      (when here
+        (condition-case nil
             (setq wgn/agent-plans--org-roam-watch
-                  (file-notify-add-watch watched '(change)
+                  (file-notify-add-watch plans '(change)
                                          #'wgn/agent-plans--org-roam-file-changed)
-                  wgn/agent-plans--org-roam-watched (cons watched plans))
-          (file-notify-error
-           (message "Plans written outside Emacs reach org-roam only on its next sync: %s"
-                    (error-message-string err))))
-        (when (and index (equal watched plans))
-          (wgn/agent-plans--org-roam-index plans))))))
+                  wgn/agent-plans--org-roam-watched here)
+          (error nil))))))
+
+(defun wgn/agent-plans--org-roam-tick ()
+  "Reconcile, watching the plans directory anew where that is due.
+While the setup waits for `org-roam-directory', turn
+`org-roam-db-autosync-mode' on once it exists instead."
+  (condition-case err
+      (cond
+       (org-roam-db-autosync-mode
+        (wgn/agent-plans--org-roam-ensure-watch)
+        (wgn/agent-plans--org-roam-reconcile))
+       ((and wgn/agent-plans--org-roam-awaiting
+             (file-directory-p org-roam-directory))
+        (setq wgn/agent-plans--org-roam-awaiting nil)
+        (org-roam-db-autosync-mode 1)))
+    (error (message "org-roam's plans may be out of date: %s"
+                    (error-message-string err)))))
+
+(defun wgn/agent-plans--org-roam-start ()
+  "Start the periodic reconcile, unless it runs."
+  (unless (timerp wgn/agent-plans--org-roam-timer)
+    (setq wgn/agent-plans--org-roam-timer
+          (run-at-time wgn/agent-plans-org-roam-reconcile-interval
+                       wgn/agent-plans-org-roam-reconcile-interval
+                       #'wgn/agent-plans--org-roam-tick))))
+
+(defun wgn/agent-plans--org-roam-follow-autosync ()
+  "Reconcile the plans while `org-roam-db-autosync-mode' is on, and only then.
+The mode's hook runs this as it is turned on or off."
+  (setq wgn/agent-plans--org-roam-awaiting nil)
+  (if org-roam-db-autosync-mode
+      (progn
+        (wgn/agent-plans--org-roam-start)
+        (wgn/agent-plans--org-roam-ensure-watch))
+    (dolist (timer (list wgn/agent-plans--org-roam-timer
+                         wgn/agent-plans--org-roam-pending))
+      (when (timerp timer)
+        (cancel-timer timer)))
+    (setq wgn/agent-plans--org-roam-timer nil
+          wgn/agent-plans--org-roam-pending nil)
+    (wgn/agent-plans--org-roam-unwatch)))
 
 (defun wgn/agent-plans-org-roam-setup ()
   "Make `wgn/agent-plans-org-roam-directory' org-roam's, each plan one node.
-Plans' parts, logs and lock files are left out of org-roam.  If the
-directory exists, `org-roam-db-autosync-mode' keeps the database in
-step with it, syncing it now, and while that mode is on, a file
-notification watch on the plans directory, `wgn/agent-plans-directory',
-indexes the plans `agent-plan' writes from outside Emacs, as
-`wgn/agent-plans--org-roam-watch-plans' says.  Unless the variable is an
-absolute path, one starting with /, nothing is set up: \"\" would be
-Emacs's current directory.
+Plans' parts, logs and lock files are left out of org-roam.
+`org-roam-db-autosync-mode' keeps the database in step with the
+directory, syncing it now, or once the directory exists.  While that
+mode is on, the plans `agent-plan' writes from outside Emacs into
+`wgn/agent-plans-directory' are indexed every
+`wgn/agent-plans-org-roam-reconcile-interval' seconds, and a second
+after a file notification from that directory where it can be watched.
+Unless the variable is an absolute path, one starting with /, nothing
+is set up: \"\" would be Emacs's current directory.
 
 Call this once org-roam is loaded: it adds to org-roam's own exclusions,
 which may be one regexp or a list of them, and puts
@@ -2010,12 +2038,18 @@ set your own filter before this runs, or add yours with
                 (cons wgn/agent-plans-org-roam-exclude-regexp exclusions))))
       (add-function :before-while org-roam-db-node-include-function
                     #'wgn/agent-plans-org-roam-node-p)
-      (add-hook 'org-roam-db-autosync-mode-hook #'wgn/agent-plans--org-roam-watch-plans)
-      (if (or org-roam-db-autosync-mode
-              (not (file-directory-p org-roam-directory)))
-          (wgn/agent-plans--org-roam-watch-plans)
-        ;; Its hook adds the watch.
-        (org-roam-db-autosync-mode 1)))))
+      (add-hook 'org-roam-db-autosync-mode-hook #'wgn/agent-plans--org-roam-follow-autosync)
+      (cond
+       (org-roam-db-autosync-mode
+        ;; The plans directory may have changed.
+        (wgn/agent-plans--org-roam-unwatch)
+        (wgn/agent-plans--org-roam-follow-autosync))
+       ((file-directory-p org-roam-directory)
+        ;; Its hook starts the reconciles.
+        (org-roam-db-autosync-mode 1))
+       (t
+        (setq wgn/agent-plans--org-roam-awaiting t)
+        (wgn/agent-plans--org-roam-start))))))
 
 ;;;; Capture
 ;;
