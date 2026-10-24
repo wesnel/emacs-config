@@ -3152,8 +3152,25 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
 
 ;;;; Against the real agent-plan
 ;;
-;; Skipped where `agent-plan' is not on `exec-path'; nix-config's
+;; Skipped where `agent-plan' is not on `exec-path', or where it reads
+;; a config file built into it rather than the test's; nix-config's
 ;; `agent-plans' check runs it with the agent-plan of the same commit.
+
+(defun wgn-agent-plans-test--agent-plan-reads (plans)
+  "Return non-nil if the `agent-plan' on `exec-path' takes PLANS for its plans.
+One built with its config file reads none from the environment, and
+would write into the operator's plans; it refuses a plan under PLANS as
+under no plans directory of its own.  Nothing is left in PLANS."
+  (let ((plan (expand-file-name "2026-01-01-probe.mac.org" plans))
+        (log (expand-file-name "2026-01-01-probe.mac.log.org" plans)))
+    (wgn-agent-plans-test--write plan "* Plan\n** Goal\nProbe.\n")
+    (wgn-agent-plans-test--write log "")
+    (unwind-protect
+        (with-temp-buffer
+          (and (eq 0 (call-process "agent-plan" nil t nil "goal" plan))
+               (string-search "Probe." (buffer-string))))
+      (delete-file plan)
+      (delete-file log))))
 
 (defun wgn-agent-plans-test--agent-plan (&rest args)
   "Run the real `agent-plan' with ARGS and return its output; fail on error."
@@ -3175,6 +3192,7 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
                         "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
                         "CLAUDE_CODE_SESSION_ID")
                   process-environment))
+         (wgn/agent-plans-config-file config)
          (org-agenda-custom-commands (list (wgn/agent-plans-agenda-command)))
          (wgn/agent-plans-questions-interval 30)
          (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
@@ -3184,6 +3202,8 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
         (wgn-agent-plans-test--protected
           (wgn-agent-plans-test--write
            config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
+          ;; Before agent-plan writes anything.
+          (skip-unless (wgn-agent-plans-test--agent-plan-reads plans))
           (make-directory (expand-file-name "lisp" worktree) t)
           (let ((default-directory (file-name-as-directory worktree)))
             (should (eq 0 (call-process "git" nil nil nil "init" "-q"))))
@@ -3240,6 +3260,28 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
                          (string-prefix-p root (buffer-file-name buffer)))
                 (with-current-buffer buffer (set-buffer-modified-p nil))
                 (kill-buffer buffer)))))
+      (delete-directory root t))))
+
+(ert-deftest wgn-agent-plans-real-agent-plan-test-skips-one-with-its-own-config ()
+  ;; A stand-in for an agent-plan built with its config file, which
+  ;; refuses every plan outside its own plans directory and records what
+  ;; it was asked.
+  (let* ((root (file-name-as-directory (make-temp-file "agent-plans-baked-" t)))
+         (bin (expand-file-name "bin" root))
+         (asked (expand-file-name "asked" root))
+         (exec-path (cons bin exec-path)))
+    (unwind-protect
+        (progn
+          (wgn-agent-plans-test--write
+           (expand-file-name "agent-plan" bin)
+           (format "#!/bin/sh\necho \"$1\" >> %s\necho \"agent-plan: refused: $2 is not a plan under /elsewhere\" >&2\nexit 2\n"
+                   (shell-quote-argument asked)))
+          (set-file-modes (expand-file-name "agent-plan" bin) #o755)
+          (let ((result (ert-run-test
+                         (ert-get-test 'wgn-agent-plans-views-read-what-agent-plan-writes))))
+            (should (ert-test-skipped-p result)))
+          (should (equal (with-temp-buffer (insert-file-contents asked) (buffer-string))
+                         "goal\n")))
       (delete-directory root t))))
 
 ;;; agent-plans.el ends here

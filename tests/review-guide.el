@@ -128,9 +128,10 @@ and `pr-file'.  No git delegate or forge is asked anything."
   `(let* ((root (file-name-as-directory (make-temp-file "review-guide-" t)))
           (process-environment
            (append (list (concat "XDG_STATE_HOME=" root "state")
-                         (concat "XDG_CACHE_HOME=" root "cache")
-                         (concat "AGENT_TOOLS_CONFIG=" root "config.json"))
+                         (concat "XDG_CACHE_HOME=" root "cache"))
                    process-environment))
+          ;; Not the operator's, whatever the environment says.
+          (wgn/agent-plans-config-file (concat root "config.json"))
           (review-guide-records-directory nil)
           (review-guide-cache-directory nil)
           (records (expand-file-name "state/agent-tools/reviews/owner/repo/" root))
