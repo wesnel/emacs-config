@@ -2263,6 +2263,16 @@ It writes a temporary file beside FILE and renames it into place."
                               "printf %s \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\""
                               "sh" file contents))))
 
+(defun wgn-agent-plans-test--read-events-until (done)
+  "Read input events, for at most ten seconds, until DONE returns non-nil.
+Batch Emacs handles file notifications and timers only while it reads
+input.  Return what DONE last returned."
+  (let ((deadline (time-add nil 10))
+        result)
+    (while (and (not (setq result (funcall done))) (time-less-p nil deadline))
+      (read-event nil nil 0.1))
+    result))
+
 (defun wgn-agent-plans-test--watched (event)
   "Hand EVENT, (ACTION FILE [FILE1]), to the plans directory's watch handler."
   (wgn/agent-plans--org-roam-file-changed
@@ -2286,6 +2296,29 @@ It writes a temporary file beside FILE and renames it into place."
         (while (and (not (nodes)) (time-less-p nil deadline))
           (read-event nil nil 0.1)))
       (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-watch-reports-its-errors-without-signalling ()
+  (wgn-agent-plans-test--with-roam
+    (skip-unless file-notify--library)
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans))
+          messages)
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (wgn-agent-plans-test--read-events-until (lambda () (nodes))))
+      ;; A database another Emacs holds, which the test cannot make
+      ;; SQLite refuse on demand.
+      (cl-letf (((symbol-function 'org-roam-db-clear-file)
+                 (lambda (&rest _) (error "database is locked")))
+                ((symbol-function 'message)
+                 (lambda (format &rest args)
+                   (push (apply #'format-message format args) messages))))
+        (should (eq 0 (call-process "rm" nil nil nil file)))
+        (should (wgn-agent-plans-test--read-events-until
+                 (lambda () (seq-find (lambda (m) (string-search "database is locked" m))
+                                      messages))))))))
 
 (ert-deftest wgn-agent-plans-org-roam-watch-keeps-the-database-in-step ()
   (wgn-agent-plans-test--with-roam

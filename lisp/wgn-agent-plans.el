@@ -1876,7 +1876,16 @@ buffer over FILE.  The database takes it when the buffer is saved."
 EVENT is a file notification, (DESCRIPTOR ACTION FILE [FILE1]).
 `org-roam-db-autosync-mode' sees only what Emacs writes, and
 `agent-plan' writes plans from outside, each by a temporary file
-renamed into place.  Only files `org-roam-file-p' takes are touched."
+renamed into place.  Only files `org-roam-file-p' takes are touched.
+An error is reported, not signalled: it would reach whatever was
+reading input when the event arrived."
+  (condition-case err
+      (wgn/agent-plans--org-roam-handle event)
+    (error (message "org-roam missed %s in the plans directory: %s"
+                    (nth 2 event) (error-message-string err)))))
+
+(defun wgn/agent-plans--org-roam-handle (event)
+  "Do what `wgn/agent-plans--org-roam-file-changed' says for EVENT."
   (pcase-let ((`(,descriptor ,action ,file ,file1) event))
     (pcase action
       ('stopped
