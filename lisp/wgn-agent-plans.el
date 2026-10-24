@@ -100,11 +100,18 @@ Plans of both forms are on disk, so both are read.")
                           wgn/agent-plans--id-properties "|"))
              patterns "|"))
 
+(defconst wgn/agent-plans-machine-file "etc/agent-plans.el"
+  "The file, under `user-emacs-directory', that Home Manager writes.
+It sets `wgn/agent-plans-config-file' and
+`wgn/agent-plans-org-roam-directory', those this machine has.  Load it
+before `wgn/agent-plans-protect-mode', which reads the config file.")
+
 (defvar wgn/agent-plans-config-file nil
   "The absolute path of `agent-plan''s config file, or nil.
-Set it to the file the deployed agent-tools read where that build has
-its config file built in: such a build reads no environment, so
-neither does Emacs while this is set.")
+Home Manager's home.programs.wgn.emacs.agent-tools.configFile sets it,
+in the file `wgn/agent-plans-machine-file' names, to the file the
+deployed agent-tools read: that build has its config file built in and
+reads no environment, so neither does Emacs while this is set.")
 
 (defun wgn/agent-plans--absolute (path)
   "Return PATH if it is absolute, starting with /, else nil.
@@ -1868,11 +1875,7 @@ every plan, are no nodes, nor is an ID org-id gives an entry."
 (defvar wgn/agent-plans-org-roam-directory nil
   "The notes repository that is org-roam's directory, or nil for none.
 Home Manager's home.programs.wgn.emacs.org-roam.directory sets it, in
-the file `wgn/agent-plans-org-roam-machine-file' names.")
-
-(defconst wgn/agent-plans-org-roam-machine-file "etc/org-roam-notes.el"
-  "The file, under `user-emacs-directory', that Home Manager writes.
-It sets `wgn/agent-plans-org-roam-directory'.")
+the file `wgn/agent-plans-machine-file' names.")
 
 ;; `org-roam-db-autosync-mode' indexes only what Emacs saves, and
 ;; `agent-plan' writes plans from outside.  A stream of file events is

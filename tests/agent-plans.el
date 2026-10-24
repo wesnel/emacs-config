@@ -2708,25 +2708,35 @@ input.  Return what DONE last returned."
       (ert-skip (format "%s is not in the checkout" path)))
     (with-temp-buffer (insert-file-contents path) (buffer-string))))
 
-(ert-deftest wgn-agent-plans-org-roam-machine-file-is-the-one-home-manager-writes ()
+(defun wgn-agent-plans-test--use-package (text package)
+  "Return the `use-package' form of PACKAGE in TEXT, read, and where it starts."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (re-search-forward (concat "^(use-package " (regexp-quote package) "$"))
+    (goto-char (match-beginning 0))
+    (cons (read (current-buffer)) (match-beginning 0))))
+
+(ert-deftest wgn-agent-plans-machine-file-is-the-one-home-manager-writes ()
   (should (string-search
-           (concat "\".emacs.d/" wgn/agent-plans-org-roam-machine-file "\" = ")
+           (concat "\".emacs.d/" wgn/agent-plans-machine-file "\" = ")
            (wgn-agent-plans-test--repository-text "flake.nix"))))
 
-(ert-deftest wgn-agent-plans-org-roam-form-loads-the-machine-file-before-setup ()
+;; The machine file names agent-plan's config file, which protect-mode
+;; reads from the first plan buffer on, and org-roam's directory.
+(ert-deftest wgn-agent-plans-machine-file-is-loaded-before-protect-mode ()
   (let* ((text (wgn-agent-plans-test--repository-text "default.el"))
-         (form (with-temp-buffer
-                 (insert text)
-                 (goto-char (point-min))
-                 (re-search-forward "^(use-package org-roam$")
-                 (goto-char (match-beginning 0))
-                 (read (current-buffer))))
-         (config (cdr (memq :config form))))
-    (should (equal (seq-take config 2)
-                   '((load (expand-file-name wgn/agent-plans-org-roam-machine-file
+         (agenda (wgn-agent-plans-test--use-package text "org-agenda"))
+         (roam (wgn-agent-plans-test--use-package text "org-roam")))
+    (should (equal (seq-take (cdr (memq :init (car agenda))) 2)
+                   '((load (expand-file-name wgn/agent-plans-machine-file
                                              user-emacs-directory)
                            t t)
-                     (wgn/agent-plans-org-roam-setup))))))
+                     (wgn/agent-plans-protect-mode))))
+    ;; Both forms wait for Org, so the one before is set up first.
+    (should (< (cdr agenda) (cdr roam)))
+    (should (equal (cdr (memq :config (car roam)))
+                   '((wgn/agent-plans-org-roam-setup))))))
 
 ;; Org is loaded by then, so the org-roam form syncs as it is evaluated:
 ;; before no-littering moves `org-roam-db-location', a first database
