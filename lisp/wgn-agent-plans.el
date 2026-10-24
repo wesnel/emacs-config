@@ -1913,7 +1913,7 @@ mode's hook runs this as it is turned on or off."
     (when old
       (file-notify-rm-watch old)))
   (let ((dir (wgn/agent-plans-directory)))
-    (when (and dir (file-directory-p dir))
+    (when (and dir org-roam-db-autosync-mode (file-directory-p dir))
       (condition-case err
           (setq wgn/agent-plans--org-roam-watch
                 (file-notify-add-watch (file-truename dir) '(change)
