@@ -1856,8 +1856,12 @@ one starting with /, nothing is set up: \"\" would be Emacs's current
 directory.
 
 Call this once org-roam is loaded: it adds to org-roam's own exclusions,
-which may be one regexp or a list of them, and sets
-`org-roam-db-node-include-function'.  Calling it again changes nothing."
+which may be one regexp or a list of them, and puts
+`wgn/agent-plans-org-roam-node-p' before the function
+`org-roam-db-node-include-function' holds, which then decides only
+where that one lets it.  A later `setq' of that variable drops it, so
+set your own filter before this runs, or add yours with
+`add-function'.  Calling it again changes nothing."
   (let ((repo wgn/agent-plans-org-roam-directory))
     (when (and (stringp repo) (string-prefix-p "/" repo))
       (setq org-roam-directory (file-truename repo))
@@ -1865,7 +1869,8 @@ which may be one regexp or a list of them, and sets
         (unless (member wgn/agent-plans-org-roam-exclude-regexp exclusions)
           (setq org-roam-file-exclude-regexp
                 (cons wgn/agent-plans-org-roam-exclude-regexp exclusions))))
-      (setq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p)
+      (add-function :before-while org-roam-db-node-include-function
+                    #'wgn/agent-plans-org-roam-node-p)
       (when (and (file-directory-p org-roam-directory)
                  (not org-roam-db-autosync-mode))
         (org-roam-db-autosync-mode 1)))))

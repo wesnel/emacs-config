@@ -2192,6 +2192,16 @@ Return the plan file."
   "Return a fresh copy of VARIABLE's standard value."
   (eval (car (get variable 'standard-value)) t))
 
+(defun wgn-agent-plans-test--node-filters ()
+  "Return how often the plans' node filter is in org-roam's."
+  (let ((count 0))
+    (advice-function-mapc
+     (lambda (function _)
+       (when (eq function #'wgn/agent-plans-org-roam-node-p)
+         (cl-incf count)))
+     org-roam-db-node-include-function)
+    count))
+
 (defmacro wgn-agent-plans-test--with-roam (&rest body)
   "Run BODY with org-roam set to its defaults on a notes directory of its own.
 Skipped where org-roam is not on `load-path': give its directory with
@@ -2331,7 +2341,7 @@ and `org-roam-db-autosync-mode' is turned off after."
       (should (equal org-roam-directory (expand-file-name "not-the-notes/" root)))
       (should (equal org-roam-file-exclude-regexp
                      (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp)))
-      (should-not (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))
+      (should (zerop (wgn-agent-plans-test--node-filters)))
       (should-not org-roam-db-autosync-mode))))
 
 (ert-deftest wgn-agent-plans-org-roam-setup-syncs-the-directory-if-there ()
@@ -2348,7 +2358,30 @@ and `org-roam-db-autosync-mode' is turned off after."
     (should (equal org-roam-file-exclude-regexp
                    (cons wgn/agent-plans-org-roam-exclude-regexp
                          (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp))))
-    (should (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))))
+    (should (= (wgn-agent-plans-test--node-filters) 1))))
+
+(ert-deftest wgn-agent-plans-org-roam-keeps-the-users-node-filter ()
+  (wgn-agent-plans-test--with-roam
+    ;; The operator's own filter, set before the setup runs.
+    (setq org-roam-db-node-include-function
+          (lambda ()
+            (not (string-search "private" (file-name-nondirectory (buffer-file-name))))))
+    (wgn/agent-plans-org-roam-setup)
+    (wgn-agent-plans-test--write
+     (expand-file-name "20200101000000-private.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000f" "Private"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20200101000000-a_note.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000e" "A note"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261016120000-r.mac.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-00000000000d" "Plan R"
+           (concat "* Plan\n*** TODO First\n:PROPERTIES:\n:CUSTOM_ID: S1\n"
+                   ":ID: a1b2c3d4-0000-4000-8000-0000000000d1\n:END:\n")))
+    (org-roam-db-sync)
+    (should (equal (nodes)
+                   '(("a1b2c3d4-0000-4000-8000-00000000000d" "Plan R")
+                     ("a1b2c3d4-0000-4000-8000-00000000000e" "A note"))))))
 
 (ert-deftest wgn-agent-plans-org-roam-makes-each-plan-one-node ()
   (wgn-agent-plans-test--with-roam
