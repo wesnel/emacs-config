@@ -9,6 +9,7 @@
 ;; Only the plan files are listed here.  Nothing here adds them to
 ;; `org-agenda-files' or `org-refile-targets', or writes any other Org file.
 
+(require 'filenotify)
 (require 'json)
 (require 'seq)
 
@@ -1820,6 +1821,9 @@ SEARCH, as `org-execute-file-search-functions' expects."
 (defvar org-roam-directory)
 (defvar org-roam-db-autosync-mode)
 (declare-function org-roam-db-autosync-mode "org-roam-db" (&optional arg))
+(declare-function org-roam-file-p "org-roam" (&optional file))
+(declare-function org-roam-db-update-file "org-roam-db" (&optional file-path _deprecated-arg))
+(declare-function org-roam-db-clear-file "org-roam-db" (&optional file))
 
 (defconst wgn/agent-plans-org-roam-exclude-regexp
   (concat "\\(?:\\`\\|/\\)" wgn/agent-plans--name-regexp
@@ -1847,13 +1851,73 @@ the file `wgn/agent-plans-org-roam-machine-file' names.")
   "The file, under `user-emacs-directory', that Home Manager writes.
 It sets `wgn/agent-plans-org-roam-directory'.")
 
+(defvar wgn/agent-plans--org-roam-watch nil
+  "The file notification watch on the plans directory, or nil.
+`wgn/agent-plans-org-roam-setup' adds it, removing the one before.")
+
+(defun wgn/agent-plans--org-roam-written (file)
+  "Index FILE, written outside Emacs, in org-roam's database.
+A buffer visiting FILE is reverted first if it has no unsaved changes,
+since org-roam reads a visited file from its buffer.  One with unsaved
+changes is left alone, and so is the database: org-roam would save the
+buffer over FILE.  The database takes it when the buffer is saved."
+  (let ((buffer (find-buffer-visiting file)))
+    (unless (and buffer (buffer-modified-p buffer))
+      (when (and buffer (not (verify-visited-file-modtime buffer)))
+        (with-current-buffer buffer
+          (revert-buffer t t t)))
+      (condition-case err
+          (org-roam-db-update-file file)
+        (error (message "org-roam could not index %s: %s"
+                        file (error-message-string err)))))))
+
+(defun wgn/agent-plans--org-roam-file-changed (event)
+  "Keep org-roam's database in step with EVENT in the plans directory.
+EVENT is a file notification, (DESCRIPTOR ACTION FILE [FILE1]).
+`org-roam-db-autosync-mode' sees only what Emacs writes, and
+`agent-plan' writes plans from outside, each by a temporary file
+renamed into place.  Only files `org-roam-file-p' takes are touched."
+  (pcase-let ((`(,descriptor ,action ,file ,file1) event))
+    (pcase action
+      ('stopped
+       (when (equal descriptor wgn/agent-plans--org-roam-watch)
+         (setq wgn/agent-plans--org-roam-watch nil)))
+      ((or 'created 'changed 'renamed)
+       (when (and (eq action 'renamed) (org-roam-file-p file))
+         (org-roam-db-clear-file file))
+       (let ((written (if (eq action 'renamed) file1 file)))
+         (when (and (org-roam-file-p written) (file-exists-p written))
+           (wgn/agent-plans--org-roam-written written))))
+      ('deleted
+       (when (org-roam-file-p file)
+         (org-roam-db-clear-file file))))))
+
+(defun wgn/agent-plans--org-roam-watch-plans ()
+  "Watch the plans directory for `agent-plan''s writes, if there is one.
+Any earlier watch is removed first.  There is none to add while
+`org-roam-db-autosync-mode' is off, which keeps nothing in step."
+  (when wgn/agent-plans--org-roam-watch
+    (file-notify-rm-watch wgn/agent-plans--org-roam-watch)
+    (setq wgn/agent-plans--org-roam-watch nil))
+  (let ((dir (wgn/agent-plans-directory)))
+    (when (and dir org-roam-db-autosync-mode (file-directory-p dir))
+      (condition-case err
+          (setq wgn/agent-plans--org-roam-watch
+                (file-notify-add-watch (file-truename dir) '(change)
+                                       #'wgn/agent-plans--org-roam-file-changed))
+        (file-notify-error
+         (message "Plans written outside Emacs reach org-roam only on its next sync: %s"
+                  (error-message-string err)))))))
+
 (defun wgn/agent-plans-org-roam-setup ()
   "Make `wgn/agent-plans-org-roam-directory' org-roam's, each plan one node.
 Plans' parts, logs and lock files are left out of org-roam.  If the
 directory exists, `org-roam-db-autosync-mode' keeps the database in
-step with it, syncing it now.  Unless the variable is an absolute path,
-one starting with /, nothing is set up: \"\" would be Emacs's current
-directory.
+step with it, syncing it now, and a file notification watch on the
+plans directory, `wgn/agent-plans-directory', indexes the plans
+`agent-plan' writes from outside Emacs.  Unless the variable is an
+absolute path, one starting with /, nothing is set up: \"\" would be
+Emacs's current directory.
 
 Call this once org-roam is loaded: it adds to org-roam's own exclusions,
 which may be one regexp or a list of them, and puts
@@ -1873,7 +1937,8 @@ set your own filter before this runs, or add yours with
                     #'wgn/agent-plans-org-roam-node-p)
       (when (and (file-directory-p org-roam-directory)
                  (not org-roam-db-autosync-mode))
-        (org-roam-db-autosync-mode 1)))))
+        (org-roam-db-autosync-mode 1))
+      (wgn/agent-plans--org-roam-watch-plans))))
 
 ;;;; Capture
 ;;

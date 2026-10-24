@@ -8,6 +8,7 @@
 ;; variables dynamically.
 (require 'org-id)
 (require 'autorevert)
+(require 'filenotify)
 ;; Loaded now, so that its autoload does not undo a test's stand-in.  It
 ;; provides no feature to require.
 (load "userlock" nil t)
@@ -2188,6 +2189,8 @@ Return the plan file."
 (declare-function org-roam-db-query "org-roam-db" (sql &rest args))
 (declare-function org-roam-db--close "org-roam-db" (&optional db))
 
+(defvar wgn/agent-plans--org-roam-watch)
+
 (defun wgn-agent-plans-test--standard (variable)
   "Return a fresh copy of VARIABLE's standard value."
   (eval (car (get variable 'standard-value)) t))
@@ -2209,7 +2212,8 @@ Skipped where org-roam is not on `load-path': give its directory with
 `wgn/agent-plans-org-roam-directory' names, as the machine file does,
 and `plans', its agents/plans; `node' returns a file node's text, and
 `nodes' the database's nodes.  `org-roam-directory' starts elsewhere,
-and `org-roam-db-autosync-mode' is turned off after."
+and `org-roam-db-autosync-mode' is turned off after, as is the watch
+on the plans directory."
   (declare (indent 0))
   `(progn
      (skip-unless (require 'org-roam nil t))
@@ -2229,7 +2233,8 @@ and `org-roam-db-autosync-mode' is turned off after."
              (wgn-agent-plans-test--standard 'org-roam-db-node-include-function))
             (org-id-locations-file (expand-file-name "org-id-locations" root))
             (org-id-locations nil)
-            (org-id-files nil))
+            (org-id-files nil)
+            (wgn/agent-plans--org-roam-watch nil))
        (cl-flet ((node (id title &optional body)
                    (concat ":PROPERTIES:\n:ID: " id "\n:END:\n#+title: " title "\n" body))
                  (nodes ()
@@ -2237,9 +2242,138 @@ and `org-roam-db-autosync-mode' is turned off after."
                          (lambda (a b) (string< (car a) (car b))))))
          (unwind-protect
              (progn ,@body)
+           (when wgn/agent-plans--org-roam-watch
+             (file-notify-rm-watch wgn/agent-plans--org-roam-watch))
            (org-roam-db-autosync-mode -1)
            (org-roam-db--close)
            (delete-directory root t))))))
+
+(defun wgn-agent-plans-test--roam-config (root plans)
+  "Name PLANS as agent-plan's plans directory, in a config file under ROOT.
+Return `process-environment' with the config file in AGENT_TOOLS_CONFIG."
+  (let ((config (expand-file-name "config.json" root)))
+    (wgn-agent-plans-test--write
+     config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
+    (cons (concat "AGENT_TOOLS_CONFIG=" config) process-environment)))
+
+(defun wgn-agent-plans-test--write-elsewhere (file contents)
+  "Write CONTENTS to FILE from another process, as agent-plan does.
+It writes a temporary file beside FILE and renames it into place."
+  (should (eq 0 (call-process "sh" nil nil nil "-c"
+                              "printf %s \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\""
+                              "sh" file contents))))
+
+(defun wgn-agent-plans-test--watched (event)
+  "Hand EVENT, (ACTION FILE [FILE1]), to the plans directory's watch handler."
+  (wgn/agent-plans--org-roam-file-changed
+   (cons wgn/agent-plans--org-roam-watch event)))
+
+(declare-function wgn/agent-plans--org-roam-file-changed "wgn-agent-plans" (event))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-a-plan-written-outside-emacs ()
+  (wgn-agent-plans-test--with-roam
+    ;; Emacs built with no file notification library has nothing to watch with.
+    (skip-unless file-notify--library)
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should org-roam-db-autosync-mode)
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      ;; Batch Emacs handles file notifications only while it reads input.
+      (let ((deadline (time-add nil 10)))
+        (while (and (not (nodes)) (time-less-p nil deadline))
+          (read-event nil nil 0.1)))
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-watch-keeps-the-database-in-step ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans))
+          (b (expand-file-name "20261015120000-b.mac.org" plans))
+          (part (expand-file-name "20261014120000-a.mac.P1.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should wgn/agent-plans--org-roam-watch)
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn-agent-plans-test--watched (list 'created a))
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))))
+      ;; A part is no node, though the watch sees it.
+      (wgn-agent-plans-test--write part (node "a1b2c3d4-0000-4000-8000-0000000000a1" "Part"))
+      (wgn-agent-plans-test--watched (list 'created part))
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))))
+      ;; A buffer visiting the plan holds what it read; the database
+      ;; takes what the file now says.
+      (let ((buffer (find-file-noselect a)))
+        (unwind-protect
+            (progn
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn-agent-plans-test--watched (list 'changed a))
+              (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a"
+                                        "Plan A, retitled"))))
+              (should (string-search "Plan A, retitled"
+                                     (with-current-buffer buffer (buffer-string)))))
+          (kill-buffer buffer)))
+      ;; Moved and removed by another process, past org-roam's advice
+      ;; on `rename-file' and `delete-file'.
+      (should (eq 0 (call-process "mv" nil nil nil a b)))
+      (wgn-agent-plans-test--watched (list 'renamed a b))
+      (should (equal (org-roam-db-query [:select [file] :from nodes]) `((,b))))
+      (should (eq 0 (call-process "rm" nil nil nil b)))
+      (wgn-agent-plans-test--watched (list 'deleted b))
+      (should-not (nodes)))))
+
+(ert-deftest wgn-agent-plans-org-roam-watch-leaves-a-changed-buffer-alone ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (let ((buffer (find-file-noselect a)))
+        (unwind-protect
+            (progn
+              (with-current-buffer buffer
+                (goto-char (point-max))
+                (insert "Unsaved.\n"))
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn-agent-plans-test--watched (list 'changed a))
+              (should (string-search "Unsaved." (with-current-buffer buffer (buffer-string))))
+              ;; Not saved over what the other process wrote.
+              (should (equal (with-temp-buffer
+                               (insert-file-contents a)
+                               (buffer-string))
+                             (node "a1b2c3d4-0000-4000-8000-00000000000a"
+                                   "Plan A, retitled"))))
+          (with-current-buffer buffer (set-buffer-modified-p nil))
+          (kill-buffer buffer))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-watches-the-plans-directory-once ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans)))
+      (let ((watches (hash-table-count file-notify-descriptors)))
+        (wgn/agent-plans-org-roam-setup)
+        (wgn/agent-plans-org-roam-setup)
+        (should (= (hash-table-count file-notify-descriptors) (1+ watches)))
+        (should (file-notify-valid-p wgn/agent-plans--org-roam-watch))
+        ;; A watch that stops, as when its directory goes, is forgotten.
+        (file-notify-rm-watch wgn/agent-plans--org-roam-watch)
+        (should-not wgn/agent-plans--org-roam-watch)
+        (should (= (hash-table-count file-notify-descriptors) watches))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-watches-nothing-without-a-plans-directory ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((process-environment (wgn-agent-plans-test--roam-config root plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should wgn/agent-plans--org-roam-watch))
+    ;; The config file that `with-roam' names is not there.
+    (wgn/agent-plans-org-roam-setup)
+    (should-not wgn/agent-plans--org-roam-watch)))
 
 (ert-deftest wgn-agent-plans-org-roam-sees-plans-but-not-parts-or-logs ()
   (wgn-agent-plans-test--with-roam
