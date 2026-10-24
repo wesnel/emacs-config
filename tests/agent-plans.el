@@ -2375,7 +2375,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-forgets-plans-renamed-away-and-replaced ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (wgn/agent-plans-org-roam-reconcile-interval 0.3))
       (wgn/agent-plans-org-roam-setup)
       (wgn-agent-plans-test--write-elsewhere
@@ -2396,7 +2396,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-follows-the-plans-path-when-its-parent-moves ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (wgn/agent-plans-org-roam-reconcile-interval 0.3)
           (agents (expand-file-name "agents" root)))
       (wgn/agent-plans-org-roam-setup)
@@ -2416,7 +2416,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-setup-goes-on-without-a-readable-plans-directory ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (wgn/agent-plans-org-roam-reconcile-interval 0.3))
       ;; Synced while it could be read: org-roam's own sync stops at a
       ;; directory it cannot.
@@ -2438,7 +2438,7 @@ input.  Return what DONE last returned."
     ;; As when the notes are cloned after Emacs has started.
     (let* ((wgn/agent-plans-org-roam-directory (expand-file-name "notes" root))
            (plans (expand-file-name "notes/agents/plans" root))
-           (process-environment (wgn-agent-plans-test--roam-config root plans))
+           (wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
            (wgn/agent-plans-org-roam-reconcile-interval 0.3))
       (wgn/agent-plans-org-roam-setup)
       (should-not org-roam-db-autosync-mode)
@@ -2452,7 +2452,7 @@ input.  Return what DONE last returned."
 
 (ert-deftest wgn-agent-plans-org-roam-sees-plans-once-their-directory-appears ()
   (wgn-agent-plans-test--with-roam
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (wgn/agent-plans-org-roam-reconcile-interval 0.3)
           (file (expand-file-name "20261014120000-a.mac.org" plans)))
       (wgn/agent-plans-org-roam-setup)
@@ -2467,7 +2467,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconcile-follows-a-directory-away-and-back ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans)))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans)))
       (wgn/agent-plans-org-roam-setup)
       (wgn-agent-plans-test--write
        (expand-file-name "20261014120000-a.mac.org" plans)
@@ -2487,7 +2487,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconcile-follows-the-path-when-a-parent-moves ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (agents (expand-file-name "agents" root)))
       (wgn/agent-plans-org-roam-setup)
       (wgn-agent-plans-test--write
@@ -2505,7 +2505,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconcile-leaves-a-sibling-directory-alone ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (old (expand-file-name "20261014120000-a.mac.org" (concat plans ".bak"))))
       (wgn/agent-plans-org-roam-setup)
       ;; Its name starts with the plans directory's.
@@ -2517,7 +2517,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconcile-reports-its-errors-without-signalling ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (file (expand-file-name "20261014120000-a.mac.org" plans))
           messages)
       (wgn/agent-plans-org-roam-setup)
@@ -2537,7 +2537,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconcile-keeps-a-current-buffer ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (a (expand-file-name "20261014120000-a.mac.org" plans)))
       (wgn/agent-plans-org-roam-setup)
       (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
@@ -2622,7 +2622,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-setup-runs-one-timer-and-one-watch ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (watches (hash-table-count file-notify-descriptors)))
       (wgn/agent-plans-org-roam-setup)
       (wgn/agent-plans-org-roam-setup)
@@ -2634,7 +2634,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-reconciles-only-while-autosync-is-on ()
   (wgn-agent-plans-test--with-roam
     (make-directory plans t)
-    (let ((process-environment (wgn-agent-plans-test--roam-config root plans))
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (watches (hash-table-count file-notify-descriptors)))
       (wgn/agent-plans-org-roam-setup)
       (org-roam-db-autosync-mode -1)
