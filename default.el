@@ -311,7 +311,11 @@
 
   :init
   ;; Before any plan file is visited: `:after org' runs this once Org is
-  ;; loaded, ahead of the visiting buffer's `find-file-hook'.
+  ;; loaded, ahead of the visiting buffer's `find-file-hook'.  The
+  ;; machine file Home Manager writes names agent-plan's config file,
+  ;; which protect-mode reads, and the org-roam form below reads the
+  ;; notes directory it names.
+  (load (expand-file-name wgn/agent-plans-machine-file user-emacs-directory) t t)
   (wgn/agent-plans-protect-mode)
   (wgn/agent-plans-links-setup)
   (with-eval-after-load 'org-capture
@@ -469,7 +473,9 @@ if USER is given, its username is USER.  The port is not matched."
 ;; home.programs.wgn.emacs.org-roam.directory; without it, org-roam is
 ;; not set up for the notes.  `wgn/agent-plans-org-roam-setup' says what
 ;; it configures.  The `org-agenda' form above defines it in its
-;; `:preface'.  Org is loaded before this form runs, so the setup's
+;; `:preface' and loads the machine file in its `:init', both of which
+;; run first, since that form also waits for Org and comes before this
+;; one.  Org is loaded before this form runs, so the setup's
 ;; first sync happens here: after no-littering, which sets
 ;; `org-roam-db-location', or that sync makes a second database.
 (use-package org-roam
@@ -478,7 +484,6 @@ if USER is given, its username is USER.  The port is not matched."
   :after org
 
   :config
-  (load (expand-file-name wgn/agent-plans-org-roam-machine-file user-emacs-directory) t t)
   (wgn/agent-plans-org-roam-setup))
 
 ;;;; Required for :bind in use-package.

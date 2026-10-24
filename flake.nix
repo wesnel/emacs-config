@@ -141,8 +141,28 @@
                   description = ''
                     Absolute path of the notes repository that org-roam
                     indexes, agents' plans among its notes. Emacs reads it
-                    from ~/.emacs.d/etc/org-roam-notes.el, which this writes.
+                    from ~/.emacs.d/etc/agent-plans.el, which this writes.
                     With null, org-roam is not set up for the notes.
+                  '';
+                };
+              };
+
+              agent-tools = {
+                configFile = lib.mkOption {
+                  # Emacs would read "" or a relative path against its
+                  # current directory.
+                  type = lib.types.nullOr (lib.types.strMatching "/.*");
+                  default = null;
+                  example = "/home/me/.config/agent-tools/config.json";
+                  description = ''
+                    Absolute path of the config file the deployed
+                    agent-tools read, where agent-plan finds the plans.
+                    Emacs then reads exactly that file, ignoring
+                    AGENT_TOOLS_CONFIG and XDG_CONFIG_HOME, as an
+                    agent-tools build with its config file built in does.
+                    Emacs reads it from ~/.emacs.d/etc/agent-plans.el,
+                    which this writes. With null, Emacs follows the rule
+                    agent-tools has without a built-in file.
                   '';
                 };
               };
@@ -181,12 +201,18 @@
 
                 ".emacs.d/etc/eshell/login".source = ./login.el;
 
-                # `wgn/agent-plans-org-roam-machine-file' names this file.
-                ".emacs.d/etc/org-roam-notes.el" = lib.mkIf (cfg.org-roam.directory != null) {
-                  text = ''
-                    ;;; org-roam-notes.el --- Machine org-roam notes -*- lexical-binding: t; -*-
-                    (setq wgn/agent-plans-org-roam-directory ${builtins.toJSON cfg.org-roam.directory})
-                  '';
+                # `wgn/agent-plans-machine-file' names this file.
+                ".emacs.d/etc/agent-plans.el" = lib.mkIf (cfg.org-roam.directory != null || cfg.agent-tools.configFile != null) {
+                  text =
+                    ''
+                      ;;; agent-plans.el --- This machine's notes and agent-tools config -*- lexical-binding: t; -*-
+                    ''
+                    + lib.optionalString (cfg.org-roam.directory != null) ''
+                      (setq wgn/agent-plans-org-roam-directory ${builtins.toJSON cfg.org-roam.directory})
+                    ''
+                    + lib.optionalString (cfg.agent-tools.configFile != null) ''
+                      (setq wgn/agent-plans-config-file ${builtins.toJSON cfg.agent-tools.configFile})
+                    '';
                 };
               };
             };

@@ -100,11 +100,36 @@ Plans of both forms are on disk, so both are read.")
                           wgn/agent-plans--id-properties "|"))
              patterns "|"))
 
+(defconst wgn/agent-plans-machine-file "etc/agent-plans.el"
+  "The file, under `user-emacs-directory', that Home Manager writes.
+It sets `wgn/agent-plans-config-file' and
+`wgn/agent-plans-org-roam-directory', those this machine has.  Load it
+before `wgn/agent-plans-protect-mode', which reads the config file.")
+
+(defvar wgn/agent-plans-config-file nil
+  "The absolute path of `agent-plan''s config file, or nil.
+Home Manager's home.programs.wgn.emacs.agent-tools.configFile sets it,
+in the file `wgn/agent-plans-machine-file' names, to the file the
+deployed agent-tools read: that build has its config file built in and
+reads no environment, so neither does Emacs while this is set.")
+
+(defun wgn/agent-plans--absolute (path)
+  "Return PATH if it is absolute, starting with /, else nil.
+An empty or relative path would be read against the current directory."
+  (and (stringp path) (string-prefix-p "/" path) path))
+
 (defun wgn/agent-plans--config-file ()
-  "Return the file `agent-plan' reads its settings from."
-  (or (getenv "AGENT_TOOLS_CONFIG")
+  "Return the file `agent-plan' reads its settings from.
+It is `wgn/agent-plans-config-file' where that is set.  Otherwise it is
+found as agent-tools does when no config file is built in:
+AGENT_TOOLS_CONFIG, else agent-tools/config.json under XDG_CONFIG_HOME,
+else under ~/.config; a variable that is empty or not absolute counts
+as unset."
+  (or (wgn/agent-plans--absolute wgn/agent-plans-config-file)
+      (wgn/agent-plans--absolute (getenv "AGENT_TOOLS_CONFIG"))
       (expand-file-name "agent-tools/config.json"
-                        (or (getenv "XDG_CONFIG_HOME") "~/.config"))))
+                        (or (wgn/agent-plans--absolute (getenv "XDG_CONFIG_HOME"))
+                            "~/.config"))))
 
 (defvar wgn/agent-plans--config-cache nil
   "(FILE ATTRIBUTES PLANS): the \"plans\" object of FILE, read when it had ATTRIBUTES.")
@@ -1850,11 +1875,7 @@ every plan, are no nodes, nor is an ID org-id gives an entry."
 (defvar wgn/agent-plans-org-roam-directory nil
   "The notes repository that is org-roam's directory, or nil for none.
 Home Manager's home.programs.wgn.emacs.org-roam.directory sets it, in
-the file `wgn/agent-plans-org-roam-machine-file' names.")
-
-(defconst wgn/agent-plans-org-roam-machine-file "etc/org-roam-notes.el"
-  "The file, under `user-emacs-directory', that Home Manager writes.
-It sets `wgn/agent-plans-org-roam-directory'.")
+the file `wgn/agent-plans-machine-file' names.")
 
 ;; `org-roam-db-autosync-mode' indexes only what Emacs saves, and
 ;; `agent-plan' writes plans from outside.  A stream of file events is
@@ -2033,8 +2054,8 @@ which may be one regexp or a list of them, and puts
 where that one lets it.  A later `setq' of that variable drops it, so
 set your own filter before this runs, or add yours with
 `add-function'.  Calling it again changes nothing."
-  (let ((repo wgn/agent-plans-org-roam-directory))
-    (when (and (stringp repo) (string-prefix-p "/" repo))
+  (let ((repo (wgn/agent-plans--absolute wgn/agent-plans-org-roam-directory)))
+    (when repo
       (setq org-roam-directory (file-truename repo))
       (let ((exclusions (ensure-list org-roam-file-exclude-regexp)))
         (unless (member wgn/agent-plans-org-roam-exclude-regexp exclusions)
