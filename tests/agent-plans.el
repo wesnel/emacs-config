@@ -8,6 +8,7 @@
 ;; variables dynamically.
 (require 'org-id)
 (require 'autorevert)
+(require 'filenotify)
 ;; Loaded now, so that its autoload does not undo a test's stand-in.  It
 ;; provides no feature to require.
 (load "userlock" nil t)
@@ -41,8 +42,9 @@ esac
 
 (defmacro wgn-agent-plans-test--with-plans (&rest body)
   "Run BODY with a plans directory and a fake `agent-plan' under a temp dir.
-Binds `root' to the temp dir, whose plans directory is configured through
-AGENT_TOOLS_CONFIG, and `agent-plan' is found on `exec-path'.  The IDs
+Binds `root' to the temp dir, whose plans directory is configured in
+`config', the file `wgn/agent-plans-config-file' names, so that the
+environment is not read; `agent-plan' is found on `exec-path'.  The IDs
 Org records, and saves with every Org buffer, stay under the temp dir
 too, out of `user-emacs-directory', which the Nix build sandbox lacks."
   (declare (indent 0))
@@ -53,11 +55,11 @@ too, out of `user-emacs-directory', which the Nix build sandbox lacks."
           (org-id-locations-file (expand-file-name "org-id-locations" root))
           (org-id-locations nil)
           (org-id-files nil)
+          (wgn/agent-plans-config-file config)
           (exec-path (cons bin exec-path))
           (process-environment
-           (cons (concat "AGENT_TOOLS_CONFIG=" config)
-                 (cons (concat "PATH=" bin ":" (getenv "PATH"))
-                       process-environment))))
+           (cons (concat "PATH=" bin ":" (getenv "PATH"))
+                 process-environment)))
      (unwind-protect
          (progn
            (wgn-agent-plans-test--write
@@ -91,9 +93,66 @@ Its part and log files sit beside it."
   (wgn-agent-plans-test--with-plans
     (should (equal (wgn/agent-plans-directory) plans)))
   ;; Nothing else names it.
-  (let ((process-environment
-         (cons "AGENT_TOOLS_CONFIG=/nonexistent/config.json" process-environment)))
+  (let ((wgn/agent-plans-config-file "/nonexistent/config.json"))
     (should-not (wgn/agent-plans-directory))))
+
+;; The rule agent-tools follows when no config file is built in: an
+;; absolute AGENT_TOOLS_CONFIG, else agent-tools/config.json under an
+;; absolute XDG_CONFIG_HOME, else under ~/.config.  An empty or relative
+;; value counts as unset.
+(defun wgn-agent-plans-test--config-file (&rest environment)
+  "Return the config file read with ENVIRONMENT, HOME being /home/me.
+An entry with no = unsets its variable."
+  (let ((wgn/agent-plans-config-file nil)
+        (process-environment
+         (append environment '("HOME=/home/me" "AGENT_TOOLS_CONFIG" "XDG_CONFIG_HOME")
+                 process-environment)))
+    (wgn/agent-plans--config-file)))
+
+(ert-deftest wgn-agent-plans-config-file-is-an-absolute-agent-tools-config ()
+  (should (equal (wgn-agent-plans-test--config-file
+                  "AGENT_TOOLS_CONFIG=/etc/tools.json" "XDG_CONFIG_HOME=/xdg")
+                 "/etc/tools.json")))
+
+(ert-deftest wgn-agent-plans-config-file-takes-empty-or-relative-agent-tools-config-as-unset ()
+  (dolist (value '("" "tools.json" "~/tools.json"))
+    (should (equal (wgn-agent-plans-test--config-file
+                    (concat "AGENT_TOOLS_CONFIG=" value) "XDG_CONFIG_HOME=/xdg")
+                   "/xdg/agent-tools/config.json"))))
+
+(ert-deftest wgn-agent-plans-config-file-takes-only-an-absolute-xdg-config-home ()
+  (should (equal (wgn-agent-plans-test--config-file)
+                 "/home/me/.config/agent-tools/config.json"))
+  (dolist (value '("" "xdg" "~/xdg"))
+    (should (equal (wgn-agent-plans-test--config-file (concat "XDG_CONFIG_HOME=" value))
+                   "/home/me/.config/agent-tools/config.json"))))
+
+(ert-deftest wgn-agent-plans-config-file-variable-beats-the-environment ()
+  (let ((process-environment
+         (append '("AGENT_TOOLS_CONFIG=/etc/tools.json" "XDG_CONFIG_HOME=/xdg")
+                 process-environment)))
+    (let ((wgn/agent-plans-config-file "/nix/tools.json"))
+      (should (equal (wgn/agent-plans--config-file) "/nix/tools.json")))
+    ;; Only an absolute path is one.
+    (dolist (value '("" "tools.json"))
+      (let ((wgn/agent-plans-config-file value))
+        (should (equal (wgn/agent-plans--config-file) "/etc/tools.json"))))))
+
+(ert-deftest wgn-agent-plans-empty-agent-tools-config-lets-writes-go-on ()
+  (let* ((root (file-name-as-directory (make-temp-file "agent-plans-empty-" t)))
+         (file (expand-file-name "note.txt" root))
+         (default-directory root)
+         (wgn/agent-plans-config-file nil)
+         (wgn/agent-plans--config-cache nil)
+         (process-environment
+          (append (list "AGENT_TOOLS_CONFIG=" (concat "HOME=" root) "XDG_CONFIG_HOME")
+                  process-environment)))
+    (unwind-protect
+        (wgn-agent-plans-test--protected
+          (write-region "Saved.\n" nil file nil 'silent)
+          (should (equal (with-temp-buffer (insert-file-contents file) (buffer-string))
+                         "Saved.\n")))
+      (delete-directory root t))))
 
 (ert-deftest wgn-agent-plans-directory-is-only-an-absolute-path ()
   (wgn-agent-plans-test--with-plans
@@ -2188,9 +2247,28 @@ Return the plan file."
 (declare-function org-roam-db-query "org-roam-db" (sql &rest args))
 (declare-function org-roam-db--close "org-roam-db" (&optional db))
 
+(defvar wgn/agent-plans--org-roam-watch)
+(defvar wgn/agent-plans--org-roam-watched)
+(defvar wgn/agent-plans--org-roam-timer)
+(defvar wgn/agent-plans--org-roam-pending)
+(defvar wgn/agent-plans--org-roam-awaiting)
+(defvar wgn/agent-plans-org-roam-reconcile-interval)
+(defvar org-roam-db-autosync-mode-hook)
+(declare-function wgn/agent-plans--org-roam-reconcile "wgn-agent-plans" ())
+
 (defun wgn-agent-plans-test--standard (variable)
   "Return a fresh copy of VARIABLE's standard value."
   (eval (car (get variable 'standard-value)) t))
+
+(defun wgn-agent-plans-test--node-filters ()
+  "Return how often the plans' node filter is in org-roam's."
+  (let ((count 0))
+    (advice-function-mapc
+     (lambda (function _)
+       (when (eq function #'wgn/agent-plans-org-roam-node-p)
+         (cl-incf count)))
+     org-roam-db-node-include-function)
+    count))
 
 (defmacro wgn-agent-plans-test--with-roam (&rest body)
   "Run BODY with org-roam set to its defaults on a notes directory of its own.
@@ -2199,7 +2277,9 @@ Skipped where org-roam is not on `load-path': give its directory with
 `wgn/agent-plans-org-roam-directory' names, as the machine file does,
 and `plans', its agents/plans; `node' returns a file node's text, and
 `nodes' the database's nodes.  `org-roam-directory' starts elsewhere,
-and `org-roam-db-autosync-mode' is turned off after."
+and `org-roam-db-autosync-mode' is turned off after, as are the timers
+and the watch that reconcile the plans; the periodic reconcile runs
+only where a test sets its interval."
   (declare (indent 0))
   `(progn
      (skip-unless (require 'org-roam nil t))
@@ -2208,9 +2288,7 @@ and `org-roam-db-autosync-mode' is turned off after."
             (plans (expand-file-name "agents/plans" root))
             (wgn/agent-plans-org-roam-directory root)
             ;; Never the operator's.
-            (process-environment
-             (cons (concat "AGENT_TOOLS_CONFIG=" (expand-file-name "no-config.json" root))
-                   process-environment))
+            (wgn/agent-plans-config-file (expand-file-name "no-config.json" root))
             (org-roam-directory (expand-file-name "not-the-notes/" root))
             (org-roam-db-location (expand-file-name "roam.db" root))
             (org-roam-file-exclude-regexp
@@ -2219,7 +2297,14 @@ and `org-roam-db-autosync-mode' is turned off after."
              (wgn-agent-plans-test--standard 'org-roam-db-node-include-function))
             (org-id-locations-file (expand-file-name "org-id-locations" root))
             (org-id-locations nil)
-            (org-id-files nil))
+            (org-id-files nil)
+            (org-roam-db-autosync-mode-hook nil)
+            (wgn/agent-plans-org-roam-reconcile-interval 3600)
+            (wgn/agent-plans--org-roam-timer nil)
+            (wgn/agent-plans--org-roam-pending nil)
+            (wgn/agent-plans--org-roam-awaiting nil)
+            (wgn/agent-plans--org-roam-watch nil)
+            (wgn/agent-plans--org-roam-watched nil))
        (cl-flet ((node (id title &optional body)
                    (concat ":PROPERTIES:\n:ID: " id "\n:END:\n#+title: " title "\n" body))
                  (nodes ()
@@ -2228,8 +2313,347 @@ and `org-roam-db-autosync-mode' is turned off after."
          (unwind-protect
              (progn ,@body)
            (org-roam-db-autosync-mode -1)
+           (cancel-function-timers #'wgn/agent-plans--org-roam-tick)
+           (cancel-function-timers #'wgn/agent-plans--org-roam-reconcile-pending)
+           (when wgn/agent-plans--org-roam-watch
+             (file-notify-rm-watch wgn/agent-plans--org-roam-watch))
            (org-roam-db--close)
            (delete-directory root t))))))
+
+(defun wgn-agent-plans-test--roam-config (root plans)
+  "Name PLANS as agent-plan's plans directory, in a config file under ROOT.
+Return the config file, for `wgn/agent-plans-config-file'."
+  (let ((config (expand-file-name "config.json" root)))
+    (wgn-agent-plans-test--write
+     config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
+    config))
+
+(defun wgn-agent-plans-test--write-elsewhere (file contents)
+  "Write CONTENTS to FILE from another process, as agent-plan does.
+It writes a temporary file beside FILE and renames it into place."
+  (should (eq 0 (call-process "sh" nil nil nil "-c"
+                              "printf %s \"$2\" > \"$1.tmp\" && mv \"$1.tmp\" \"$1\""
+                              "sh" file contents))))
+
+(defun wgn-agent-plans-test--read-events-until (done)
+  "Read input events, for at most ten seconds, until DONE returns non-nil.
+Batch Emacs handles file notifications and timers only while it reads
+input.  Return what DONE last returned."
+  (let ((deadline (time-add nil 10))
+        result)
+    (while (and (not (setq result (funcall done))) (time-less-p nil deadline))
+      (read-event nil nil 0.1))
+    result))
+
+(defun wgn-agent-plans-test--reconcile-timers ()
+  "Return how many timers run the periodic reconcile."
+  (seq-count (lambda (timer) (eq (timer--function timer) #'wgn/agent-plans--org-roam-tick))
+             timer-list))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-a-plan-written-outside-emacs ()
+  (wgn-agent-plans-test--with-roam
+    ;; Emacs built with no file notification library has nothing to watch with.
+    (skip-unless file-notify--library)
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should org-roam-db-autosync-mode)
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      ;; Batch Emacs handles file notifications only while it reads input.
+      (let ((deadline (time-add nil 10)))
+        (while (and (not (nodes)) (time-less-p nil deadline))
+          (read-event nil nil 0.1)))
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+;; What a stream of file events misses, the periodic reconcile finds.
+;; These run it every 0.3 seconds, and read events until it has.
+
+(defvar wgn/agent-plans-org-roam-reconcile-interval)
+
+(ert-deftest wgn-agent-plans-org-roam-forgets-plans-renamed-away-and-replaced ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (wgn/agent-plans-org-roam-reconcile-interval 0.3))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write-elsewhere
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (wgn-agent-plans-test--read-events-until (lambda () (nodes))))
+      (should (eq 0 (call-process "sh" nil nil nil "-c"
+                                  "mv \"$1\" \"$1.old\" && mkdir \"$1\" && printf %s \"$2\" > \"$1/20261015120000-b.mac.org\""
+                                  "sh" plans
+                                  (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))))
+      (should (equal (wgn-agent-plans-test--read-events-until
+                      (lambda () (let ((now (nodes)))
+                                   (and (equal now '(("a1b2c3d4-0000-4000-8000-00000000000b"
+                                                      "Plan B")))
+                                        now))))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000b" "Plan B")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-follows-the-plans-path-when-its-parent-moves ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (wgn/agent-plans-org-roam-reconcile-interval 0.3)
+          (agents (expand-file-name "agents" root)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write-elsewhere
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (wgn-agent-plans-test--read-events-until (lambda () (nodes))))
+      (should (eq 0 (call-process "mv" nil nil nil agents (concat agents "-old"))))
+      (make-directory plans t)
+      (wgn-agent-plans-test--write-elsewhere
+       (expand-file-name "20261015120000-b.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))
+      (should (wgn-agent-plans-test--read-events-until
+               (lambda () (equal (org-roam-db-query [:select [file] :from nodes])
+                                 `((,(expand-file-name "20261015120000-b.mac.org" plans))))))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-goes-on-without-a-readable-plans-directory ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (wgn/agent-plans-org-roam-reconcile-interval 0.3))
+      ;; Synced while it could be read: org-roam's own sync stops at a
+      ;; directory it cannot.
+      (setq org-roam-directory root)
+      (org-roam-db-autosync-mode 1)
+      (set-file-modes plans 0)
+      (unwind-protect
+          ;; No watch can be added on it.
+          (wgn/agent-plans-org-roam-setup)
+        (set-file-modes plans #o755))
+      (wgn-agent-plans-test--write-elsewhere
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (equal (wgn-agent-plans-test--read-events-until (lambda () (nodes)))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-plans-once-the-notes-appear ()
+  (wgn-agent-plans-test--with-roam
+    ;; As when the notes are cloned after Emacs has started.
+    (let* ((wgn/agent-plans-org-roam-directory (expand-file-name "notes" root))
+           (plans (expand-file-name "notes/agents/plans" root))
+           (wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+           (wgn/agent-plans-org-roam-reconcile-interval 0.3))
+      (wgn/agent-plans-org-roam-setup)
+      (should-not org-roam-db-autosync-mode)
+      (should (eq 0 (call-process "mkdir" nil nil nil "-p" plans)))
+      (wgn-agent-plans-test--write-elsewhere
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (equal (wgn-agent-plans-test--read-events-until
+                      (lambda () (and org-roam-db-autosync-mode (nodes))))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-sees-plans-once-their-directory-appears ()
+  (wgn-agent-plans-test--with-roam
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (wgn/agent-plans-org-roam-reconcile-interval 0.3)
+          (file (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should (eq 0 (call-process "mkdir" nil nil nil "-p" plans)))
+      (wgn-agent-plans-test--write-elsewhere
+       file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (should (equal (wgn-agent-plans-test--read-events-until (lambda () (nodes)))
+                     '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+;; The reconcile alone, as the timers run it.
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-follows-a-directory-away-and-back ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))))
+      (should (eq 0 (call-process "rm" nil nil nil "-rf" plans)))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should-not (nodes))
+      ;; Back, holding other plans.
+      (wgn-agent-plans-test--write
+       (expand-file-name "20261015120000-b.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000b" "Plan B")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-follows-the-path-when-a-parent-moves ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (agents (expand-file-name "agents" root)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write
+       (expand-file-name "20261014120000-a.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (eq 0 (call-process "mv" nil nil nil agents (concat agents "-old"))))
+      (wgn-agent-plans-test--write
+       (expand-file-name "20261015120000-b.mac.org" plans)
+       (node "a1b2c3d4-0000-4000-8000-00000000000b" "Plan B"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (org-roam-db-query [:select [file title] :from nodes])
+                     `((,(expand-file-name "20261015120000-b.mac.org" plans) "Plan B")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-leaves-a-sibling-directory-alone ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (old (expand-file-name "20261014120000-a.mac.org" (concat plans ".bak"))))
+      (wgn/agent-plans-org-roam-setup)
+      ;; Its name starts with the plans directory's.
+      (wgn-agent-plans-test--write old (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (org-roam-db-update-file old)
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A")))))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-reports-its-errors-without-signalling ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (file (expand-file-name "20261014120000-a.mac.org" plans))
+          messages)
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write file (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (eq 0 (call-process "rm" nil nil nil file)))
+      ;; A database another Emacs holds, which the test cannot make
+      ;; SQLite refuse on demand.
+      (cl-letf (((symbol-function 'org-roam-db-clear-file)
+                 (lambda (&rest _) (error "database is locked")))
+                ((symbol-function 'message)
+                 (lambda (format &rest args)
+                   (push (apply #'format-message format args) messages))))
+        (wgn/agent-plans--org-roam-reconcile))
+      (should (seq-find (lambda (m) (string-search "database is locked" m)) messages)))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-keeps-a-current-buffer ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (let ((buffer (find-file-noselect a))
+            (reverted 0))
+        (unwind-protect
+            (with-current-buffer buffer
+              (add-hook 'after-revert-hook (lambda () (cl-incf reverted)) nil t)
+              ;; The buffer holds what the file does: it needs no revert.
+              (wgn/agent-plans--org-roam-reconcile)
+              (should (= reverted 0))
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn/agent-plans--org-roam-reconcile)
+              (should (= reverted 1)))
+          (kill-buffer buffer))))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-keeps-the-database-in-step ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans))
+          (b (expand-file-name "20261015120000-b.mac.org" plans))
+          (part (expand-file-name "20261014120000-a.mac.P1.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      ;; New, beside a part, which is no node.
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn-agent-plans-test--write part (node "a1b2c3d4-0000-4000-8000-0000000000a1" "Part"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))))
+      ;; Changed under a buffer visiting it, which holds what it read;
+      ;; the database takes what the file now says.
+      (let ((buffer (find-file-noselect a)))
+        (unwind-protect
+            (progn
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn/agent-plans--org-roam-reconcile)
+              (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a"
+                                        "Plan A, retitled"))))
+              (should (string-search "Plan A, retitled"
+                                     (with-current-buffer buffer (buffer-string)))))
+          (kill-buffer buffer)))
+      ;; Moved and removed by another process, past org-roam's advice
+      ;; on `rename-file' and `delete-file'.
+      (should (eq 0 (call-process "mv" nil nil nil a b)))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should (equal (org-roam-db-query [:select [file] :from nodes]) `((,b))))
+      (should (eq 0 (call-process "rm" nil nil nil b)))
+      (wgn/agent-plans--org-roam-reconcile)
+      (should-not (nodes)))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconcile-leaves-a-changed-buffer-alone ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (a (expand-file-name "20261014120000-a.mac.org" plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn-agent-plans-test--write a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))
+      (wgn/agent-plans--org-roam-reconcile)
+      (let ((buffer (find-file-noselect a)))
+        (unwind-protect
+            (progn
+              (with-current-buffer buffer
+                (goto-char (point-max))
+                (insert "Unsaved.\n"))
+              (wgn-agent-plans-test--write
+               a (node "a1b2c3d4-0000-4000-8000-00000000000a" "Plan A, retitled"))
+              (wgn/agent-plans--org-roam-reconcile)
+              (should (string-search "Unsaved." (with-current-buffer buffer (buffer-string))))
+              ;; The database waits for the buffer to be saved.
+              (should (equal (nodes) '(("a1b2c3d4-0000-4000-8000-00000000000a" "Plan A"))))
+              ;; Not saved over what the other process wrote.
+              (should (equal (with-temp-buffer
+                               (insert-file-contents a)
+                               (buffer-string))
+                             (node "a1b2c3d4-0000-4000-8000-00000000000a"
+                                   "Plan A, retitled"))))
+          (with-current-buffer buffer (set-buffer-modified-p nil))
+          (kill-buffer buffer))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-runs-one-timer-and-one-watch ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (watches (hash-table-count file-notify-descriptors)))
+      (wgn/agent-plans-org-roam-setup)
+      (wgn/agent-plans-org-roam-setup)
+      (wgn/agent-plans-org-roam-setup)
+      (should (= (wgn-agent-plans-test--reconcile-timers) 1))
+      (should (= (hash-table-count file-notify-descriptors)
+                 (if file-notify--library (1+ watches) watches))))))
+
+(ert-deftest wgn-agent-plans-org-roam-reconciles-only-while-autosync-is-on ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (watches (hash-table-count file-notify-descriptors)))
+      (wgn/agent-plans-org-roam-setup)
+      (org-roam-db-autosync-mode -1)
+      (should (= (wgn-agent-plans-test--reconcile-timers) 0))
+      (should (= (hash-table-count file-notify-descriptors) watches))
+      (org-roam-db-autosync-mode 1)
+      (should (= (wgn-agent-plans-test--reconcile-timers) 1))
+      (should (= (hash-table-count file-notify-descriptors)
+                 (if file-notify--library (1+ watches) watches))))))
+
+(ert-deftest wgn-agent-plans-org-roam-setup-watches-nothing-without-a-plans-directory ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans)))
+      (wgn/agent-plans-org-roam-setup)
+      (should wgn/agent-plans--org-roam-watch))
+    ;; The config file that `with-roam' names is not there.
+    (wgn/agent-plans-org-roam-setup)
+    (should-not wgn/agent-plans--org-roam-watch)))
 
 (ert-deftest wgn-agent-plans-org-roam-sees-plans-but-not-parts-or-logs ()
   (wgn-agent-plans-test--with-roam
@@ -2284,25 +2708,35 @@ and `org-roam-db-autosync-mode' is turned off after."
       (ert-skip (format "%s is not in the checkout" path)))
     (with-temp-buffer (insert-file-contents path) (buffer-string))))
 
-(ert-deftest wgn-agent-plans-org-roam-machine-file-is-the-one-home-manager-writes ()
+(defun wgn-agent-plans-test--use-package (text package)
+  "Return the `use-package' form of PACKAGE in TEXT, read, and where it starts."
+  (with-temp-buffer
+    (insert text)
+    (goto-char (point-min))
+    (re-search-forward (concat "^(use-package " (regexp-quote package) "$"))
+    (goto-char (match-beginning 0))
+    (cons (read (current-buffer)) (match-beginning 0))))
+
+(ert-deftest wgn-agent-plans-machine-file-is-the-one-home-manager-writes ()
   (should (string-search
-           (concat "\".emacs.d/" wgn/agent-plans-org-roam-machine-file "\" = ")
+           (concat "\".emacs.d/" wgn/agent-plans-machine-file "\" = ")
            (wgn-agent-plans-test--repository-text "flake.nix"))))
 
-(ert-deftest wgn-agent-plans-org-roam-form-loads-the-machine-file-before-setup ()
+;; The machine file names agent-plan's config file, which protect-mode
+;; reads from the first plan buffer on, and org-roam's directory.
+(ert-deftest wgn-agent-plans-machine-file-is-loaded-before-protect-mode ()
   (let* ((text (wgn-agent-plans-test--repository-text "default.el"))
-         (form (with-temp-buffer
-                 (insert text)
-                 (goto-char (point-min))
-                 (re-search-forward "^(use-package org-roam$")
-                 (goto-char (match-beginning 0))
-                 (read (current-buffer))))
-         (config (cdr (memq :config form))))
-    (should (equal (seq-take config 2)
-                   '((load (expand-file-name wgn/agent-plans-org-roam-machine-file
+         (agenda (wgn-agent-plans-test--use-package text "org-agenda"))
+         (roam (wgn-agent-plans-test--use-package text "org-roam")))
+    (should (equal (seq-take (cdr (memq :init (car agenda))) 2)
+                   '((load (expand-file-name wgn/agent-plans-machine-file
                                              user-emacs-directory)
                            t t)
-                     (wgn/agent-plans-org-roam-setup))))))
+                     (wgn/agent-plans-protect-mode))))
+    ;; Both forms wait for Org, so the one before is set up first.
+    (should (< (cdr agenda) (cdr roam)))
+    (should (equal (cdr (memq :config (car roam)))
+                   '((wgn/agent-plans-org-roam-setup))))))
 
 ;; Org is loaded by then, so the org-roam form syncs as it is evaluated:
 ;; before no-littering moves `org-roam-db-location', a first database
@@ -2317,9 +2751,7 @@ and `org-roam-db-autosync-mode' is turned off after."
     (let ((wgn/agent-plans-org-roam-directory nil)
           ;; Agent-plan's config names the notes repository: it is not
           ;; org-roam's directory.
-          (process-environment
-           (cons (concat "AGENT_TOOLS_CONFIG=" (expand-file-name "config.json" root))
-                 process-environment))
+          (wgn/agent-plans-config-file (expand-file-name "config.json" root))
           messages)
       (wgn-agent-plans-test--write
        (expand-file-name "config.json" root)
@@ -2331,7 +2763,7 @@ and `org-roam-db-autosync-mode' is turned off after."
       (should (equal org-roam-directory (expand-file-name "not-the-notes/" root)))
       (should (equal org-roam-file-exclude-regexp
                      (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp)))
-      (should-not (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))
+      (should (zerop (wgn-agent-plans-test--node-filters)))
       (should-not org-roam-db-autosync-mode))))
 
 (ert-deftest wgn-agent-plans-org-roam-setup-syncs-the-directory-if-there ()
@@ -2348,7 +2780,30 @@ and `org-roam-db-autosync-mode' is turned off after."
     (should (equal org-roam-file-exclude-regexp
                    (cons wgn/agent-plans-org-roam-exclude-regexp
                          (wgn-agent-plans-test--standard 'org-roam-file-exclude-regexp))))
-    (should (eq org-roam-db-node-include-function #'wgn/agent-plans-org-roam-node-p))))
+    (should (= (wgn-agent-plans-test--node-filters) 1))))
+
+(ert-deftest wgn-agent-plans-org-roam-keeps-the-users-node-filter ()
+  (wgn-agent-plans-test--with-roam
+    ;; The operator's own filter, set before the setup runs.
+    (setq org-roam-db-node-include-function
+          (lambda ()
+            (not (string-search "private" (file-name-nondirectory (buffer-file-name))))))
+    (wgn/agent-plans-org-roam-setup)
+    (wgn-agent-plans-test--write
+     (expand-file-name "20200101000000-private.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000f" "Private"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20200101000000-a_note.org" root)
+     (node "a1b2c3d4-0000-4000-8000-00000000000e" "A note"))
+    (wgn-agent-plans-test--write
+     (expand-file-name "20261016120000-r.mac.org" plans)
+     (node "a1b2c3d4-0000-4000-8000-00000000000d" "Plan R"
+           (concat "* Plan\n*** TODO First\n:PROPERTIES:\n:CUSTOM_ID: S1\n"
+                   ":ID: a1b2c3d4-0000-4000-8000-0000000000d1\n:END:\n")))
+    (org-roam-db-sync)
+    (should (equal (nodes)
+                   '(("a1b2c3d4-0000-4000-8000-00000000000d" "Plan R")
+                     ("a1b2c3d4-0000-4000-8000-00000000000e" "A note"))))))
 
 (ert-deftest wgn-agent-plans-org-roam-makes-each-plan-one-node ()
   (wgn-agent-plans-test--with-roam
@@ -2697,8 +3152,25 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
 
 ;;;; Against the real agent-plan
 ;;
-;; Skipped where `agent-plan' is not on `exec-path'; nix-config's
+;; Skipped where `agent-plan' is not on `exec-path', or where it reads
+;; a config file built into it rather than the test's; nix-config's
 ;; `agent-plans' check runs it with the agent-plan of the same commit.
+
+(defun wgn-agent-plans-test--agent-plan-reads (plans)
+  "Return non-nil if the `agent-plan' on `exec-path' takes PLANS for its plans.
+One built with its config file reads none from the environment, and
+would write into the operator's plans; it refuses a plan under PLANS as
+under no plans directory of its own.  Nothing is left in PLANS."
+  (let ((plan (expand-file-name "2026-01-01-probe.mac.org" plans))
+        (log (expand-file-name "2026-01-01-probe.mac.log.org" plans)))
+    (wgn-agent-plans-test--write plan "* Plan\n** Goal\nProbe.\n")
+    (wgn-agent-plans-test--write log "")
+    (unwind-protect
+        (with-temp-buffer
+          (and (eq 0 (call-process "agent-plan" nil t nil "goal" plan))
+               (string-search "Probe." (buffer-string))))
+      (delete-file plan)
+      (delete-file log))))
 
 (defun wgn-agent-plans-test--agent-plan (&rest args)
   "Run the real `agent-plan' with ARGS and return its output; fail on error."
@@ -2720,6 +3192,7 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
                         "GIT_CONFIG_GLOBAL=/dev/null" "GIT_CONFIG_NOSYSTEM=1"
                         "CLAUDE_CODE_SESSION_ID")
                   process-environment))
+         (wgn/agent-plans-config-file config)
          (org-agenda-custom-commands (list (wgn/agent-plans-agenda-command)))
          (wgn/agent-plans-questions-interval 30)
          (wgn/agent-plans-questions--cache (make-hash-table :test #'equal))
@@ -2729,6 +3202,8 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
         (wgn-agent-plans-test--protected
           (wgn-agent-plans-test--write
            config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
+          ;; Before agent-plan writes anything.
+          (skip-unless (wgn-agent-plans-test--agent-plan-reads plans))
           (make-directory (expand-file-name "lisp" worktree) t)
           (let ((default-directory (file-name-as-directory worktree)))
             (should (eq 0 (call-process "git" nil nil nil "init" "-q"))))
@@ -2785,6 +3260,28 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
                          (string-prefix-p root (buffer-file-name buffer)))
                 (with-current-buffer buffer (set-buffer-modified-p nil))
                 (kill-buffer buffer)))))
+      (delete-directory root t))))
+
+(ert-deftest wgn-agent-plans-real-agent-plan-test-skips-one-with-its-own-config ()
+  ;; A stand-in for an agent-plan built with its config file, which
+  ;; refuses every plan outside its own plans directory and records what
+  ;; it was asked.
+  (let* ((root (file-name-as-directory (make-temp-file "agent-plans-baked-" t)))
+         (bin (expand-file-name "bin" root))
+         (asked (expand-file-name "asked" root))
+         (exec-path (cons bin exec-path)))
+    (unwind-protect
+        (progn
+          (wgn-agent-plans-test--write
+           (expand-file-name "agent-plan" bin)
+           (format "#!/bin/sh\necho \"$1\" >> %s\necho \"agent-plan: refused: $2 is not a plan under /elsewhere\" >&2\nexit 2\n"
+                   (shell-quote-argument asked)))
+          (set-file-modes (expand-file-name "agent-plan" bin) #o755)
+          (let ((result (ert-run-test
+                         (ert-get-test 'wgn-agent-plans-views-read-what-agent-plan-writes))))
+            (should (ert-test-skipped-p result)))
+          (should (equal (with-temp-buffer (insert-file-contents asked) (buffer-string))
+                         "goal\n")))
       (delete-directory root t))))
 
 ;;; agent-plans.el ends here
