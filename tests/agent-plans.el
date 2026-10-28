@@ -2889,6 +2889,58 @@ GitHub.  `commit' commits a file's new text and returns the commit."
         (should (equal (reverse shown)
                        `((log ("org-plans") ,repo) (commit "abc1234" ,repo) (status ,repo))))))))
 
+(ert-deftest wgn-agent-plans-commit-link-follows-the-signed-revision ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-plans
+     (wgn-agent-plans-test--with-links
+      (let ((old "1111111111111111111111111111111111111111")
+            (signed "2222222222222222222222222222222222222222")
+            shown)
+        (cl-letf (((symbol-function 'wgn/agent-plans--call)
+                   (lambda (&rest _args)
+                     (json-serialize
+                      (list :repository "wesnel/thing"
+                            :revision signed :original_revision old))))
+                  ((symbol-function 'magit-show-commit)
+                   (lambda (rev &rest _) (setq shown rev))))
+          (wgn-agent-plans-test--follow (format "[[commit:wesnel/thing:%s]]" old)))
+        (should (equal shown signed)))))))
+
+(ert-deftest wgn-agent-plans-commit-link-without-plans-still-opens ()
+  (wgn-agent-plans-test--with-repo
+    (wgn-agent-plans-test--with-links
+      (let ((wgn/agent-plans-config-file (expand-file-name "unconfigured.json" root))
+            (revision "1111111111111111111111111111111111111111")
+            shown)
+        (cl-letf (((symbol-function 'wgn/agent-plans--call)
+                   (lambda (&rest _) (user-error "No plans configured")))
+                  ((symbol-function 'magit-show-commit)
+                   (lambda (rev &rest _) (setq shown rev))))
+          (wgn-agent-plans-test--follow (format "[[commit:wesnel/thing:%s]]" revision)))
+        (should (equal shown revision))))))
+
+(ert-deftest wgn-agent-plans-commit-identity-rejects-lookalike-hosts ()
+  (wgn-agent-plans-test--with-repo
+    (let ((default-directory repo))
+      (dolist (remote '("git@github.com:wesnel/thing.git"
+                        "ssh://git@github.com/wesnel/thing.git"
+                        "https://github.com/wesnel/thing.git"))
+        (should (eq 0 (call-process "git" nil nil nil "remote" "set-url" "origin" remote)))
+        (should (equal (wgn/agent-plans--repository-identity repo) "wesnel/thing")))
+      (dolist (remote '("https://notgithub.com/wesnel/thing.git" "/tmp/thing.git"))
+        (should (eq 0 (call-process "git" nil nil nil "remote" "set-url" "origin" remote)))
+        (should-not (wgn/agent-plans--repository-identity repo t))
+        (should-error (wgn/agent-plans--repository-identity repo) :type 'user-error)))))
+
+(ert-deftest wgn-agent-plans-commit-navigation-is-bound-in-the-agenda ()
+  (let ((org-mode-map (copy-keymap org-mode-map))
+        (org-agenda-mode-map (copy-keymap org-agenda-mode-map))
+        (org-link-parameters (copy-tree org-link-parameters))
+        (org-execute-file-search-functions nil))
+    (wgn/agent-plans-links-setup)
+    (should (eq (lookup-key org-mode-map (kbd "C-c g")) #'wgn/agent-plans-commits))
+    (should (eq (lookup-key org-agenda-mode-map (kbd "C-c g")) #'wgn/agent-plans-commits))))
+
 (ert-deftest wgn-agent-plans-pr-link-uses-forge-else-the-browser ()
   (wgn-agent-plans-test--with-repo
     (wgn-agent-plans-test--with-links
@@ -3155,6 +3207,105 @@ Finalize it, or with ABORT leave it open; return the capture buffer."
 ;; Skipped where `agent-plan' is not on `exec-path', or where it reads
 ;; a config file built into it rather than the test's; nix-config's
 ;; `agent-plans' check runs it with the agent-plan of the same commit.
+
+(ert-deftest wgn-agent-plans-commit-navigation-uses-exact-associations ()
+  (should (commandp 'wgn/agent-plans-commits))
+  (should (commandp 'wgn/agent-plans-visit-commit-plans))
+  (let ((program (or (getenv "AGENT_PLAN_PROGRAM") (executable-find "agent-plan"))))
+    (skip-unless program)
+    (wgn-agent-plans-test--with-repo
+      (let* ((plans (expand-file-name "plans" root))
+             (config (expand-file-name "config.json" root))
+             (bin (expand-file-name "bin" root))
+             (exec-path (cons bin exec-path))
+             (process-environment (cons (concat "AGENT_TOOLS_CONFIG=" config)
+                                        process-environment))
+             (wgn/agent-plans-config-file config)
+             (org-stored-links nil)
+             (org-link-parameters (copy-tree org-link-parameters))
+             (first (commit "same" "one"))
+             (second (commit "same" "two")))
+        (make-directory bin)
+        (make-symbolic-link program (expand-file-name "agent-plan" bin))
+        (wgn-agent-plans-test--write
+         config (format "{\"plans\":{\"dir\":%S,\"host\":\"mac\"}}" plans))
+        (skip-unless (wgn-agent-plans-test--agent-plan-reads plans))
+        (let* ((plan (gethash "plan" (json-parse-string
+                                     (wgn-agent-plans-test--agent-plan
+                                      "new" "--title" "Navigation" "--slug" "navigation"
+                                      "--repo" "wesnel/thing" "--worktree" repo))))
+               (other (gethash "plan" (json-parse-string
+                                      (wgn-agent-plans-test--agent-plan
+                                       "new" "--title" "Other" "--slug" "other"
+                                       "--repo" "wesnel/thing" "--worktree" repo))))
+               shown)
+          (dolist (entry (list (cons plan first) (cons other second)))
+            (wgn-agent-plans-test--agent-plan "step" (car entry) "--title" "Do it")
+            (let ((default-directory repo))
+              (wgn-agent-plans-test--agent-plan
+               "log" (car entry) "--item" "S1" "--kind" "done" "--revision" (cdr entry))))
+          (wgn/agent-plans-links-setup)
+          (unwind-protect
+              (save-window-excursion
+                (with-current-buffer (find-file-noselect plan)
+                  (wgn-agent-plans-test--goto "S1")
+                  (cl-letf (((symbol-function 'magit-show-commit)
+                             (lambda (rev &rest _) (setq shown rev))))
+                    (wgn/agent-plans-commits))
+                  (should (equal shown first))
+                  (should-not (buffer-modified-p)))
+                (with-temp-buffer
+                  (setq default-directory repo major-mode 'magit-mode)
+                  (cl-letf (((symbol-function 'magit-commit-at-point) (lambda () first)))
+                    (should (equal (org-store-link nil)
+                                   (concat "[[commit:wesnel/thing:" first "][same]]")))))
+                (with-temp-buffer
+                  (setq default-directory repo major-mode 'magit-mode)
+                  (cl-letf (((symbol-function 'magit-commit-at-point) (lambda () first)))
+                    (wgn/agent-plans-visit-commit-plans)
+                    (should (equal (buffer-file-name) plan))
+                    (should (equal (wgn/agent-plans--entry-id) "S1"))))
+                (let ((default-directory repo))
+                  (wgn-agent-plans-test--agent-plan
+                   "log" other "--item" "S1" "--kind" "done" "--revision" first))
+                (with-temp-buffer
+                  (setq default-directory repo major-mode 'magit-mode)
+                  (cl-letf (((symbol-function 'magit-commit-at-point) (lambda () first))
+                            ((symbol-function 'completing-read)
+                             (lambda (_prompt candidates &rest _)
+                               (should (= (length candidates) 2))
+                               (let ((candidate
+                                      (seq-find
+                                       (lambda (candidate)
+                                         (file-equal-p (gethash "file" (cdr candidate)) other))
+                                       candidates)))
+                                 (should candidate)
+                                 (car candidate)))))
+                    (wgn/agent-plans-visit-commit-plans)
+                    (should (equal (buffer-file-name) other))
+                    (should (equal (wgn/agent-plans--entry-id) "S1"))))
+                (let* ((unrecorded (commit "same" "three"))
+                       (rewritten (commit "same" "four")))
+                  (with-temp-buffer
+                    (setq default-directory repo major-mode 'magit-mode)
+                    (cl-letf (((symbol-function 'magit-commit-at-point) (lambda () unrecorded)))
+                      (should-error (wgn/agent-plans-visit-commit-plans) :type 'user-error)))
+                  (let* ((log (wgn/agent-plans--log-file plan))
+                         (contents (with-temp-buffer (insert-file-contents log) (buffer-string))))
+                    (wgn-agent-plans-test--write
+                     log (concat contents
+                                 (format (concat "\n* commit-rewritten\n:PROPERTIES:\n:EVENT: rewrite-fixture\n"
+                                                 ":KIND: commit-rewritten\n:ITEM: %s\n:REPOSITORY: wesnel/thing\n"
+                                                 ":OLD_REVISION: %s\n:REVISION: %s\n:END:\n")
+                                         (file-name-base plan) unrecorded rewritten))))
+                  (let ((default-directory repo))
+                    (cl-letf (((symbol-function 'magit-show-commit)
+                               (lambda (rev &rest _) (setq shown rev))))
+                      (wgn-agent-plans-test--follow
+                       (format "[[commit:wesnel/thing:%s]]" unrecorded))))
+                  (should (equal shown rewritten))))
+            (dolist (file (list plan other))
+              (when-let* ((buffer (find-buffer-visiting file))) (kill-buffer buffer)))))))))
 
 (defun wgn-agent-plans-test--agent-plan-reads (plans)
   "Return non-nil if the `agent-plan' on `exec-path' takes PLANS for its plans.

@@ -252,6 +252,28 @@ time. Images are cached under `$XDG_CACHE_HOME/offline-run/images` (by default
 `overlays/offline-run/build-config.json`, the architecture and the Gondolin
 version. Publishing a new image removes the superseded ones.
 
+## Plans and commits
+
+In an Org plan or its agenda entry, `C-c g`
+(`wgn/agent-plans-commits`) opens an associated commit in Magit. Use
+`C-u C-c g` to choose from the whole plan. In a Magit log or revision,
+`C-c g` (`wgn/agent-plans-visit-commit-plans`) visits an associated plan
+entry, asking which one when several refer to the commit.
+
+`org-store-link` in Magit captures a `commit:OWNER/REPO:REVISION` link
+with the full commit ID. Insert it in another Org note with
+`org-insert-link`; following it consults recorded signing-pass rewrites.
+Plan files are written through `agent-plan`.
+
+Exact associations require `agent-plan` on `exec-path`, its configured
+plans directory, and a GitHub `origin` using HTTPS or SSH. Record a
+step's commit with `agent-plan log PLAN --item S1 --kind done --revision HEAD`.
+Existing records that hold only a commit subject cannot identify a
+commit uniquely. The signing pass keeps recorded associations current
+through signing and fixup squashing; arbitrary rebases outside that pass
+are not tracked. Plan metadata stays in private plan files and does not
+change shared commit messages.
+
 ## Tests
 
 The agent plan tests use ERT and require only Emacs. Run them from an Emacs

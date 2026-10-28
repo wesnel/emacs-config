@@ -1721,9 +1721,142 @@ They are offered by title, those where QID is open first."
 (defun wgn/agent-plans--follow-commit (path _arg)
   "Follow a commit: link to PATH, REPO:SHA, showing the commit in magit."
   (let* ((parts (wgn/agent-plans--split path ":" "REPO:SHA"))
-         (default-directory (wgn/agent-plans--repository (car parts))))
+         (default-directory (wgn/agent-plans--repository (car parts)))
+         (revision (cdr parts))
+         (full (if (wgn/agent-plans--full-revision-p revision) revision
+                 (wgn/agent-plans--git default-directory "rev-parse" "--verify"
+                                       "--end-of-options" (concat revision "^{commit}"))))
+         (identity (wgn/agent-plans--repository-identity default-directory t))
+         (resolved (and full identity (wgn/agent-plans-directory)
+                        (executable-find "agent-plan")
+                        (wgn/agent-plans--resolve-commit identity full))))
     (wgn/agent-plans--need 'magit-show-commit 'magit)
-    (magit-show-commit (cdr parts))))
+    (magit-show-commit (or resolved revision))))
+
+(defun wgn/agent-plans--full-revision-p (revision)
+  "Return non-nil if REVISION is a full Git object ID."
+  (and (stringp revision)
+       (string-match-p "\\`\\(?:[0-9a-f]\\{40\\}\\|[0-9a-f]\\{64\\}\\)\\'" revision)))
+
+(defun wgn/agent-plans--commits (&rest args)
+  "Return exact commit associations from `agent-plan commits' with ARGS.
+Each is a JSON object with full recorded and resolved revision IDs."
+  (let ((entries (json-parse-string (apply #'wgn/agent-plans--call "commits" args)
+                                   :array-type 'list)))
+    (unless (and (listp entries)
+                 (seq-every-p
+                  (lambda (entry)
+                    (and (hash-table-p entry)
+                         (seq-every-p (lambda (key) (stringp (gethash key entry)))
+                                      '("plan" "file" "item" "repository" "subject"))
+                         (wgn/agent-plans--full-revision-p (gethash "revision" entry))
+                         (wgn/agent-plans--full-revision-p (gethash "original_revision" entry))))
+                  entries))
+      (user-error "agent-plan returned invalid commit associations"))
+    entries))
+
+(defun wgn/agent-plans--resolve-commit (repository revision)
+  "Resolve full REVISION of REPOSITORY through recorded signing-pass rewrites."
+  (let ((entry (json-parse-string
+                (wgn/agent-plans--call "resolve-commit" "--repo" repository
+                                       "--revision" revision))))
+    (unless (and (hash-table-p entry)
+                 (equal (gethash "repository" entry) repository)
+                 (equal (gethash "original_revision" entry) revision)
+                 (wgn/agent-plans--full-revision-p (gethash "revision" entry)))
+      (user-error "agent-plan returned an invalid resolved commit"))
+    (gethash "revision" entry)))
+
+(defun wgn/agent-plans--repository-identity (directory &optional noerror)
+  "Return DIRECTORY's GitHub OWNER/NAME identity, as agent-plan records it.
+Without a supported origin, signal a user error, or return nil with NOERROR."
+  (let ((remote (wgn/agent-plans--git directory "remote" "get-url" "origin")))
+    (or (and remote
+             (string-match
+              (concat "\\`\\(?:git@github\\.com:\\|ssh://git@github\\.com/"
+                      "\\|https://github\\.com/\\)"
+                      "\\([A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+?\\)\\(?:\\.git\\)?/?\\'")
+              remote)
+             (match-string 1 remote))
+        (unless noerror
+          (user-error "No supported GitHub origin in %s" directory)))))
+
+(defun wgn/agent-plans--choose-commit (entries prompt)
+  "Choose an association from ENTRIES with PROMPT, directly if there is one."
+  (unless entries (user-error "No exact commit associations recorded"))
+  (if (null (cdr entries)) (car entries)
+    (let ((candidates
+           (mapcar (lambda (entry)
+                     (cons (format "%s [%s %s] %s#%s"
+                                   (gethash "subject" entry)
+                                   (gethash "repository" entry)
+                                   (substring (gethash "revision" entry) 0 12)
+                                   (gethash "plan" entry) (gethash "item" entry))
+                           entry))
+                   entries)))
+      (cdr (assoc (completing-read prompt candidates nil t) candidates)))))
+
+;;;###autoload
+(defun wgn/agent-plans-commits (&optional whole-plan)
+  "Show a commit associated with the plan entry at point, in Magit.
+With prefix WHOLE-PLAN, offer all the plan's commits.  Outside a plan
+or its agenda entry, ask which plan.  Associations use exact revision
+IDs recorded by agent-plan, including signing-pass rewrites."
+  (interactive "P")
+  (let* ((item (wgn/agent-plans--item-at-point))
+         (file (or (car item) (buffer-file-name (buffer-base-buffer))))
+         (plan (or (and file (wgn/agent-plans--plan-file file))
+                   (wgn/agent-plans--read)))
+         (entry (wgn/agent-plans--choose-commit
+                 (apply #'wgn/agent-plans--commits plan
+                        (and item (not whole-plan) (list "--item" (cdr item))))
+                 "Commit: "))
+         (default-directory (wgn/agent-plans--repository (gethash "repository" entry))))
+    (wgn/agent-plans--need 'magit-show-commit 'magit)
+    (magit-show-commit (gethash "revision" entry))))
+
+(declare-function magit-commit-at-point "magit-git" ())
+(declare-function org-link-store-props "ol" (&rest rest))
+(defvar magit-mode-map)
+
+(with-eval-after-load 'magit-mode
+  (define-key magit-mode-map (kbd "C-c g") #'wgn/agent-plans-visit-commit-plans))
+
+(defun wgn/agent-plans--commit-at-point ()
+  "Return the full object ID of the commit at point in Magit."
+  (wgn/agent-plans--need 'magit-commit-at-point 'magit)
+  (let* ((revision (or (magit-commit-at-point) (user-error "No commit at point")))
+         (full (wgn/agent-plans--git default-directory "rev-parse" "--verify"
+                                    "--end-of-options" (concat revision "^{commit}"))))
+    (unless (wgn/agent-plans--full-revision-p full)
+      (user-error "%s is not an available commit" revision))
+    full))
+
+;;;###autoload
+(defun wgn/agent-plans-visit-commit-plans ()
+  "Visit a plan entry associated with the commit at point in Magit.
+When several entries refer to it, ask which one.  Match exact full
+revision IDs, following recorded signing-pass rewrites."
+  (interactive)
+  (let ((entry (wgn/agent-plans--choose-commit
+                (wgn/agent-plans--commits
+                 "--repo" (wgn/agent-plans--repository-identity default-directory)
+                 "--revision" (wgn/agent-plans--commit-at-point))
+                "Plan entry: ")))
+    (wgn/agent-plans-visit (wgn/agent-plans--plan-file (gethash "file" entry))
+                           (gethash "item" entry))))
+
+(defun wgn/agent-plans--store-commit ()
+  "Store an Org commit link from a Magit buffer, using its full revision ID."
+  (when (derived-mode-p 'magit-mode)
+    (when (and (fboundp 'magit-commit-at-point) (magit-commit-at-point))
+      (let* ((revision (wgn/agent-plans--commit-at-point))
+             (repository (wgn/agent-plans--repository-identity default-directory))
+             (link (concat "commit:" repository ":" revision)))
+        (org-link-store-props :type "commit" :link link
+                              :description (wgn/agent-plans--git
+                                            default-directory "show" "-s" "--format=%s" revision))
+        link))))
 
 (defun wgn/agent-plans--git (directory &rest args)
   "Return the trimmed output of git ARGS in DIRECTORY, or nil if it fails."
@@ -1823,11 +1956,14 @@ SEARCH, as `org-execute-file-search-functions' expects."
       t)))
 
 (defvar org-execute-file-search-functions)
+(defvar org-mode-map)
+(defvar org-agenda-mode-map)
 (declare-function org-link-set-parameters "ol" (type &rest parameters))
 
 ;;;###autoload
 (defun wgn/agent-plans-links-setup ()
-  "Register the plan link types and the LINE@SHA search of file links."
+  "Register plan links and bind C-c g to commit navigation in Org and Magit.
+`org-store-link' in Magit stores a commit link with its full revision ID."
   (dolist (link `(("plan" ,#'wgn/agent-plans--follow-plan)
                   ("q" ,#'wgn/agent-plans--follow-question)
                   ("branch" ,#'wgn/agent-plans--follow-branch)
@@ -1837,6 +1973,10 @@ SEARCH, as `org-execute-file-search-functions' expects."
     (org-link-set-parameters (car link)
                              :follow (cadr link)
                              :export (wgn/agent-plans--exporter (car link))))
+  (org-link-set-parameters "commit" :store #'wgn/agent-plans--store-commit)
+  (define-key org-mode-map (kbd "C-c g") #'wgn/agent-plans-commits)
+  (with-eval-after-load 'org-agenda
+    (define-key org-agenda-mode-map (kbd "C-c g") #'wgn/agent-plans-commits))
   (add-hook 'org-execute-file-search-functions #'wgn/agent-plans--file-search))
 
 ;;;; Org-roam
