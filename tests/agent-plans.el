@@ -3204,9 +3204,15 @@ under no plans directory of its own.  Nothing is left in PLANS."
            config (format "{\"plans\": {\"dir\": %S, \"host\": \"mac\"}}" plans))
           ;; Before agent-plan writes anything.
           (skip-unless (wgn-agent-plans-test--agent-plan-reads plans))
+          ;; agent-plan matches a plan by a linked worktree only, never
+          ;; a repository's main checkout.
+          (let ((default-directory (file-name-as-directory (expand-file-name "repo" root))))
+            (make-directory default-directory t)
+            (should (eq 0 (call-process "git" nil nil nil "init" "-q")))
+            (should (eq 0 (call-process "git" nil nil nil "-c" "user.name=T" "-c" "user.email=t@e"
+                                        "-c" "commit.gpgsign=false" "commit" "-q" "--allow-empty" "-m" "base")))
+            (should (eq 0 (call-process "git" nil nil nil "worktree" "add" "-q" worktree))))
           (make-directory (expand-file-name "lisp" worktree) t)
-          (let ((default-directory (file-name-as-directory worktree)))
-            (should (eq 0 (call-process "git" nil nil nil "init" "-q"))))
           (let* ((plan (gethash "plan" (json-parse-string
                                         (wgn-agent-plans-test--agent-plan
                                          "new" "--title" "Real plan" "--slug" "real"
