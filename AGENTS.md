@@ -6,8 +6,7 @@ declare its options (`home.programs.wgn.emacs`, `programs.wgn.emacs`).
 
 ## Work that belongs in another repository
 
-A session commits only in the repository it started in. When an item you
-find belongs to a repository listed below, hand it over:
+When an item you find belongs to a repository listed below, hand it over:
 
 1. Where you have `ListAgents`, list the peer sessions. If exactly one
    row's name is that repository's name and a hyphen, then a suffix, as
