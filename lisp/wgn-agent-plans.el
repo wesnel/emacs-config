@@ -2111,6 +2111,15 @@ place, then make one reconcile."
     (when old
       (ignore-errors (file-notify-rm-watch old)))))
 
+(defun wgn/agent-plans--org-roam-watchable-p ()
+  "Return non-nil if a watch on the plans directory is affordable.
+kqueue, which macOS Emacs watches with, holds a file descriptor open for
+each file in a watched directory.  The plans directory holds hundreds,
+more than the 256 descriptors a GUI Emacs gets there, so a watch leaves
+none for the files and processes Emacs opens afterwards."
+  (and file-notify--library
+       (not (eq file-notify--library 'kqueue))))
+
 (defun wgn/agent-plans--org-roam-ensure-watch ()
   "Watch the plans directory, unless the watch on it is current.
 A watch follows the directory it was added on wherever that is moved,
@@ -2127,7 +2136,7 @@ there is none: the periodic reconcile does without."
                  (equal here wgn/agent-plans--org-roam-watched)
                  (file-notify-valid-p wgn/agent-plans--org-roam-watch))
       (wgn/agent-plans--org-roam-unwatch)
-      (when here
+      (when (and here (wgn/agent-plans--org-roam-watchable-p))
         (condition-case nil
             (setq wgn/agent-plans--org-roam-watch
                   (file-notify-add-watch plans '(change)

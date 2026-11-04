@@ -2353,7 +2353,7 @@ input.  Return what DONE last returned."
 (ert-deftest wgn-agent-plans-org-roam-sees-a-plan-written-outside-emacs ()
   (wgn-agent-plans-test--with-roam
     ;; Emacs built with no file notification library has nothing to watch with.
-    (skip-unless file-notify--library)
+    (skip-unless (wgn/agent-plans--org-roam-watchable-p))
     (make-directory plans t)
     (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
           (file (expand-file-name "20261014120000-a.mac.org" plans)))
@@ -2629,7 +2629,7 @@ input.  Return what DONE last returned."
       (wgn/agent-plans-org-roam-setup)
       (should (= (wgn-agent-plans-test--reconcile-timers) 1))
       (should (= (hash-table-count file-notify-descriptors)
-                 (if file-notify--library (1+ watches) watches))))))
+                 (if (wgn/agent-plans--org-roam-watchable-p) (1+ watches) watches))))))
 
 (ert-deftest wgn-agent-plans-org-roam-reconciles-only-while-autosync-is-on ()
   (wgn-agent-plans-test--with-roam
@@ -2643,10 +2643,11 @@ input.  Return what DONE last returned."
       (org-roam-db-autosync-mode 1)
       (should (= (wgn-agent-plans-test--reconcile-timers) 1))
       (should (= (hash-table-count file-notify-descriptors)
-                 (if file-notify--library (1+ watches) watches))))))
+                 (if (wgn/agent-plans--org-roam-watchable-p) (1+ watches) watches))))))
 
 (ert-deftest wgn-agent-plans-org-roam-setup-watches-nothing-without-a-plans-directory ()
   (wgn-agent-plans-test--with-roam
+    (skip-unless (wgn/agent-plans--org-roam-watchable-p))
     (make-directory plans t)
     (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans)))
       (wgn/agent-plans-org-roam-setup)
@@ -2654,6 +2655,17 @@ input.  Return what DONE last returned."
     ;; The config file that `with-roam' names is not there.
     (wgn/agent-plans-org-roam-setup)
     (should-not wgn/agent-plans--org-roam-watch)))
+
+;; kqueue holds a file descriptor open for each file in a watched
+;; directory, so a directory of hundreds of plans runs a macOS Emacs,
+;; whose limit is 256 by default, out of descriptors for everything else.
+(ert-deftest wgn-agent-plans-org-roam-adds-no-watch-where-the-library-is-kqueue ()
+  (wgn-agent-plans-test--with-roam
+    (make-directory plans t)
+    (let ((wgn/agent-plans-config-file (wgn-agent-plans-test--roam-config root plans))
+          (file-notify--library 'kqueue))
+      (wgn/agent-plans-org-roam-setup)
+      (should-not wgn/agent-plans--org-roam-watch))))
 
 (ert-deftest wgn-agent-plans-org-roam-sees-plans-but-not-parts-or-logs ()
   (wgn-agent-plans-test--with-roam
