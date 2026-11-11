@@ -9,19 +9,25 @@ linters:
   enable:
     - errcheck
     - exhaustive
+    - gocognit
     - gosec
     - govet
     - ineffassign
+    - interfacebloat
     - misspell
     - nolintlint
     - staticcheck
     - unused
 
   settings:
+    gocognit:
+      min-complexity: 20
     gosec:
       excludes:
         # Unchecked errors: errcheck reports the same calls.
         - G104
+    interfacebloat:
+      max: 10
     nolintlint:
       require-explanation: true
       require-specific: true

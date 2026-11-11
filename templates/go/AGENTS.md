@@ -4,7 +4,8 @@ The operator is the person who runs these agents, and who signs, pushes and deci
 
 ## Checking a change
 
-Run from the module root, inside `nix develop` (or via direnv).
+Before handing back a change, run the project checks below from the module
+root, inside `nix develop` (or via direnv).
 
 | Check | Passes when |
 | --- | --- |
@@ -29,9 +30,18 @@ in, when nixpkgs has a patched release.
 Lint and test under every target the module builds for, not just the host:
 `GOOS=linux GOARCH=amd64 go vet ./...`, and likewise for each other GOOS/GOARCH pair.
 
-`golangci-lint run` includes gosec. A finding that does not apply is annotated
-where it is found, `//nolint:gosec // <why it does not apply>`; one without a
-rule or a reason fails the lint.
+Run `golangci-lint run`, the same lint command CI uses, with the repository's
+`.golangci.yml`. It owns the enabled checks and thresholds, including cognitive
+complexity and interface size. Preserve reader load when resolving findings:
+simplify control flow and keep related logic together; extract a helper only
+when its name and contract reduce what the reader must track, never merely to
+lower a score. Keep interfaces focused on their consumers.
+
+A finding that does not apply is annotated where it is found with the specific
+linter and a concrete reason, such as `//nolint:gosec // <why it does not apply>`.
+A suppression without a linter or an explanation fails nolintlint. Add dependency
+restrictions only for concrete package boundaries, with the boundary's reason
+beside the rule in `.golangci.yml`.
 
 In Claude Code, project hooks in `.claude/hooks/` run `gofmt -w` on each
 edited `.go` file and, when you stop, `golangci-lint run` (or `go vet` where
