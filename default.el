@@ -370,8 +370,9 @@
                    "SSH_AGENT_PID"
                    "SSH_AUTH_SOCK"
                    "VISUAL"))
-      (add-to-list 'exec-path-from-shell-variables var)
-      (exec-path-from-shell-initialize))))
+      (add-to-list 'exec-path-from-shell-variables var))
+    ;; Once, after the list is complete: each call starts a shell.
+    (exec-path-from-shell-initialize)))
 
 ;;;; Store secrets in Emacs.
 ;;
@@ -1237,6 +1238,18 @@ if USER is given, its username is USER.  The port is not matched."
 
   :custom
   (eglot-code-action-indications '(eldoc-hint))
+
+  :config
+  ;; kqueue, which macOS Emacs watches files with, holds a file descriptor
+  ;; open for each file in a watched directory.  gopls asks Eglot to watch
+  ;; the whole project, which runs a GUI Emacs, limited to 256 descriptors,
+  ;; out of them: "File watching not possible, no file descriptor left".
+  (require 'filenotify)
+  (cl-defmethod eglot-register-capability :around
+    (_server (_method (eql workspace/didChangeWatchedFiles)) _id &rest _params)
+    "Skip the file watchers a language server asks for under kqueue."
+    (unless (eq file-notify--library 'kqueue)
+      (cl-call-next-method)))
 
   :bind
   (:map eglot-mode-map
