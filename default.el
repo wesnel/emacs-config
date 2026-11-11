@@ -816,7 +816,7 @@ if USER is given, its username is USER.  The port is not matched."
   :custom
   (pr-review-ghub-auth-name 'forge))
 
-;;;; Read a review record of git delegate's.
+;;;; Read a review record of agent-review's.
 (use-package review-guide
   :ensure t
 
