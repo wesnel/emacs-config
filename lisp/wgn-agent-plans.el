@@ -479,7 +479,7 @@ ID the plan does not hold never settles."
   "Return non-nil when FILE is a plan's log, which `agent-plan log' alone writes."
   (equal (nth 2 (wgn/agent-plans--file-parts file)) "log"))
 
-;; Review records, which `git delegate' and `pr-loop' alone write, are
+;; Review records, which `agent-review' and `agent-pr' alone write, are
 ;; held by the same lock as this host's plans: a deliberate edit, after
 ;; C-x C-q, is how the operator repairs one that either refuses.
 
@@ -487,7 +487,7 @@ ID the plan does not hold never settles."
 
 (defun wgn/agent-plans-records-directories ()
   "Return the directories of review records.
-`git delegate' and `pr-loop' write them under agent-tools/reviews in
+`agent-review' and `agent-pr' write them under agent-tools/reviews in
 $XDG_STATE_HOME, else in ~/.local/state; `review-guide-records-directory',
 when set, is where review-guide reads them."
   (let ((state (getenv "XDG_STATE_HOME")))
@@ -561,10 +561,10 @@ FILE's own buffer, which \\[read-only-mode] there does not let through."
       (format "agent-plan log alone writes %s" (file-name-nondirectory file)))
      (host (format "%s is %s's plan; answer it there" (file-name-nondirectory file) host))
      ((and (wgn/agent-plans--record-p file) elsewhere)
-      (format "git delegate and pr-loop write %s, and it is edited by hand only from its own buffer, after C-x C-q there"
+      (format "agent-review and agent-pr write %s, and it is edited by hand only from its own buffer, after C-x C-q there"
               (file-name-nondirectory file)))
      ((wgn/agent-plans--record-p file)
-      (format "git delegate and pr-loop write %s: C-x C-q to edit it by hand"
+      (format "agent-review and agent-pr write %s: C-x C-q to edit it by hand"
               (file-name-nondirectory file)))
      (elsewhere
       (format "agent-plan writes %s, and it is edited by hand only from its own buffer, after C-x C-q there"
@@ -947,7 +947,7 @@ FILE is a plan's, part's or log's, or a review record."
      ((equal (nth 2 (wgn/agent-plans--file-parts file)) "log")
       " Written by agent-plan log alone")
      ((wgn/agent-plans--record-p file)
-      " Written by git delegate and pr-loop · M-x review-guide shows it with its diff")
+      " Written by agent-review and agent-pr · M-x review-guide shows it with its diff")
      (t (concat " Written by agent-plan · answer questions with /questions in a Claude session"
                 " · C-c C-o follows a link · org-capture A f or A q adds a follow-up or question")))))
 
@@ -1236,7 +1236,7 @@ its keyword lines again, keeps its folds and is locked again; a plan
 buffer's unsaved changes are saved or discarded before it locks; and
 its indirect buffers are locked with it.  Review records, under
 `wgn/agent-plans-records-directories', are held as this host's plans
-are, since only `git delegate' and `pr-loop' write them, and no file
+are, since only `agent-review' and `agent-pr' write them, and no file
 variables apply in them.  Turning the mode on protects the plan
 buffers already visited; turning it off takes the header line and
 guard from plan buffers and leaves them read-only."

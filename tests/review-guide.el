@@ -108,7 +108,7 @@ diff --git lib/a.el lib/a.el
      "@@ -1 +1 @@\n-Old.\n+New.\n")))
 
 (defun review-guide-test--write (file contents)
-  "Write CONTENTS to FILE, making its directory, as git delegate would.
+  "Write CONTENTS to FILE, making its directory, as agent-review would.
 It is copied into place by cp, since the lock refuses Emacs's own writes
 into the records directory."
   (make-directory (file-name-directory file) t)
@@ -123,7 +123,7 @@ into the records directory."
 (defmacro review-guide-test--with-records (&rest body)
   "Run BODY with the records directory under a temp dir, holding the fixtures.
 Binds `root', `records' (owner/repo's directory of records), `range-file'
-and `pr-file'.  No git delegate or forge is asked anything."
+and `pr-file'.  No agent-review or forge is asked anything."
   (declare (indent 0))
   `(let* ((root (file-name-as-directory (make-temp-file "review-guide-" t)))
           (process-environment
@@ -345,7 +345,7 @@ and `pr-file'.  No git delegate or forge is asked anything."
                  "PRRT_kwDOAbc004  README.md  unresolved" "Draft, fix, posted [2026-10-20 Tue 15:05]"
                  "Rounds" "R1  codex (gpt-5.5), [2026-10-20 Tue 14:05], red-check session"
                  "Unverified:" "Dropped:" "R2  security (claude-opus-5-5)"))
-        ;; A diagram with no Mermaid from git delegate show is shown as its JSON.
+        ;; A diagram with no Mermaid from agent-review show is shown as its JSON.
         (should (string-search "{\"kind\": \"sequence\"" text))
         (should buffer-read-only)))))
 
@@ -386,6 +386,22 @@ and `pr-file'.  No git delegate or forge is asked anything."
         (should (string-search "    sequenceDiagram\n      main->>cache: Load\n" (buffer-string)))
         (should-not (string-search "its JSON" (buffer-string)))))))
 
+(ert-deftest review-guide-reads-json-from-agent-review ()
+  (review-guide-test--need-view)
+  ;; The CLI is built in nix-config; its real binary has a separate contract check.
+  (cl-letf (((symbol-function 'executable-find)
+             (lambda (program)
+               (should (equal program "agent-review"))
+               "/test/bin/agent-review"))
+            ((symbol-function 'process-file)
+             (lambda (program _infile _destination _display &rest args)
+               (should (equal program "agent-review"))
+               (should (equal args '("show" "owner/repo#12")))
+               (insert "{\"range\": {\"diagrams\": [{\"id\": \"D1\"}]}}")
+               0)))
+    (should (equal (review-guide--delegate-show '(:show "owner/repo#12"))
+                   '((range (diagrams ((id . "D1")))))))))
+
 (ert-deftest review-guide-opens-pr-review-and-a-terminal-for-post ()
   (review-guide-test--need-view)
   (review-guide-test--with-records
@@ -405,7 +421,7 @@ and `pr-file'.  No git delegate or forge is asked anything."
               (should (equal opened "https://github.com/owner/repo/pull/12"))
               (with-current-buffer "*review-guide owner/repo 9f8e7d6c5b4a..1a2b3c4d5e6f*"
                 (review-guide-post))
-              (should (equal term (list "pr-loop post owner/repo#12" "pr-loop" nil
+              (should (equal term (list "agent-pr post owner/repo#12" "agent-pr" nil
                                         '("post" "12") checkout))))
           (kill-buffer " *review-guide-test term*"))))))
 
@@ -573,10 +589,10 @@ Return the record's buffer."
       (save-window-excursion
         (with-current-buffer (review-guide-test--visit (list :range-file range-file))
           (should (equal buffer-file-name range-file))
-          (should (string-search "git delegate and pr-loop" header-line-format))
+          (should (string-search "agent-review and agent-pr" header-line-format))
           (let ((refused (should-error (let ((inhibit-read-only t)) (insert "edited\n"))
                                        :type 'user-error)))
-            (should (string-search "git delegate and pr-loop write" (cadr refused))))
+            (should (string-search "agent-review and agent-pr write" (cadr refused))))
           (goto-char (point-min))
           (re-search-forward "^\\*\\*\\* OPEN F1$")
           (ignore-errors
@@ -619,13 +635,13 @@ Return the record's buffer."
         (should (equal (review-guide-test--file-variables record t) '(org-mode)))
         (save-window-excursion
           (with-current-buffer (review-guide-test--visit (list :range-file record))
-            (should (string-search "git delegate and pr-loop" header-line-format))
+            (should (string-search "agent-review and agent-pr" header-line-format))
             (should-error (let ((inhibit-read-only t)) (insert "edited\n")) :type 'user-error)
             (kill-buffer)))
         (with-temp-buffer
           (should-error (write-region "x" nil (expand-file-name "new.org" (file-name-directory record)))
                         :type 'user-error))
-        ;; Where git delegate writes is held still.
+        ;; Where agent-review writes is held still.
         (with-temp-buffer
           (should-error (write-region "x" nil range-file) :type 'user-error))))))
 
