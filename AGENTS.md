@@ -30,7 +30,7 @@ in its `flake.lock`. Its work shows up here as:
   `~/.codex`): it owns the harnesses' settings, the skills and the MCP
   servers;
 - a fault in agent tooling on `PATH` that this flake does not build, such
-  as `agent-plan`, `pr-loop` or `git delegate`;
+  as `agent-plan`, `agent-pr` or `agent-review`;
 - a machine's value for one of this repository's options, or the pin.
 
 Two words mean different things in the two repositories. Here, a sandbox is
