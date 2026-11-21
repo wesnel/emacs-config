@@ -1,4 +1,4 @@
-;;; review-guide.el --- Read the review records git delegate writes -*- lexical-binding: t; -*-
+;;; review-guide.el --- Read the review records agent-review writes -*- lexical-binding: t; -*-
 
 ;; Version: 0.2
 ;; Package-Requires: ((emacs "29.1") (magit-section "4.0") (pr-review "0.1"))
@@ -7,20 +7,28 @@
 
 ;;; Commentary:
 
-;; A read-only view of one review, from the Org files `git delegate'
-;; and `pr-loop' write under `review-guide-records-directory':
+;; A read-only view of one review, from the Org files `agent-review'
+;; and `agent-pr' write under `review-guide-records-directory':
 ;;
-;;   <owner>/<repo>/<BASE>..<HEAD>.org   one reviewed range: its
-;;                                       walkthrough, diagrams, findings
-;;                                       and rounds
+;;   ranges/<BASE>..<HEAD>.org           one reviewed range, by its
+;;                                       commits alone, in any repository:
+;;                                       its walkthrough, diagrams,
+;;                                       findings and rounds
+;;   <owner>/<repo>/<BASE>..<HEAD>.org   the same, as written before they
+;;                                       moved to ranges/; one of the same
+;;                                       name under ranges/ wins
 ;;   <owner>/<repo>/pr-<N>.org           one pull request's threads and
 ;;                                       drafted replies
+;;
+;; A range record's REPO is the GitHub name of the repository it was
+;; written in, empty where it has none, and its PR the pull request it
+;; was reviewed for.
 ;;
 ;; The view shows the walkthrough's chunks in order, each with its hunks
 ;; from `git diff BASE HEAD', the findings at the lines they are on, the
 ;; diagrams, and a pull request's threads and drafts.  It writes nothing
 ;; and runs no model.  Comments are made in `pr-review', and drafts are
-;; posted with `pr-loop post' from a terminal, which asks the operator
+;; posted with `agent-pr post' from a terminal, which asks the operator
 ;; to confirm each one.
 ;;
 ;; A record's free text comes from models, GitHub and test runs.  It is
@@ -48,17 +56,17 @@
 (defvar pr-review--pr-info)
 
 (defgroup review-guide nil
-  "Read the review records git delegate writes."
+  "Read the review records agent-review writes."
   :group 'tools)
 
 (defcustom review-guide-records-directory nil
-  "The directory `git delegate' and `pr-loop' keep review records in.
+  "The directory `agent-review' and `agent-pr' keep review records in.
 Nil means agent-tools/reviews under $XDG_STATE_HOME, else under
 ~/.local/state, which is where they compute it."
   :type '(choice (const :tag "Under $XDG_STATE_HOME" nil) directory))
 
 (defcustom review-guide-cache-directory nil
-  "The directory `git delegate' keeps pull requests' clones in.
+  "The directory `agent-review' keeps pull requests' clones in.
 A pull request's bare clone is <owner>/<repo>/<N>/clone under it.  Nil
 means pr-review under $XDG_CACHE_HOME, else under ~/.cache."
   :type '(choice (const :tag "Under $XDG_CACHE_HOME" nil) directory))
@@ -107,6 +115,21 @@ A path made of them stays inside the records directory.")
     (user-error "%s/%s is not a GitHub owner and repository" owner repo))
   (file-name-as-directory
    (expand-file-name (concat owner "/" repo) (review-guide-records-directory))))
+
+(defun review-guide--ranges-directory ()
+  "Return the directory agent-tools writes every range record in."
+  (file-name-as-directory (expand-file-name "ranges" (review-guide-records-directory))))
+
+(defun review-guide--range-directories (owner repo)
+  "Return the directories to read OWNER/REPO's range records from, in order.
+That is ranges/, then OWNER/REPO's own where OWNER is non-nil, which
+agent-tools wrote them in before it named them by their commits alone."
+  (cons (review-guide--ranges-directory)
+        (and owner (list (review-guide--repo-directory owner repo)))))
+
+(defun review-guide--searched (directories)
+  "Return DIRECTORIES as a refusal names where it looked."
+  (mapconcat #'abbreviate-file-name directories " and "))
 
 ;;;; Reading a record
 ;;
@@ -185,7 +208,7 @@ header lines or a block's start: Org acts on other keywords, such as
          ((and (string-match-p "\\`[ \t]*#\\+" line)
                (not (and (<= number 2)
                          (equal line (nth (1- number) review-guide--header-lines)))))
-          (user-error "%s:%d is not a line of a review record; git delegate writes it again once the file is deleted"
+          (user-error "%s:%d is not a line of a review record; agent-review writes it again once the file is deleted"
                       (abbreviate-file-name file) number))))
       (forward-line 1)
       (cl-incf number))
@@ -470,16 +493,26 @@ drafts not yet posted.  Either record may be nil."
          (string-match "github\\.com[:/]\\([^/]+\\)/\\([^/]+?\\)\\(?:\\.git\\)?/?\\'" url)
          (list (match-string 1 url) (match-string 2 url)))))
 
-(defun review-guide--range-files (directory)
-  "Return the range records in DIRECTORY as (FILE BASE HEAD)."
+(defun review-guide--range-files (directories)
+  "Return the range records in DIRECTORIES as (FILE BASE HEAD).
+Of records with the same name, the one in the earlier directory is taken."
   (let ((pattern (concat "\\`\\(" review-guide--sha-regexp "\\)\\.\\.\\("
-                         review-guide--sha-regexp "\\)\\.org\\'")))
-    (delq nil (mapcar (lambda (name)
-                        (and (string-match pattern name)
-                             (list (expand-file-name name directory)
-                                   (match-string 1 name) (match-string 2 name))))
-                      (and (file-directory-p directory)
-                           (directory-files directory nil "\\.org\\'"))))))
+                         review-guide--sha-regexp "\\)\\.org\\'"))
+        names files)
+    (dolist (directory directories)
+      (dolist (name (and (file-directory-p directory)
+                         (directory-files directory nil "\\.org\\'")))
+        (unless (member name names)
+          (when (string-match pattern name)
+            (push name names)
+            (push (list (expand-file-name name directory)
+                        (match-string 1 name) (match-string 2 name))
+                  files)))))
+    (nreverse files)))
+
+(defun review-guide--in-ranges-p (file)
+  "Return non-nil when FILE is under ranges/, a path naming no repository."
+  (equal (file-name-directory file) (review-guide--ranges-directory)))
 
 (defun review-guide--header-value (file property)
   "Return PROPERTY of the record FILE's top heading, read from its first lines.
@@ -507,6 +540,20 @@ on, in an example block, is free text."
                (string> (or (review-guide--header-value a "UPDATED") "")
                         (or (review-guide--header-value b "UPDATED") ""))))))
 
+(defun review-guide--record-name (file)
+  "Return (OWNER REPO) the range record FILE names in its REPO, or nil for none."
+  (let ((name (review-guide--header-value file "REPO")))
+    (cond
+     ((member name '(nil "")) nil)
+     ((string-match "\\`\\([^/]+\\)/\\([^/]+\\)\\'" name)
+      (let ((owner (match-string 1 name))
+            (repo (match-string 2 name)))
+        ;; Refuses names that would leave the records directory.
+        (review-guide--repo-directory owner repo)
+        (list owner repo)))
+     (t (user-error "%s names %s, which is no GitHub owner and repository"
+                    (abbreviate-file-name file) name)))))
+
 (defun review-guide--forge-head (owner repo number)
   "Return the head forge has for OWNER/REPO's pull request NUMBER, or nil."
   (ignore-errors
@@ -517,28 +564,37 @@ on, in an example block, is free text."
         (and pullreq (with-no-warnings (eieio-oref pullreq 'head-rev)))))))
 
 (defun review-guide--checkout (owner repo)
-  "Return the checkout of OWNER/REPO that `default-directory' is in, or nil."
+  "Return the checkout of OWNER/REPO that `default-directory' is in, or nil.
+GitHub's names match whatever their case."
   (let ((top (review-guide--git default-directory "rev-parse" "--show-toplevel")))
     (and top
-         (equal (review-guide--github-name top) (list owner repo))
+         (string-equal-ignore-case (string-join (review-guide--github-name top) "/")
+                                   (concat owner "/" repo))
          (file-name-as-directory top))))
 
 (defun review-guide--resolve-pr (owner repo number)
-  "Return the source plist of OWNER/REPO's pull request NUMBER."
+  "Return the source plist of OWNER/REPO's pull request NUMBER.
+A range record under ranges/ names no repository in its path, so it is
+taken only where its REPO, as well as its PR, is this pull request's."
   (let* ((directory (review-guide--repo-directory owner repo))
+         (directories (review-guide--range-directories owner repo))
          (pr-file (expand-file-name (format "pr-%d.org" number) directory))
          (ranges (seq-filter (lambda (file)
-                               (equal (review-guide--header-value file "PR")
-                                      (number-to-string number)))
-                             (mapcar #'car (review-guide--range-files directory))))
+                               (and (equal (review-guide--header-value file "PR")
+                                           (number-to-string number))
+                                    (or (not (review-guide--in-ranges-p file))
+                                        (string-equal-ignore-case
+                                         (or (review-guide--header-value file "REPO") "")
+                                         (concat owner "/" repo)))))
+                             (mapcar #'car (review-guide--range-files directories))))
          (head (review-guide--forge-head owner repo number))
          (at-head (and head (seq-filter (lambda (file)
                                           (string-suffix-p (concat ".." head ".org") file))
                                         ranges)))
          (range (review-guide--newest (or at-head ranges))))
     (unless (or range (file-exists-p pr-file))
-      (user-error "No review record of %s/%s#%d under %s; git delegate %s/%s#%d makes one"
-                  owner repo number (abbreviate-file-name directory) owner repo number))
+      (user-error "No review record of %s/%s#%d under %s; agent-review %s/%s#%d makes one"
+                  owner repo number (review-guide--searched directories) owner repo number))
     (when (and head range (not at-head))
       (message "No review of %s/%s#%d at its head %s; showing the newest, of %s"
                owner repo number (substring head 0 12)
@@ -553,15 +609,16 @@ on, in an example block, is free text."
 (defun review-guide--resolve-revisions (base head)
   "Return the source plist of the range BASE..HEAD.
 With BASE nil, HEAD is a branch, and its newest review is taken.
-Either is read in the checkout `default-directory' is in."
+Either is read in the checkout `default-directory' is in.  A record
+under ranges/ is of the repository its REPO names, and of none, with no
+pull request, where that is empty; one under OWNER/REPO is of the
+checkout's GitHub origin."
   (let* ((top (or (review-guide--git default-directory "rev-parse" "--show-toplevel")
                   (user-error "A range or branch is read in its checkout, and %s is in none"
                               (abbreviate-file-name default-directory))))
          (checkout (file-name-as-directory top))
-         (name (or (review-guide--github-name checkout)
-                   (user-error "%s has no GitHub origin, so no review records"
-                               (abbreviate-file-name checkout))))
-         (directory (review-guide--repo-directory (car name) (cadr name)))
+         (origin (review-guide--github-name checkout))
+         (directories (review-guide--range-directories (car origin) (cadr origin)))
          (sha (lambda (rev)
                 (or (review-guide--git checkout "rev-parse" "--verify" "--quiet"
                                        (concat rev "^{commit}"))
@@ -569,23 +626,34 @@ Either is read in the checkout `default-directory' is in."
          (head-sha (funcall sha head))
          (base-sha (and base (funcall sha base)))
          (file (if base
-                   (expand-file-name (concat base-sha ".." head-sha ".org") directory)
+                   (seq-find #'file-exists-p
+                             (mapcar (lambda (directory)
+                                       (expand-file-name (concat base-sha ".." head-sha ".org")
+                                                         directory))
+                                     directories))
                  (review-guide--newest
                   (mapcar #'car (seq-filter (lambda (range) (equal (nth 2 range) head-sha))
-                                            (review-guide--range-files directory)))))))
-    (unless (and file (file-exists-p file))
-      (user-error "No review of %s under %s; git delegate %s makes one"
+                                            (review-guide--range-files directories)))))))
+    (unless file
+      (user-error "No review of %s under %s; agent-review %s makes one"
                   (if base (concat base ".." head) head)
-                  (abbreviate-file-name directory)
+                  (review-guide--searched directories)
                   (if base (concat base ".." head) (concat "BASE.." head))))
-    (let* ((pr (review-guide--header-value file "PR"))
+    (let* ((name (if (review-guide--in-ranges-p file) (review-guide--record-name file) origin))
+           (pr (and name (review-guide--header-value file "PR")))
            (number (and pr (string-match-p "\\`[1-9][0-9]*\\'" pr) (string-to-number pr)))
-           (pr-file (and number (expand-file-name (format "pr-%d.org" number) directory))))
+           (pr-file (and number (expand-file-name (format "pr-%d.org" number)
+                                                  (review-guide--repo-directory
+                                                   (car name) (cadr name))))))
       (list :owner (car name) :repo (cadr name) :number number
             :range-file file
             :pr-file (and pr-file (file-exists-p pr-file) pr-file)
             :directory checkout
-            :checkout checkout
+            ;; A checkout of another repository than the record's is
+            ;; diffed in, but is no checkout of it to post from.
+            :checkout (and (string-equal-ignore-case (string-join name "/")
+                                                     (string-join origin "/"))
+                           checkout)
             :show (file-name-base file)))))
 
 (defun review-guide--parse-target (target)
@@ -616,20 +684,25 @@ That is (pr OWNER REPO N), (range BASE HEAD) or (branch REV)."
     (`(branch ,rev) (review-guide--resolve-revisions nil rev))))
 
 (defun review-guide--load (source)
-  "Read SOURCE's records, and return (RANGE PR), refusing any that name others."
-  (let* ((name (concat (plist-get source :owner) "/" (plist-get source :repo)))
+  "Read SOURCE's records, and return (RANGE PR), refusing any that name others.
+A range record's REPO is empty where SOURCE has no owner, and GitHub's
+names match whatever their case."
+  (let* ((name (if (plist-get source :owner)
+                   (concat (plist-get source :owner) "/" (plist-get source :repo))
+                 ""))
          (range (and (plist-get source :range-file)
                      (review-guide-read-range (plist-get source :range-file))))
          (pr (and (plist-get source :pr-file)
                   (review-guide-read-pr (plist-get source :pr-file)))))
     (when range
       (let ((file (review-guide-range-file range)))
-        (unless (and (equal (review-guide-range-repo range) name)
+        (unless (and (string-equal-ignore-case (or (review-guide-range-repo range) "") name)
                      (equal (concat (review-guide-range-base range) ".."
                                     (review-guide-range-head range))
                             (file-name-base file)))
           (user-error "%s names %s %s..%s, not what its path does"
-                      (abbreviate-file-name file) (review-guide-range-repo range)
+                      (abbreviate-file-name file)
+                      (or (review-guide-range-repo range) "no repository")
                       (review-guide-range-base range) (review-guide-range-head range)))))
     (when pr
       (unless (and (equal (review-guide-pr-repo pr) name)
@@ -639,7 +712,7 @@ That is (pr OWNER REPO N), (range BASE HEAD) or (branch REV)."
                     (review-guide-pr-repo pr) (review-guide-pr-number pr))))
     (list range pr)))
 
-;;;; Git and git delegate
+;;;; Git and agent-review
 
 (defun review-guide--diff (directory base head)
   "Return the hunks of `git diff BASE HEAD' in DIRECTORY.
@@ -660,7 +733,7 @@ can name either."
 
 (defun review-guide--mermaid-sources (json)
   "Return an alist from diagram ID to Mermaid, from JSON.
-JSON is the parsed output of `git delegate show'.  Every object holding
+JSON is the parsed output of `agent-review show'.  Every object holding
 string \"id\" and \"mermaid\" members gives one."
   (let (found)
     (cl-labels ((walk (value)
@@ -676,13 +749,13 @@ string \"id\" and \"mermaid\" members gives one."
     (nreverse found)))
 
 (defun review-guide--delegate-show (source)
-  "Return `git delegate show' of SOURCE's review as parsed JSON, or nil.
-It is run only where git-delegate is installed."
-  (when (executable-find "git-delegate")
+  "Return `agent-review show' of SOURCE's review as parsed JSON, or nil.
+It is run only where agent-review is installed."
+  (when (executable-find "agent-review")
     (let ((default-directory (or (plist-get source :checkout) (expand-file-name "~/"))))
       (with-temp-buffer
-        (when (eq 0 (process-file "git" nil (list t nil) nil
-                                  "delegate" "show" (plist-get source :show)))
+        (when (eq 0 (process-file "agent-review" nil (list t nil) nil
+                                  "show" (plist-get source :show)))
           (ignore-errors
             (json-parse-string (buffer-string) :object-type 'alist :array-type 'list
                                :null-object nil :false-object nil)))))))
@@ -905,7 +978,7 @@ at their lines."
                     (insert "\n"))
              (mermaid (review-guide--insert-text mermaid 'default 4))
              (t (review-guide--insert-text
-                 "git delegate show gave no Mermaid for it; its JSON:" 'shadow 4)
+                 "agent-review show gave no Mermaid for it; its JSON:" 'shadow 4)
                 (review-guide--insert-text (review-guide-diagram-json diagram)
                                            'default 4)))))
         (insert "\n")))))
@@ -1001,6 +1074,12 @@ at their lines."
                                  (plist-get counts :drafted)))))
      "; ")))
 
+(defun review-guide--name (source)
+  "Return the name SOURCE is shown by: OWNER/REPO, else the directory it diffs in."
+  (if (plist-get source :owner)
+      (concat (plist-get source :owner) "/" (plist-get source :repo))
+    (file-name-nondirectory (directory-file-name (plist-get source :directory)))))
+
 (defun review-guide--render ()
   "Draw the view from its records, keeping point near where it was."
   (let* ((source review-guide--source)
@@ -1018,7 +1097,7 @@ at their lines."
     (erase-buffer)
     (magit-insert-section (review-guide-root)
       (insert (propertize
-               (concat (plist-get source :owner) "/" (plist-get source :repo)
+               (concat (review-guide--name source)
                        (if range
                            (concat " " (substring (review-guide-range-base range) 0 12) ".."
                                    (substring (review-guide-range-head range) 0 12))
@@ -1033,7 +1112,7 @@ at their lines."
       (insert (propertize
                (substitute-command-keys
                 (concat "\\<review-guide-mode-map>\\[review-guide-pr-review]: comment in pr-review"
-                        "  \\[review-guide-post]: pr-loop post in a terminal"
+                        "  \\[review-guide-post]: agent-pr post in a terminal"
                         "  \\[review-guide-visit-record]: the record file"
                         "  \\[review-guide-refresh]: read again\n"))
                'face 'shadow))
@@ -1079,8 +1158,8 @@ at their lines."
                        number))))
 
 (defun review-guide-post ()
-  "Open a terminal running `pr-loop post' on the view's pull request.
-`pr-loop' shows each draft there and asks before posting it; nothing
+  "Open a terminal running `agent-pr post' on the view's pull request.
+`agent-pr' shows each draft there and asks before posting it; nothing
 is posted from Emacs.  It runs in the operator's checkout of the
 repository, which is asked for when the view was not opened in one."
   (interactive)
@@ -1093,8 +1172,8 @@ repository, which is asked for when the view was not opened in one."
                          (or (review-guide--checkout owner repo)
                              (user-error "That is no checkout of %s/%s" owner repo)))))
          (default-directory checkout)
-         (buffer (make-term (format "pr-loop post %s/%s#%d" owner repo number)
-                            "pr-loop" nil "post" (number-to-string number))))
+         (buffer (make-term (format "agent-pr post %s/%s#%d" owner repo number)
+                            "agent-pr" nil "post" (number-to-string number))))
     (with-current-buffer buffer
       (term-char-mode))
     (pop-to-buffer buffer)))
@@ -1128,7 +1207,7 @@ repository the view diffs in, so its file: links resolve there."
   "q" #'quit-window)
 
 (define-derived-mode review-guide-mode magit-section-mode "Review-Guide"
-  "Read a review record of `git delegate' and `pr-loop'.
+  "Read a review record of `agent-review' and `agent-pr'.
 
 \\{review-guide-mode-map}"
   :interactive nil
@@ -1155,8 +1234,7 @@ branch is read in the checkout `default-directory' is in."
                         nil nil default))))
   (let* ((source (review-guide--resolve target))
          (records (review-guide--load source))
-         (name (format "*review-guide %s/%s %s*" (plist-get source :owner)
-                       (plist-get source :repo)
+         (name (format "*review-guide %s %s*" (review-guide--name source)
                        (if (car records)
                            (let ((range (car records)))
                              (concat (substring (review-guide-range-base range) 0 12) ".."

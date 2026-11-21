@@ -108,7 +108,7 @@ diff --git lib/a.el lib/a.el
      "@@ -1 +1 @@\n-Old.\n+New.\n")))
 
 (defun review-guide-test--write (file contents)
-  "Write CONTENTS to FILE, making its directory, as git delegate would.
+  "Write CONTENTS to FILE, making its directory, as agent-review would.
 It is copied into place by cp, since the lock refuses Emacs's own writes
 into the records directory."
   (make-directory (file-name-directory file) t)
@@ -123,7 +123,7 @@ into the records directory."
 (defmacro review-guide-test--with-records (&rest body)
   "Run BODY with the records directory under a temp dir, holding the fixtures.
 Binds `root', `records' (owner/repo's directory of records), `range-file'
-and `pr-file'.  No git delegate or forge is asked anything."
+and `pr-file'.  No agent-review or forge is asked anything."
   (declare (indent 0))
   `(let* ((root (file-name-as-directory (make-temp-file "review-guide-" t)))
           (process-environment
@@ -345,7 +345,7 @@ and `pr-file'.  No git delegate or forge is asked anything."
                  "PRRT_kwDOAbc004  README.md  unresolved" "Draft, fix, posted [2026-10-20 Tue 15:05]"
                  "Rounds" "R1  codex (gpt-5.5), [2026-10-20 Tue 14:05], red-check session"
                  "Unverified:" "Dropped:" "R2  security (claude-opus-5-5)"))
-        ;; A diagram with no Mermaid from git delegate show is shown as its JSON.
+        ;; A diagram with no Mermaid from agent-review show is shown as its JSON.
         (should (string-search "{\"kind\": \"sequence\"" text))
         (should buffer-read-only)))))
 
@@ -386,6 +386,22 @@ and `pr-file'.  No git delegate or forge is asked anything."
         (should (string-search "    sequenceDiagram\n      main->>cache: Load\n" (buffer-string)))
         (should-not (string-search "its JSON" (buffer-string)))))))
 
+(ert-deftest review-guide-reads-json-from-agent-review ()
+  (review-guide-test--need-view)
+  ;; The CLI is built in nix-config; its real binary has a separate contract check.
+  (cl-letf (((symbol-function 'executable-find)
+             (lambda (program)
+               (should (equal program "agent-review"))
+               "/test/bin/agent-review"))
+            ((symbol-function 'process-file)
+             (lambda (program _infile _destination _display &rest args)
+               (should (equal program "agent-review"))
+               (should (equal args '("show" "owner/repo#12")))
+               (insert "{\"range\": {\"diagrams\": [{\"id\": \"D1\"}]}}")
+               0)))
+    (should (equal (review-guide--delegate-show '(:show "owner/repo#12"))
+                   '((range (diagrams ((id . "D1")))))))))
+
 (ert-deftest review-guide-opens-pr-review-and-a-terminal-for-post ()
   (review-guide-test--need-view)
   (review-guide-test--with-records
@@ -405,49 +421,69 @@ and `pr-file'.  No git delegate or forge is asked anything."
               (should (equal opened "https://github.com/owner/repo/pull/12"))
               (with-current-buffer "*review-guide owner/repo 9f8e7d6c5b4a..1a2b3c4d5e6f*"
                 (review-guide-post))
-              (should (equal term (list "pr-loop post owner/repo#12" "pr-loop" nil
+              (should (equal term (list "agent-pr post owner/repo#12" "agent-pr" nil
                                         '("post" "12") checkout))))
           (kill-buffer " *review-guide-test term*"))))))
+
+(defun review-guide-test--git (&rest args)
+  "Run git ARGS in `default-directory', unsigned, and return its output."
+  (with-temp-buffer
+    (unless (eq 0 (apply #'call-process "git" nil t nil
+                         "-c" "commit.gpgsign=false" "-c" "tag.gpgsign=false"
+                         "-c" "user.name=Test" "-c" "user.email=test@example.com"
+                         args))
+      (error "git %S: %s" args (buffer-string)))
+    (string-trim (buffer-string))))
+
+(defun review-guide-test--checkout (directory origin)
+  "Make a repository in DIRECTORY with two commits, and ORIGIN unless nil.
+Return (BASE HEAD), the two commits' full SHAs."
+  (make-directory directory t)
+  (let ((default-directory (file-name-as-directory directory)))
+    (review-guide-test--git "init" "-q")
+    (when origin
+      (review-guide-test--git "remote" "add" "origin" origin))
+    (review-guide-test--write (expand-file-name "a.txt") "one\n")
+    (review-guide-test--git "add" "a.txt")
+    (review-guide-test--git "commit" "-q" "-m" "One")
+    (review-guide-test--write (expand-file-name "a.txt") "one\ntwo\n")
+    (review-guide-test--git "commit" "-q" "-am" "Two")
+    (list (review-guide-test--git "rev-parse" "HEAD~1")
+          (review-guide-test--git "rev-parse" "HEAD"))))
+
+(defun review-guide-test--record (repo base head &rest changes)
+  "Return the range fixture as the record of REPO's BASE..HEAD.
+REPO is \"\" for a repository with no GitHub name, written as agent-tools
+writes it, an empty property.  CHANGES are :pr N (nil for none),
+:title T and :updated STAMP."
+  (let ((text (review-guide-test--fixture "review-record.org"))
+        (pr (if (plist-member changes :pr) (plist-get changes :pr) 12)))
+    (dolist (change `((":REPO: owner/repo" . ,(if (equal repo "") ":REPO:"
+                                                (concat ":REPO: " repo)))
+                      (,review-guide-test--base . ,base)
+                      (,review-guide-test--head . ,head)
+                      (":PR: 12\n" . ,(if pr (format ":PR: %d\n" pr) ""))
+                      (":TITLE: Cache the parsed config"
+                       . ,(concat ":TITLE: " (or (plist-get changes :title)
+                                                 "Cache the parsed config")))
+                      (":UPDATED: [2026-10-20 Tue 14:05]"
+                       . ,(concat ":UPDATED: " (or (plist-get changes :updated)
+                                                   "[2026-10-20 Tue 14:05]")))))
+      (unless (string-search (car change) text)
+        (error "The fixture holds no %S" (car change)))
+      (setq text (replace-regexp-in-string (regexp-quote (car change)) (cdr change) text t t)))
+    text))
 
 (ert-deftest review-guide-reads-a-range-and-a-branch-in-their-checkout ()
   (review-guide-test--need-view)
   (review-guide-test--with-records
-    (let* ((repo (file-name-as-directory (expand-file-name "proj" root)))
-           (git (lambda (&rest args)
-                  (with-temp-buffer
-                    (unless (eq 0 (apply #'call-process "git" nil t nil
-                                         "-c" "commit.gpgsign=false" "-c" "tag.gpgsign=false"
-                                         "-c" "user.name=Test" "-c" "user.email=test@example.com"
-                                         args))
-                      (error "git %S: %s" args (buffer-string)))
-                    (string-trim (buffer-string))))))
-      (make-directory repo)
-      (let ((default-directory repo))
-        (funcall git "init" "-q")
-        (funcall git "remote" "add" "origin" "git@github.com:own/proj.git")
-        (review-guide-test--write (expand-file-name "a.txt" repo) "one\n")
-        (funcall git "add" "a.txt")
-        (funcall git "commit" "-q" "-m" "One")
-        (review-guide-test--write (expand-file-name "a.txt" repo) "one\ntwo\n")
-        (funcall git "commit" "-q" "-am" "Two")
-        (let* ((base (funcall git "rev-parse" "HEAD~1"))
-               (head (funcall git "rev-parse" "HEAD"))
-               (file (expand-file-name (format "state/agent-tools/reviews/own/proj/%s..%s.org"
-                                               base head)
-                                       root)))
-          (review-guide-test--write
-           file
-           (replace-regexp-in-string
-            "^:PR: 12\n" ""
-            (replace-regexp-in-string
-             review-guide-test--head head
-             (replace-regexp-in-string
-              review-guide-test--base base
-              (replace-regexp-in-string ":REPO: owner/repo" ":REPO: own/proj"
-                                        (review-guide-test--fixture "review-record.org") t t)
-              t t)
-             t t)
-            t t))
+    (let ((repo (file-name-as-directory (expand-file-name "proj" root))))
+      (pcase-let ((`(,base ,head) (review-guide-test--checkout repo "git@github.com:own/proj.git")))
+        (let ((default-directory repo)
+              (file (expand-file-name (format "state/agent-tools/reviews/own/proj/%s..%s.org"
+                                              base head)
+                                      root)))
+          (review-guide-test--write file (review-guide-test--record "own/proj" base head :pr nil))
           (dolist (target (list (concat base ".." head) "HEAD"))
             (save-window-excursion
               (review-guide target)
@@ -463,6 +499,116 @@ and `pr-file'.  No git delegate or forge is asked anything."
                 (should (equal (file-truename default-directory) (file-truename repo))))))
           (should-error (review-guide (concat head ".." base)) :type 'user-error)
           (should-error (review-guide "-x") :type 'user-error))))))
+
+(ert-deftest review-guide-reads-a-range-under-ranges-without-a-github-origin ()
+  (review-guide-test--need-view)
+  (review-guide-test--with-records
+    (let ((repo (file-name-as-directory (expand-file-name "local" root))))
+      (pcase-let ((`(,base ,head) (review-guide-test--checkout repo nil)))
+        (let ((default-directory repo)
+              (ranges (expand-file-name "state/agent-tools/reviews/ranges/" root)))
+          ;; Before there is a record, the refusal names where it looked.
+          (should (string-search
+                   (abbreviate-file-name ranges)
+                   (cadr (should-error (review-guide (concat base ".." head))
+                                       :type 'user-error))))
+          (review-guide-test--write (expand-file-name (format "%s..%s.org" base head) ranges)
+                                    (review-guide-test--record "" base head :pr nil))
+          (dolist (target (list (concat base ".." head) "HEAD"))
+            (save-window-excursion
+              (review-guide target)
+              (let ((text (buffer-string)))
+                (should (string-prefix-p (format "local %s..%s  Cache the parsed config\n"
+                                                 (substring base 0 12) (substring head 0 12))
+                                         text))
+                (should (review-guide-test--order text "a.txt  @@ -1 +1,2 @@" "+two\n"))
+                (should-not (string-search "Threads of" text))
+                (should-error (review-guide-pr-review) :type 'user-error))))
+          ;; A REPO no GitHub name could be names no directory of records.
+          (review-guide-test--write (expand-file-name (format "%s..%s.org" base head) ranges)
+                                    (review-guide-test--record ".x/y" base head :pr nil))
+          (should (string-search "not a GitHub owner and repository"
+                                 (cadr (should-error (review-guide "HEAD")
+                                                     :type 'user-error)))))))))
+
+(ert-deftest review-guide-prefers-the-record-under-ranges ()
+  (review-guide-test--need-view)
+  (review-guide-test--with-records
+    (let ((repo (file-name-as-directory (expand-file-name "proj" root))))
+      (pcase-let ((`(,base ,head) (review-guide-test--checkout repo "https://github.com/own/proj")))
+        (let ((default-directory repo)
+              (name (format "%s..%s.org" base head))
+              (reviews (expand-file-name "state/agent-tools/reviews/" root)))
+          (review-guide-test--write (expand-file-name name (concat reviews "own/proj/"))
+                                    (review-guide-test--record "own/proj" base head
+                                                               :pr nil :title "Old place"))
+          (review-guide-test--write (expand-file-name name (concat reviews "ranges/"))
+                                    (review-guide-test--record "own/proj" base head
+                                                               :pr nil :title "New place"
+                                                               ;; Older, so the name decides.
+                                                               :updated "[2026-10-19 Mon 14:05]"))
+          (dolist (target (list (concat base ".." head) "HEAD"))
+            (save-window-excursion
+              (review-guide target)
+              (should (string-prefix-p (format "own/proj %s..%s  New place\n"
+                                               (substring base 0 12) (substring head 0 12))
+                                       (buffer-string)))))
+          ;; Written in a clone of another repository, it is that one's
+          ;; review, diffed here; this checkout is no place to post its
+          ;; drafts from.
+          (review-guide-test--write (expand-file-name name (concat reviews "ranges/"))
+                                    (review-guide-test--record "Other/Proj" base head))
+          (let ((source (review-guide--resolve "HEAD")))
+            (should (equal (list (plist-get source :owner) (plist-get source :repo)
+                                 (plist-get source :number))
+                           '("Other" "Proj" 12)))
+            (should (equal (file-truename (plist-get source :directory)) (file-truename repo)))
+            (should-not (plist-get source :checkout)))
+          ;; The same name in another case is the same GitHub repository.
+          (review-guide-test--write (expand-file-name name (concat reviews "ranges/"))
+                                    (review-guide-test--record "Own/Proj" base head))
+          (should (equal (file-truename (plist-get (review-guide--resolve "HEAD") :checkout))
+                         (file-truename repo)))
+          (should (equal (file-truename (review-guide--checkout "Own" "Proj"))
+                         (file-truename repo)))
+          ;; Written before the checkout had a GitHub origin, it is of no
+          ;; repository, and is shown by the directory it is diffed in.
+          (review-guide-test--write (expand-file-name name (concat reviews "ranges/"))
+                                    (review-guide-test--record "" base head :pr nil))
+          (save-window-excursion
+            (review-guide "HEAD")
+            (should (string-prefix-p (format "proj %s..%s  Cache the parsed config\n"
+                                             (substring base 0 12) (substring head 0 12))
+                                     (buffer-string)))))))))
+
+(ert-deftest review-guide-reads-a-pull-requests-records-under-ranges ()
+  (review-guide-test--need-view)
+  (review-guide-test--with-records
+    (let* ((ranges (expand-file-name "state/agent-tools/reviews/ranges/" root))
+           (ours (expand-file-name (concat review-guide-test--base ".."
+                                           review-guide-test--head ".org")
+                                   ranges))
+           (other-head "2b3c4d5e6f708192a3b4c5d6e7f8091234567890")
+           (theirs (expand-file-name (concat review-guide-test--base ".." other-head ".org")
+                                     ranges)))
+      (delete-file range-file)
+      (review-guide-test--write ours (review-guide-test--fixture "review-record.org"))
+      ;; Another repository's pull request 12, reviewed later: never ours.
+      (review-guide-test--write theirs (review-guide-test--record
+                                        "owner/other" review-guide-test--base other-head
+                                        :title "Another repository"
+                                        :updated "[2026-10-21 Wed 14:05]"))
+      (let ((source (review-guide--resolve "owner/repo#12")))
+        (should (equal (plist-get source :range-file) ours))
+        (should (equal (plist-get source :pr-file) pr-file)))
+      (should (equal (plist-get (review-guide--resolve "owner/other#12") :range-file) theirs))
+      (review-guide-test--in-view "owner/repo#12"
+        (should (string-prefix-p "owner/repo 9f8e7d6c5b4a..1a2b3c4d5e6f #12  Cache the parsed config\n"
+                                 (buffer-string))))
+      ;; With no record of it, the refusal names both places it looked.
+      (let ((message (cadr (should-error (review-guide "owner/repo#13") :type 'user-error))))
+        (should (string-search (abbreviate-file-name ranges) message))
+        (should (string-search (abbreviate-file-name records) message))))))
 
 ;;;; Visiting a record
 
@@ -573,10 +719,10 @@ Return the record's buffer."
       (save-window-excursion
         (with-current-buffer (review-guide-test--visit (list :range-file range-file))
           (should (equal buffer-file-name range-file))
-          (should (string-search "git delegate and pr-loop" header-line-format))
+          (should (string-search "agent-review and agent-pr" header-line-format))
           (let ((refused (should-error (let ((inhibit-read-only t)) (insert "edited\n"))
                                        :type 'user-error)))
-            (should (string-search "git delegate and pr-loop write" (cadr refused))))
+            (should (string-search "agent-review and agent-pr write" (cadr refused))))
           (goto-char (point-min))
           (re-search-forward "^\\*\\*\\* OPEN F1$")
           (ignore-errors
@@ -619,13 +765,13 @@ Return the record's buffer."
         (should (equal (review-guide-test--file-variables record t) '(org-mode)))
         (save-window-excursion
           (with-current-buffer (review-guide-test--visit (list :range-file record))
-            (should (string-search "git delegate and pr-loop" header-line-format))
+            (should (string-search "agent-review and agent-pr" header-line-format))
             (should-error (let ((inhibit-read-only t)) (insert "edited\n")) :type 'user-error)
             (kill-buffer)))
         (with-temp-buffer
           (should-error (write-region "x" nil (expand-file-name "new.org" (file-name-directory record)))
                         :type 'user-error))
-        ;; Where git delegate writes is held still.
+        ;; Where agent-review writes is held still.
         (with-temp-buffer
           (should-error (write-region "x" nil range-file) :type 'user-error))))))
 
